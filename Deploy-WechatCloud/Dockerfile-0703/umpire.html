@@ -1,0 +1,376 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pickle球 精英裁判管理大盘</title>
+   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ccircle cx='50' cy='50' r='45' fill='%23a3e635'/%3E%3Ccircle cx='50' cy='20' r='7' fill='%231e293b' opacity='0.4'/%3E%3Ccircle cx='30' cy='32' r='7' fill='%231e293b' opacity='0.4'/%3E%3Ccircle cx='70' cy='32' r='7' fill='%231e293b' opacity='0.4'/%3E%3Ccircle cx='18' cy='55' r='7' fill='%231e293b' opacity='0.4'/%3E%3Ccircle cx='82' cy='55' r='7' fill='%231e293b' opacity='0.4'/%3E%3Ccircle cx='35' cy='75' r='7' fill='%231e293b' opacity='0.4'/%3E%3Ccircle cx='65' cy='75' r='7' fill='%231e293b' opacity='0.4'/%3E%3Ccircle cx='50' cy='50' r='7' fill='%231e293b' opacity='0.4'/%3E%3Ccircle cx='50' cy='85' r='7' fill='%231e293b' opacity='0.4'/%3E%3C/svg%3E">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body { font-family: 'Inter', system-ui; background-color: #0f172a; color: white; }
+        .input-box { background: #1e293b; border: 1px solid #334155; padding: 0.35rem 0.5rem; border-radius: 0.25rem; color: white; width: 100%; outline: none; transition: border-color 0.2s; }
+        .input-box:focus { border-color: #10b981; }
+        .custom-scrollbar::-webkit-scrollbar { height: 6px; width: 6px; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: #475569; border-radius: 4px; }
+        .logout-btn { background: #dc2626; padding: 0.3rem 0.8rem; border-radius: 0.5rem; font-size: 0.75rem; font-weight: bold; cursor: pointer; border: none; color: white; transition: 0.2s; }
+        .logout-btn:hover { background: #b91c1c; }
+		.pb-icon {
+            display: inline-block;
+            width: 1.2em; 
+            height: 1.2em;
+            vertical-align: text-bottom;
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ccircle cx='50' cy='50' r='45' fill='%23a3e635'/%3E%3Ccircle cx='50' cy='20' r='7' fill='%231e293b' opacity='0.4'/%3E%3Ccircle cx='30' cy='32' r='7' fill='%231e293b' opacity='0.4'/%3E%3Ccircle cx='70' cy='32' r='7' fill='%231e293b' opacity='0.4'/%3E%3Ccircle cx='18' cy='55' r='7' fill='%231e293b' opacity='0.4'/%3E%3Ccircle cx='82' cy='55' r='7' fill='%231e293b' opacity='0.4'/%3E%3Ccircle cx='35' cy='75' r='7' fill='%231e293b' opacity='0.4'/%3E%3Ccircle cx='65' cy='75' r='7' fill='%231e293b' opacity='0.4'/%3E%3Ccircle cx='50' cy='50' r='7' fill='%231e293b' opacity='0.4'/%3E%3Ccircle cx='50' cy='85' r='7' fill='%231e293b' opacity='0.4'/%3E%3C/svg%3E");
+            background-size: contain;
+            background-repeat: no-repeat;
+        }
+    </style>
+</head>
+<body class="p-4 md:p-8 max-w-[1400px] mx-auto min-h-screen">
+
+    <!-- 鉴权隔离墙 -->
+    <div id="authPanel" class="bg-slate-800 p-8 rounded-2xl max-w-sm mx-auto mt-20 border border-slate-700 shadow-2xl text-center">
+        <h2 class="text-xl font-black text-amber-500 mb-6 flex items-center justify-center gap-2"><span>🔒</span> 裁判档案库门禁</h2>
+        <input type="text" id="eventCodeInput" class="w-full bg-slate-900 border border-slate-600 rounded-lg p-3 text-white mb-3 focus:border-blue-500 outline-none" placeholder="请输入赛事代码 (如 PICKLE01)">
+        <input type="password" id="pwdInput" class="w-full bg-slate-900 border border-slate-600 rounded-lg p-3 text-white mb-6 focus:border-blue-500 outline-none" placeholder="请输入本赛事的调度密码">
+        <button onclick="verify()" class="w-full bg-blue-600 hover:bg-blue-500 py-3 rounded-lg font-bold transition-all shadow-lg active:scale-95">验证并解锁</button>
+        <div class="text-[10px] text-slate-500 mt-4">裁判长和执裁人员均可凭赛区密码登入此空间</div>
+    </div>
+
+    <div id="mainPanel" class="hidden flex-col gap-6">
+        
+        <!-- 顶部工具栏（含退出按钮） -->
+        <div class="flex flex-col md:flex-row justify-between items-center bg-slate-800 p-5 rounded-xl border border-slate-700 shadow-lg">
+            <div class="flex items-center gap-3 mb-4 md:mb-0">
+                <div class="w-10 h-10 bg-amber-600 rounded-lg flex items-center justify-center font-black text-xl shadow-lg">👨‍⚖️</div>
+                <div>
+                    <h1 class="text-xl font-black text-amber-400">精英裁判大盘与履职纪录</h1>
+                    <p class="text-[10px] text-slate-400 mt-1">当前绑定赛事: <span id="eCode" class="font-mono text-emerald-400 font-bold bg-slate-900 px-2 py-0.5 rounded"></span></p>
+                </div>
+            </div>
+            <div class="flex gap-2">
+                <button onclick="batchDelete()" class="bg-orange-900/60 border border-orange-500/50 hover:bg-orange-800 text-orange-300 px-4 py-2 rounded-lg text-xs font-bold transition-colors shadow">🗑️ 批量除名</button>
+                <button onclick="logout()" class="logout-btn">🚪 退出</button>
+            </div>
+        </div>
+
+        <!-- ✨ 裁判个人自主报到区 ✨ -->
+        <div class="bg-indigo-900/40 p-6 rounded-xl border border-indigo-500/50 shadow-lg">
+            <h2 class="text-lg font-black text-indigo-300 mb-4 flex items-center gap-2"><span>🙋‍♂️</span> 裁判员现场报到与建档</h2>
+            <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4">
+                <div>
+                    <label class="text-[10px] text-slate-400 ml-1">真实姓名 (必填)</label>
+                    <input type="text" id="refCheckinName" class="input-box font-bold text-white py-2">
+                </div>
+                <div>
+                    <label class="text-[10px] text-slate-400 ml-1">身份证尾号 (必填)</label>
+                    <input type="text" id="refCheckinId4" class="input-box font-mono text-amber-300 py-2" maxlength="4">
+                </div>
+                <div>
+                    <label class="text-[10px] text-slate-400 ml-1">微信号 (可选，方便领补助)</label>
+                    <input type="text" id="refCheckinWx" class="input-box text-emerald-300 py-2">
+                </div>
+                <div>
+                    <label class="text-[10px] text-slate-400 ml-1">联系电话 (可选)</label>
+                    <input type="text" id="refCheckinPhone" class="input-box font-mono text-blue-300 py-2">
+                </div>
+            </div>
+            <button onclick="handleRefCheckin()" id="refCheckinBtn" class="w-full bg-indigo-600 hover:bg-indigo-500 py-3 rounded-xl font-bold text-sm shadow-md transition-all active:scale-95">✅ 确认信息并报到上岗 (此时主控台雷达将看到您)</button>
+        </div>
+
+        <!-- 裁判长高级管理大盘 -->
+        <div class="bg-slate-800 p-4 rounded-xl border border-slate-700 shadow-xl">
+            <div class="flex gap-4 mb-4">
+                <div class="relative w-full">
+                    <span class="absolute inset-y-0 left-0 flex items-center pl-3 text-slate-400">🔍</span>
+                    <input type="text" id="search" oninput="renderTable()" placeholder="全局检索 姓名 / 昵称 / 手机 / 微信 / 资质..." class="w-full bg-slate-900 border border-slate-600 rounded-lg p-2.5 pl-10 text-white font-bold outline-none focus:border-emerald-500 transition-colors">
+                </div>
+            </div>
+            
+            <div class="overflow-x-auto custom-scrollbar">
+                <table class="w-full text-left border-collapse min-w-[1000px]">
+                    <thead>
+                        <tr class="bg-slate-900/60 text-slate-400 text-xs tracking-widest uppercase">
+                            <th class="p-3 w-12 rounded-tl-lg text-center"><input type="checkbox" id="selectAll" onchange="toggleSelectAll()" class="w-4 h-4 accent-emerald-500 cursor-pointer"></th>
+                            <th class="p-3 w-32">姓名 / 昵称</th>
+                            <th class="p-3 w-32">通讯方式 (微信/电话)</th>
+                            <th class="p-3 w-28 text-center">资质/权值</th>
+                            <th class="p-3 w-24 text-center">总执裁量</th>
+                            <th class="p-3 w-64">裁判长专属考核评语</th>
+                            <th class="p-3 text-center w-28 rounded-tr-lg">荣誉操作</th>
+                        </tr>
+                    </thead>
+                    <tbody id="rBody" class="divide-y divide-slate-700/50 text-sm"></tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- 荣誉证书高清画板 -->
+    <div id="certModal" class="hidden fixed inset-0 bg-black/90 z-[9999] flex items-center justify-center p-4">
+        <div class="bg-slate-800 p-4 rounded-xl w-full max-w-lg border border-slate-600 relative shadow-2xl flex flex-col items-center">
+            <button onclick="document.getElementById('certModal').classList.add('hidden')" class="absolute top-2 right-2 text-white bg-red-600 hover:bg-red-500 transition-colors rounded-full w-8 h-8 flex items-center justify-center font-bold text-lg active:scale-95">&times;</button>
+            <h3 class="text-amber-400 font-black mb-3 text-lg">🏅 官方荣誉证书签发</h3>
+            <canvas id="certCanvas" width="800" height="600" class="w-full h-auto rounded-lg shadow-lg border-2 border-amber-500/50 mb-3 bg-white"></canvas>
+            <div class="text-xs text-emerald-300 font-bold animate-pulse bg-emerald-900/30 px-4 py-2 rounded-full w-full text-center">👆 长按上方生成的图片可保存或派发给裁判</div>
+        </div>
+    </div>
+
+    <script>
+        let referees = [];
+        let eventCode = '';
+        const $ = id => document.getElementById(id);
+
+        // ======================== 安全加固：登录与会话恢复 ========================
+        window.onload = async () => {
+            const urlParams = new URLSearchParams(window.location.search);
+            // 优先从 sessionStorage 恢复
+            let code = sessionStorage.getItem('pickle_master_code');
+            let pwd = sessionStorage.getItem('pickle_master_pwd');
+            if (!code) {
+                code = urlParams.get('code');
+                if (code) {
+                    sessionStorage.setItem('pickle_master_code', code.toUpperCase());
+                }
+            }
+            if (!pwd) {
+                pwd = urlParams.get('pwd');
+                if (pwd) {
+                    sessionStorage.setItem('pickle_master_pwd', pwd);
+                }
+            }
+            // 如果 sessionStorage 有凭据，自动填入并登录
+            if (code && pwd) {
+                document.getElementById('eventCodeInput').value = code;
+                document.getElementById('pwdInput').value = pwd;
+                // 清除 URL 参数
+                if (window.history && window.history.replaceState) {
+                    const url = new URL(window.location);
+                    url.searchParams.delete('code');
+                    url.searchParams.delete('pwd');
+                    window.history.replaceState({}, document.title, url.toString());
+                }
+                // 自动登录
+                setTimeout(verify, 100);
+            } else {
+                // 仅从 URL 填充（无 sessionStorage）
+                const urlCode = urlParams.get('code');
+                const urlPwd = urlParams.get('pwd');
+                if (urlCode) document.getElementById('eventCodeInput').value = urlCode;
+                if (urlPwd) document.getElementById('pwdInput').value = urlPwd;
+                if (urlCode || urlPwd) {
+                    if (window.history && window.history.replaceState) {
+                        const url = new URL(window.location);
+                        url.searchParams.delete('code');
+                        url.searchParams.delete('pwd');
+                        window.history.replaceState({}, document.title, url.toString());
+                    }
+                }
+            }
+        };
+
+        // ========== 登录验证 ==========
+        async function verify() {
+            const select = document.getElementById('eventCodeInput');
+            eventCode = select.value.trim().toUpperCase();
+            let pwd = document.getElementById('pwdInput').value;
+            if (!eventCode) return alert('请输入赛事代码');
+            if (!pwd) return alert('请输入密码');
+            
+            const btn = document.querySelector('#authPanel button');
+            btn.innerText = '穿透验证中...'; btn.disabled = true;
+            try {
+                let res = await fetch('/data.php?action=get_event_config&event_code=' + eventCode);
+                let data = await res.json();
+                if(data.status === 'success' && data.data.referee_password === pwd) {
+                    // 存储到 sessionStorage
+                    sessionStorage.setItem('pickle_master_code', eventCode);
+                    sessionStorage.setItem('pickle_master_pwd', pwd);
+                    document.getElementById('authPanel').classList.add('hidden');
+                    document.getElementById('mainPanel').classList.remove('hidden');
+                    document.getElementById('mainPanel').classList.add('flex');
+                    document.getElementById('eCode').innerText = eventCode;
+                    // 清除 URL 参数
+                    if (window.history && window.history.replaceState) {
+                        const url = new URL(window.location);
+                        url.searchParams.delete('code');
+                        url.searchParams.delete('pwd');
+                        window.history.replaceState({}, document.title, url.toString());
+                    }
+                    loadData();
+                } else {
+                    alert('❌ 鉴权失败：密码错误或赛事不存在！');
+                }
+            } catch(e) {
+                alert('网络通信错误');
+            }
+            btn.innerText = '验证并解锁数据库'; btn.disabled = false;
+        }
+
+        // ========== 退出登录 ==========
+        window.logout = () => {
+            sessionStorage.removeItem('pickle_master_code');
+            sessionStorage.removeItem('pickle_master_pwd');
+            location.reload();
+        };
+
+        // ========== 原有所有功能（完整保留） ==========
+        window.handleRefCheckin = async () => {
+            const name = document.getElementById('refCheckinName').value.trim();
+            const id4 = document.getElementById('refCheckinId4').value.trim();
+            const wechat = document.getElementById('refCheckinWx').value.trim();
+            const phone = document.getElementById('refCheckinPhone').value.trim();
+
+            if(!name || !id4) return alert('姓名和身份证尾号必填，以便财务结算核对！');
+
+            const btn = document.getElementById('refCheckinBtn'); btn.disabled = true; btn.innerText = '信息加密上传中...';
+
+            try {
+                let existing = referees.find(r => r.name === name);
+                if(existing) {
+                    existing.id_last4 = id4;
+                    if(wechat) existing.wechat = wechat;
+                    if(phone) existing.phone = phone;
+                    existing.last_login = new Date().toLocaleString();
+                    existing.status = '空闲';
+                } else {
+                    referees.unshift({
+                        name: name, id_last4: id4, wechat: wechat, phone: phone,
+                        level: 'L1', weight: '1.0', match_count: 0, comment: '',
+                        status: '空闲', last_login: new Date().toLocaleString()
+                    });
+                }
+
+                await fetch('/data.php', {
+                    method: 'POST', headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({ action: 'set_referees', event_code: eventCode, referees: referees })
+                });
+
+                alert('✅ 签到与建档成功！您现在可以打开裁判平板进行工作了。');
+                sessionStorage.setItem('pickle_ref_name', name);
+                
+                document.getElementById('refCheckinName').value = '';
+                document.getElementById('refCheckinId4').value = '';
+                loadData();
+            } catch(e) {
+                alert('签到失败，请重试');
+            }
+            btn.disabled = false; btn.innerText = '✅ 确认信息并报到上岗 (此时主控台雷达将看到您)';
+        };
+
+        async function loadData() {
+            try {
+                let res = await fetch('/data.php?action=get_referees&event_code=' + eventCode);
+                let data = await res.json();
+                if(data.status === 'success') {
+                    referees = data.data || []; renderTable();
+                }
+            } catch(e) { alert('云端数据拉取失败'); }
+        }
+
+        function renderTable() {
+            let s = document.getElementById('search').value.toLowerCase().trim();
+            let html = '';
+            
+            referees.forEach((r, i) => {
+                let matchStr = `${r.name||''} ${r.nickname||''} ${r.wechat||''} ${r.phone||''} ${r.level||''}`.toLowerCase();
+                if(s && !matchStr.includes(s)) return;
+                
+                html += `
+                <tr class="hover:bg-slate-800/40 transition-colors">
+                    <td class="p-2 text-center"><input type="checkbox" class="row-checkbox w-4 h-4 accent-emerald-500 cursor-pointer" value="${i}"></td>
+                    <td class="p-2">
+                        <input type="text" class="input-box font-bold mb-1" placeholder="真实姓名 (必填)" value="${r.name||''}" onchange="referees[${i}].name=this.value; syncRefRecord(${i});">
+                        <input type="text" class="input-box text-xs text-slate-400" placeholder="赛场昵称" value="${r.nickname||''}" onchange="referees[${i}].nickname=this.value; syncRefRecord(${i});">
+                    </td>
+                    <td class="p-2">
+                        <div class="flex items-center gap-1 mb-1"><span class="text-xs text-slate-500">Wx:</span><input type="text" class="input-box text-xs text-emerald-300 py-1" placeholder="微信号" value="${r.wechat||''}" onchange="referees[${i}].wechat=this.value; syncRefRecord(${i});"></div>
+                        <div class="flex items-center gap-1"><span class="text-xs text-slate-500">Ph:</span><input type="text" class="input-box text-xs font-mono text-blue-300 py-1" placeholder="手机号" value="${r.phone||''}" onchange="referees[${i}].phone=this.value; syncRefRecord(${i});"></div>
+                    </td>
+                    <td class="p-2 text-center">
+                        <select class="input-box text-xs font-bold text-center mb-1 appearance-none" onchange="referees[${i}].level=this.value; syncRefRecord(${i});">
+                            <option value="L1" ${r.level==='L1'?'selected':''}>L1 见习</option>
+                            <option value="L2" ${r.level==='L2'?'selected':''}>L2 认证</option>
+                            <option value="L3" ${r.level==='L3'?'selected':''}>L3 高级</option>
+                        </select>
+                        <input type="number" step="0.1" class="input-box text-xs text-pink-400 font-bold text-center py-1" placeholder="系统权重" value="${r.weight||'1.0'}" onchange="referees[${i}].weight=this.value; syncRefRecord(${i});">
+                    </td>
+                    <td class="p-2 text-center">
+                        <span class="text-2xl font-black text-amber-400 font-mono">${r.match_count||0}</span>
+                        <div class="text-[9px] text-slate-500 mt-1">登录: ${r.last_login?r.last_login.split(' ')[0]:'从未'}</div>
+                    </td>
+                    <td class="p-2">
+                        <textarea class="input-box text-xs text-slate-300 h-16 resize-none custom-scrollbar" placeholder="记录裁判长考核评语、优点、待改进项..." onchange="referees[${i}].comment=this.value; syncRefRecord(${i});">${r.comment||''}</textarea>
+                    </td>
+                    <td class="p-2 text-center">
+                        <button onclick="generateCertificate(${i})" class="w-full bg-gradient-to-r from-amber-600 to-orange-500 hover:from-amber-500 hover:to-orange-400 text-white py-2 rounded-lg text-xs font-black shadow-md transition-transform active:scale-95 mb-1">🏅 颁发证书</button>
+                    </td>
+                </tr>`;
+            });
+            
+            document.getElementById('rBody').innerHTML = html || '<tr><td colspan="7" class="p-8 text-center text-slate-500 italic">空空如也，请新增裁判或检查检索条件</td></tr>';
+        }
+
+        window.toggleSelectAll = () => {
+            let checked = document.getElementById('selectAll').checked;
+            document.querySelectorAll('.row-checkbox').forEach(cb => cb.checked = checked);
+        };
+
+        window.batchDelete = () => {
+            let cbs = document.querySelectorAll('.row-checkbox:checked');
+            if(cbs.length === 0) return alert('⚠️ 请先在列表左侧勾选要除名的裁判！');
+            if(!confirm(`确定要将选中的 ${cbs.length} 名裁判永久除名吗？`)) return;
+            
+            let indices = Array.from(cbs).map(cb => parseInt(cb.value)).sort((a,b)=>b-a);
+            indices.forEach(idx => referees.splice(idx, 1));
+            
+            document.getElementById('selectAll').checked = false;
+            
+            fetch('/data.php', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ action: 'set_referees', event_code: eventCode, referees: referees }) }).then(()=>{ renderTable(); });
+        };
+
+        window.syncRefRecord = async (idx) => {
+            await fetch('/data.php', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ action: 'set_referees', event_code: eventCode, referees: referees }) });
+        };
+
+        window.generateCertificate = (idx) => {
+            let r = referees[idx];
+            if(!r.name) return alert('请先填写裁判姓名！');
+            
+            document.getElementById('certModal').classList.remove('hidden'); 
+            const canvas = document.getElementById('certCanvas'); const ctx = canvas.getContext('2d');
+            ctx.fillStyle = '#1e293b'; ctx.fillRect(0, 0, 800, 600); 
+            ctx.strokeStyle = '#fbbf24'; ctx.lineWidth = 10; ctx.strokeRect(15, 15, 770, 570); 
+            ctx.strokeStyle = '#f59e0b'; ctx.lineWidth = 2;  ctx.strokeRect(22, 22, 756, 556);
+            
+            ctx.textAlign = 'center'; ctx.fillStyle = '#fbbf24'; ctx.font = 'bold 42px "SimHei", sans-serif'; 
+            ctx.fillText('🏆 优秀裁判员证书', 400, 100); 
+            ctx.fillStyle = '#94a3b8'; ctx.font = '16px "SimHei", sans-serif'; 
+            ctx.fillText('HONORARY CERTIFICATE', 400, 130);
+            
+            ctx.textAlign = 'left'; ctx.fillStyle = '#f1f5f9'; ctx.font = 'bold 24px "SimHei", sans-serif'; 
+            ctx.fillText(`兹证明：${r.name} ${r.level ? '('+r.level+')' : ''}`, 100, 220);
+            
+            ctx.font = '20px "SimHei", sans-serif'; ctx.fillStyle = '#cbd5e1'; 
+            ctx.fillText(`在执裁期间表现优异，专业且公正，`, 100, 270); 
+            ctx.fillText(`累计圆满完成赛事执裁工作：`, 100, 310);
+            
+            ctx.fillStyle = '#fbbf24'; ctx.font = 'bold 36px "Arial", sans-serif'; 
+            ctx.fillText(r.match_count || 0, 330, 312); 
+            ctx.fillStyle = '#cbd5e1'; ctx.font = '20px "SimHei", sans-serif'; 
+            ctx.fillText('场次。', 330 + ctx.measureText(String(r.match_count||0)).width + 10, 310);
+            
+            if(r.comment) { 
+                ctx.fillStyle = '#0f172a'; ctx.fillRect(100, 350, 600, 80); 
+                ctx.strokeStyle = '#334155'; ctx.lineWidth = 1; ctx.strokeRect(100, 350, 600, 80); 
+                ctx.fillStyle = '#10b981'; ctx.font = 'bold 18px "SimHei", sans-serif'; ctx.fillText('主裁官方评语：', 120, 380); 
+                ctx.fillStyle = '#f8fafc'; ctx.font = 'italic 18px "SimHei", sans-serif'; ctx.fillText(`"${r.comment}"`, 120, 410); 
+            }
+            
+            ctx.textAlign = 'right'; ctx.fillStyle = '#94a3b8'; ctx.font = '16px "SimHei", sans-serif'; 
+            ctx.fillText('Pickle球赛事管理系统 赛事法务管理中心签发', 700, 520); 
+            let dateStr = `${new Date().getFullYear()}年${new Date().getMonth()+1}月${new Date().getDate()}日`; 
+            ctx.fillText(`签发日期：${dateStr}`, 700, 550);
+        };
+    </script>
+</body>
+</html>

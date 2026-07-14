@@ -1,0 +1,367 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Pickle球 专属赛事实况大屏</title>
+    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ccircle cx='50' cy='50' r='45' fill='%23a3e635'/%3E%3Ccircle cx='50' cy='20' r='7' fill='%231e293b' opacity='0.4'/%3E%3Ccircle cx='30' cy='32' r='7' fill='%231e293b' opacity='0.4'/%3E%3Ccircle cx='70' cy='32' r='7' fill='%231e293b' opacity='0.4'/%3E%3Ccircle cx='18' cy='55' r='7' fill='%231e293b' opacity='0.4'/%3E%3Ccircle cx='82' cy='55' r='7' fill='%231e293b' opacity='0.4'/%3E%3Ccircle cx='35' cy='75' r='7' fill='%231e293b' opacity='0.4'/%3E%3Ccircle cx='65' cy='75' r='7' fill='%231e293b' opacity='0.4'/%3E%3Ccircle cx='50' cy='50' r='7' fill='%231e293b' opacity='0.4'/%3E%3Ccircle cx='50' cy='85' r='7' fill='%231e293b' opacity='0.4'/%3E%3C/svg%3E">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body { font-family: 'Inter', system-ui; background: #020617; color: white; margin: 0; padding: 0; }
+        .glass { background: rgba(30, 41, 59, 0.7); backdrop-filter: blur(10px); border: 1px solid rgba(255,255,255,0.05); }
+        .pulse-dot { width: 8px; height: 8px; background-color: #10b981; border-radius: 50%; display: inline-block; animation: pulse 1.5s infinite; }
+        @keyframes pulse { 0% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.7); } 70% { box-shadow: 0 0 0 10px rgba(16, 185, 129, 0); } 100% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0); } }
+        .score-num { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace; font-weight: 900; }
+        .fade-in { animation: fadeIn 0.5s ease-in; }
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+        .pb-icon {
+            display: inline-block;
+            width: 1.2em;
+            height: 1.2em;
+            vertical-align: text-bottom;
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ccircle cx='50' cy='50' r='45' fill='%23a3e635'/%3E%3Ccircle cx='50' cy='20' r='7' fill='%231e293b' opacity='0.4'/%3E%3Ccircle cx='30' cy='32' r='7' fill='%231e293b' opacity='0.4'/%3E%3Ccircle cx='70' cy='32' r='7' fill='%231e293b' opacity='0.4'/%3E%3Ccircle cx='18' cy='55' r='7' fill='%231e293b' opacity='0.4'/%3E%3Ccircle cx='82' cy='55' r='7' fill='%231e293b' opacity='0.4'/%3E%3Ccircle cx='35' cy='75' r='7' fill='%231e293b' opacity='0.4'/%3E%3Ccircle cx='65' cy='75' r='7' fill='%231e293b' opacity='0.4'/%3E%3Ccircle cx='50' cy='50' r='7' fill='%231e293b' opacity='0.4'/%3E%3Ccircle cx='50' cy='85' r='7' fill='%231e293b' opacity='0.4'/%3E%3C/svg%3E");
+            background-size: contain;
+            background-repeat: no-repeat;
+        }
+        .filter-group { display: flex; align-items: center; gap: 0.5rem; background: rgba(30, 41, 59, 0.8); padding: 0.2rem 0.6rem; border-radius: 0.5rem; border: 1px solid #334155; }
+        .filter-group select { background: transparent; border: none; color: #fbbf24; font-weight: 700; font-size: 0.75rem; outline: none; padding: 0.2rem 0; }
+        .filter-group span { color: #94a3b8; font-size: 0.7rem; }
+    </style>
+</head>
+<body class="min-h-screen flex flex-col p-4 md:p-8">
+
+    <div id="setupPanel" class="flex-grow flex flex-col items-center justify-center">
+        <div class="glass p-8 rounded-2xl w-full max-w-sm text-center shadow-2xl">
+            <h1 class="text-3xl font-black text-emerald-400 mb-2">赛事转播大屏</h1>
+            <p class="text-slate-400 text-sm mb-6">请输入裁判长分配的赛事码</p>
+            <input type="text" id="eventCode" class="w-full bg-slate-900 border border-slate-700 p-3 rounded-lg text-center text-xl font-bold uppercase tracking-widest mb-6 focus:border-emerald-500 focus:outline-none" placeholder="赛事代码">
+            <button onclick="startDashboard()" class="w-full bg-emerald-600 hover:bg-emerald-500 py-3 rounded-lg font-bold text-lg transition-transform active:scale-95 shadow-lg shadow-emerald-900/50">接入实时信号</button>
+        </div>
+    </div>
+
+    <div id="dashPanel" class="hidden flex-col h-full w-full max-w-7xl mx-auto">
+
+        <div id="topNoticeBox" class="fade-in" style="display: none; flex-direction: column; width: 100%; margin-bottom: 20px; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 6px rgba(0,0,0,0.3); border: 1px solid #14b8a6; background: rgba(13, 148, 136, 0.2);">
+            <img id="topNoticeImg" src="" style="display: none; width: 100%; height: 180px; object-fit: contain; object-position: center;">
+            <div id="topNoticeText" style="display: none; padding: 12px; text-align: center; color: #ccfbf1; font-weight: bold; letter-spacing: 2px; font-size: 1.1rem; background: rgba(15, 23, 42, 0.8);"></div>
+        </div>
+
+        <header class="flex justify-between items-center mb-6 pb-4 border-b border-slate-800 flex-wrap gap-2">
+            <div class="flex items-center gap-3">
+                <div class="w-10 h-10 bg-emerald-500/20 text-emerald-400 rounded-lg flex items-center justify-center text-xl"><i class="pb-icon"></i></div>
+                <div>
+                    <h1 class="text-2xl font-black tracking-tight" id="eventNameDisplay">Pickle球 实况中心</h1>
+                    <div class="text-xs text-slate-400 mt-1 flex items-center gap-2">
+                        <span class="pulse-dot"></span> LIVE BROADCAST
+                    </div>
+                </div>
+            </div>
+            <div class="flex items-center gap-3 flex-wrap">
+                <!-- 日期筛选 -->
+                <div class="filter-group">
+                    <span>📅</span>
+                    <select id="dateFilter" onchange="fetchData()">
+                        <option value="">全部</option>
+                    </select>
+                </div>
+                <div class="text-right">
+                    <div class="text-3xl font-black font-mono text-emerald-400 tracking-widest" id="clock">00:00:00</div>
+                    <div class="text-[10px] text-slate-500 mt-1" id="dateStr"></div>
+                </div>
+            </div>
+        </header>
+
+        <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+            <div class="lg:col-span-8">
+                <h2 class="text-sm font-bold text-slate-400 uppercase tracking-widest mb-4 flex items-center gap-2"><span>⚔️</span> 激战焦点赛区</h2>
+                <div id="liveCourts" class="grid grid-cols-1 md:grid-cols-2 gap-4"></div>
+            </div>
+
+            <div class="lg:col-span-4 space-y-6">
+                <div class="glass rounded-xl p-5 border border-indigo-500/30 bg-indigo-900/10">
+                    <h2 class="text-xs font-bold text-indigo-400 uppercase tracking-widest mb-3 flex items-center gap-2"><span>📢</span> 裁判长通报</h2>
+                    <div id="broadcastMsg" class="text-sm font-bold text-indigo-100 leading-relaxed whitespace-pre-wrap">暂无最新通知</div>
+                </div>
+
+                <div class="glass rounded-xl p-5">
+                    <h2 class="text-xs font-bold text-slate-400 uppercase tracking-widest mb-4 flex items-center gap-2"><span>🏆</span> 最新完赛战报</h2>
+                    <div id="finishedMatches" class="space-y-3 max-h-[500px] overflow-y-hidden relative">
+                        <div class="absolute bottom-0 left-0 right-0 h-16 bg-gradient-to-t from-[#0f172a]/90 to-transparent pointer-events-none"></div>
+                        <div id="finishedScrollArea" class="space-y-3 pb-8"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const API = '/data.php';
+        let eventCode = '';
+        let sysMode = 'ind';
+        let currentNoticeArray = [];
+        let carouselIdx = 0;
+        let carouselTimer = null;
+
+        setInterval(() => {
+            const now = new Date();
+            document.getElementById('clock').innerText = now.toTimeString().split(' ')[0];
+            document.getElementById('dateStr').innerText = now.toLocaleDateString();
+        }, 1000);
+
+        window.onload = () => {
+            const urlParams = new URLSearchParams(window.location.search);
+            const code = urlParams.get('code');
+            if (code) {
+                document.getElementById('eventCode').value = code.toUpperCase();
+                setTimeout(() => startDashboard(), 300);
+            }
+        };
+
+        async function startDashboard() {
+            const code = document.getElementById('eventCode').value.trim().toUpperCase();
+            if (!code) return alert('请输入赛事代码');
+            eventCode = code;
+
+            try {
+                const confRes = await fetch(`${API}?action=get_event_config&event_code=${eventCode}`);
+                const confData = await confRes.json();
+                if (confData.status === 'success') {
+                    sysMode = confData.data.event_type || 'ind';
+                    document.getElementById('eventNameDisplay').innerText = confData.data.event_name || 'Pickle球 实况中心';
+                } else {
+                    alert('赛事不存在或网络异常');
+                    return;
+                }
+            } catch (e) {
+                alert('无法连接到服务器，请检查网络');
+                return;
+            }
+
+            document.getElementById('setupPanel').classList.add('hidden');
+            document.getElementById('dashPanel').classList.remove('hidden');
+            document.getElementById('dashPanel').classList.add('flex');
+
+            if (window.history && window.history.replaceState) {
+                const url = new URL(window.location);
+                url.searchParams.delete('code');
+                url.searchParams.delete('pwd');
+                window.history.replaceState({}, document.title, url.toString());
+            }
+
+            fetchNotice();
+            fetchData();
+            setInterval(fetchData, 4000);
+            setInterval(fetchNotice, 10000);
+        }
+
+        function renderCurrentNotice() {
+            const container = document.getElementById('topNoticeBox');
+            if (currentNoticeArray.length === 0) { container.style.display = 'none'; return; }
+
+            let n = currentNoticeArray[carouselIdx];
+            const imgNode = document.getElementById('topNoticeImg');
+            const txtNode = document.getElementById('topNoticeText');
+
+            let hasContent = false;
+
+            container.classList.remove('fade-in');
+            void container.offsetWidth;
+            container.classList.add('fade-in');
+
+            if (n.image && n.image.startsWith('data:image')) {
+                imgNode.src = n.image;
+                imgNode.style.display = 'block';
+                hasContent = true;
+            } else {
+                imgNode.style.display = 'none';
+            }
+
+            if (n.text && n.text.trim() !== '') {
+                txtNode.innerText = n.text;
+                txtNode.style.display = 'block';
+                hasContent = true;
+            } else {
+                txtNode.style.display = 'none';
+            }
+
+            container.style.display = hasContent ? 'flex' : 'none';
+        }
+
+        function nextNotice() {
+            if (currentNoticeArray.length <= 1) return;
+            carouselIdx = (carouselIdx + 1) % currentNoticeArray.length;
+            renderCurrentNotice();
+        }
+
+        async function fetchNotice() {
+            if (!eventCode) return;
+            try {
+                const res = await fetch(`${API}?action=get_event_notice&event_code=${eventCode}&_t=${Date.now()}`);
+                const data = await res.json();
+
+                if (data.status === 'success' && data.data) {
+                    let rawArr = Array.isArray(data.data) ? data.data : [data.data];
+                    let newArr = rawArr.filter(n => (n.text && n.text.trim() !== '') || (n.image && n.image.startsWith('data:image')));
+
+                    if (JSON.stringify(newArr) !== JSON.stringify(currentNoticeArray)) {
+                        currentNoticeArray = newArr;
+                        carouselIdx = 0;
+                        renderCurrentNotice();
+                        if (carouselTimer) clearInterval(carouselTimer);
+                        if (currentNoticeArray.length > 1) {
+                            carouselTimer = setInterval(nextNotice, 6000);
+                        }
+                    }
+                }
+            } catch (e) {}
+        }
+
+        async function fetchData() {
+            if (!eventCode) return;
+            try {
+                const res = await fetch(`${API}?action=get_full_dashboard&event_code=${eventCode}`);
+                const data = await res.json();
+
+                if (data.status === 'success') {
+                    // 更新日期下拉框
+                    let dates = new Set();
+                    (data.tasks || []).forEach(t => { if (t.date) dates.add(t.date); });
+                    let dateSelect = document.getElementById('dateFilter');
+                    let currentVal = dateSelect.value;
+                    dateSelect.innerHTML = '<option value="">全部</option>';
+                    let sortedDates = Array.from(dates).sort();
+                    sortedDates.forEach(d => {
+                        let opt = document.createElement('option');
+                        opt.value = d;
+                        opt.textContent = d;
+                        if (d === currentVal) opt.selected = true;
+                        dateSelect.appendChild(opt);
+                    });
+                    if (currentVal && !dates.has(currentVal)) {
+                        dateSelect.value = '';
+                    }
+                    let selectedDate = dateSelect.value;
+
+                    // 过滤任务（用于场地显示和完赛记录匹配）
+                    let tasks = data.tasks || {};
+                    let tasksArr = Object.values(tasks);
+                    if (selectedDate) {
+                        tasksArr = tasksArr.filter(t => t.date === selectedDate);
+                    }
+
+                    // 构建场地卡片
+                    let courtsHtml = '';
+                    let courts = data.courts || {};
+                    let liveScores = data.live_scores || {};
+                    let referees = data.referees || [];
+
+                    // 为每个场地构建任务队列（仅显示当天任务）
+                    let courtTasksMap = {};
+                    for (let c in courts) { courtTasksMap[c] = []; }
+                    tasksArr.forEach(t => {
+                        let court = t.court || '';
+                        if (court && courtTasksMap[court]) {
+                            courtTasksMap[court].push(t);
+                        }
+                    });
+
+                    for (let c in courts) {
+                        let info = courts[c];
+                        let isLive = info.status === '比赛中';
+                        let cTasks = courtTasksMap[c] || [];
+
+                        // 场地头部显示当前正在进行的比赛（无论是否当天，只要 status 为比赛中）
+                        let liveInfo = null;
+                        if (isLive && info.match_id) {
+                            let liveTask = tasks[info.match_id];
+                            if (liveTask) {
+                                liveInfo = {
+                                    match_name: info.match_name || '自由匹配',
+                                    score: info.score || '...',
+                                    referee: info.referee || '未知'
+                                };
+                            }
+                        }
+
+                        let headerClass = isLive ? 'bg-emerald-900/40 border-b border-emerald-500/50' : 'bg-slate-800/80 border-b border-slate-700';
+                        
+                        let liveInfoHtml = liveInfo ? `
+                            <div class="mt-2 pt-2 border-t border-emerald-500/20">
+                                <div class="text-[10px] text-emerald-200 truncate mb-1">${liveInfo.match_name}</div>
+                                <div class="text-xl font-black text-emerald-400 font-mono tracking-wider drop-shadow-md">${liveInfo.score}</div>
+                                <div class="text-[9px] text-slate-400 mt-1 text-right">👨‍⚖️ 主裁: ${liveInfo.referee}</div>
+                            </div>
+                        ` : `<div class="mt-2 pt-2 border-t border-slate-700 text-xs text-slate-500 italic text-center py-2">无进行中对局</div>`;
+
+                        courtsHtml += `
+                        <div class="bg-slate-800/40 p-4 rounded-xl border ${isLive ? 'border-emerald-500/50 shadow-[0_0_15px_rgba(16,185,129,0.15)]' : 'border-slate-700/50'} flex flex-col justify-between">
+                            <div class="flex justify-between items-start mb-2">
+                                <div class="font-black text-amber-400 text-xl tracking-wider"># ${c}</div>
+                                <div class="text-[10px] font-bold px-2 py-1 rounded ${isLive ? 'bg-emerald-900/80 text-emerald-300' : 'bg-slate-700 text-slate-400'}">${info.status}</div>
+                            </div>
+                            ${liveInfoHtml}
+                            <div class="mt-2 text-[10px] text-slate-500 border-t border-slate-700/30 pt-1">
+                                今日 ${cTasks.length} 场
+                            </div>
+                        </div>`;
+                    }
+
+                    // 游离场（不受日期过滤影响，仍显示所有游离的比赛）
+                    if (data.tasks) {
+                        Object.values(data.tasks).forEach(t => {
+                            // 如果选中了日期，且该任务不在该日期，则跳过显示（但游离场仍显示所有比赛中？这里我们仅显示当天的游离场）
+                            if (selectedDate && t.date !== selectedDate) return;
+                            if (t.status === '比赛中' && (!t.court || t.court.trim() === '')) {
+                                courtsHtml += `<div class="bg-slate-800/40 p-4 rounded-xl border border-indigo-500/50 shadow-[0_0_15px_rgba(99,102,241,0.15)] flex flex-col justify-between">
+                                    <div class="flex justify-between items-start mb-2">
+                                        <div class="font-black text-indigo-400 text-xl tracking-wider"># 游离场</div>
+                                        <div class="text-[10px] font-bold px-2 py-1 rounded bg-indigo-900/80 text-indigo-300">比赛中</div>
+                                    </div>
+                                    <div class="text-xs text-slate-300 mb-1 truncate">${t.t1} vs ${t.t2}</div>
+                                    <div class="text-2xl font-black text-emerald-400 score-num truncate my-auto py-2">${t.live_score || '正在记分'}</div>
+                                    <div class="text-[10px] text-slate-500 mt-auto text-right">🆔 任务: ${t.id}</div>
+                                </div>`;
+                            }
+                        });
+                    }
+
+                    document.getElementById('liveCourts').innerHTML = courtsHtml || `<div class="col-span-full glass p-10 rounded-xl text-center text-slate-500 italic">当前各场地均在休整或备赛中...</div>`;
+
+                    // 完赛记录 - 根据日期过滤
+                    let recordsArr = data.records || [];
+                    // 根据 sysMode 过滤
+                    recordsArr = recordsArr.filter(r => sysMode === 'team' ? r.is_team === true : r.is_team !== true);
+                    // 日期过滤：需要从 tasks 中获取日期
+                    if (selectedDate) {
+                        let tasksMap = {};
+                        (data.tasks || []).forEach(t => { tasksMap[t.id] = t; });
+                        recordsArr = recordsArr.filter(r => {
+                            let task = tasksMap[r.id];
+                            return task && task.date === selectedDate;
+                        });
+                    }
+                    recordsArr = recordsArr.slice(0, 15);
+
+                    let recHtml = recordsArr.map(r => `
+                        <div class="bg-slate-800/40 p-3 rounded-lg border border-slate-700/50">
+                            <div class="flex justify-between items-center mb-1">
+                                <span class="text-xs font-bold text-slate-300">${r.id} <span class="text-slate-500 ml-1">#${r.court}</span></span>
+                                <span class="text-sm score-num text-emerald-400">${r.score}</span>
+                            </div>
+                            <div class="text-[10px] text-slate-400 truncate">${r.t1} <span class="mx-1 text-slate-600">vs</span> ${r.t2}</div>
+                        </div>
+                    `).join('');
+                    document.getElementById('finishedScrollArea').innerHTML = recHtml || '<div class="text-xs text-slate-500 text-center py-4">等待首场对决战报...</div>';
+
+                    // 获取广播消息
+                    const bRes = await fetch(`${API}?action=get_broadcast&event_code=${eventCode}`);
+                    const bData = await bRes.json();
+                    if (bData.status === 'success') {
+                        document.getElementById('broadcastMsg').innerText = bData.message ? bData.message : '暂无最新通知';
+                    }
+                }
+            } catch (e) {}
+        }
+    </script>
+</body>
+</html>

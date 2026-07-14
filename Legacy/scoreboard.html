@@ -1,0 +1,551 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pickle球 直播计分板</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            background: transparent;
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            overflow: hidden;
+        }
+
+        .scoreboard {
+            background: rgba(0, 0, 0, 0.82);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border-radius: 16px;
+            padding: 18px 28px 14px 28px;
+            min-width: 680px;
+            max-width: 960px;
+            width: 100%;
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.6);
+            transition: all 0.3s ease;
+        }
+
+        /* 顶部：赛事名称 */
+        .match-title {
+            text-align: center;
+            font-size: 14px;
+            font-weight: 600;
+            color: rgba(255, 255, 255, 0.5);
+            letter-spacing: 1.5px;
+            padding-bottom: 10px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+            margin-bottom: 12px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        /* 主体 */
+        .match-body {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 16px;
+        }
+
+        .team {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-width: 0;
+        }
+        .team-left {
+            align-items: flex-end;
+            text-align: right;
+        }
+        .team-right {
+            align-items: flex-start;
+            text-align: left;
+        }
+
+        /* 队员名 + 队名（自动缩小） */
+        .team-name-wrapper {
+            max-width: 220px;
+            width: 100%;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            font-size: 24px;
+            font-weight: 700;
+            line-height: 1.2;
+            /* 动态字号：如果名字太长，自动缩小 */
+            transition: font-size 0.2s;
+        }
+        /* 对于超长名字，通过JS动态调整字号，下面用clamp备用 */
+        .team-name-wrapper .player-name {
+            color: #ffffff;
+        }
+        .team-left .team-name-wrapper .player-name {
+            color: #60a5fa;
+        }
+        .team-right .team-name-wrapper .player-name {
+            color: #34d399;
+        }
+        .team-name-wrapper .team-tag {
+            color: rgba(255, 255, 255, 0.4);
+            font-weight: 400;
+            font-size: 0.7em;
+            margin-left: 4px;
+        }
+        /* 长名字自动缩小 */
+        .team-name-wrapper.long-text {
+            font-size: 18px;
+        }
+        .team-name-wrapper.very-long-text {
+            font-size: 15px;
+        }
+
+        .team-score {
+            font-size: 52px;
+            font-weight: 900;
+            line-height: 1;
+            margin-top: 2px;
+            font-variant-numeric: tabular-nums;
+            letter-spacing: -2px;
+        }
+        .team-left .team-score {
+            color: #60a5fa;
+        }
+        .team-right .team-score {
+            color: #34d399;
+        }
+
+        /* 发球标识（仅在 sideout 模式显示） */
+        .serve-indicator {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 13px;
+            font-weight: 700;
+            margin-top: 4px;
+            padding: 2px 12px;
+            border-radius: 20px;
+            background: rgba(251, 191, 36, 0.15);
+            border: 1px solid rgba(251, 191, 36, 0.25);
+            color: #fbbf24;
+            opacity: 0;
+            transition: opacity 0.3s;
+            pointer-events: none;
+        }
+        .serve-indicator.visible {
+            opacity: 1;
+        }
+        .serve-indicator .serve-num {
+            background: rgba(251, 191, 36, 0.2);
+            padding: 0 8px;
+            border-radius: 10px;
+            font-size: 12px;
+            color: #fcd34d;
+        }
+
+        /* 中间 VS */
+        .vs-divider {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 0 10px;
+            flex-shrink: 0;
+        }
+        .vs-text {
+            font-size: 18px;
+            font-weight: 800;
+            color: rgba(255, 255, 255, 0.12);
+            letter-spacing: 2px;
+        }
+
+        /* 底部：局分 + 盘分 */
+        .match-footer {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 30px;
+            padding-top: 10px;
+            margin-top: 10px;
+            border-top: 1px solid rgba(255, 255, 255, 0.06);
+        }
+
+        .games-container,
+        .sets-container {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .games-label,
+        .sets-label {
+            font-size: 11px;
+            font-weight: 600;
+            color: rgba(255, 255, 255, 0.3);
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+        .games-scores,
+        .sets-scores {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+        .games-score,
+        .set-score {
+            font-size: 18px;
+            font-weight: 700;
+            font-variant-numeric: tabular-nums;
+            min-width: 24px;
+            text-align: center;
+        }
+        .games-score.g-left,
+        .set-score.s-left {
+            color: #60a5fa;
+        }
+        .games-score.g-right,
+        .set-score.s-right {
+            color: #34d399;
+        }
+        .games-score.g-sep,
+        .set-score.s-sep {
+            color: rgba(255, 255, 255, 0.15);
+            font-weight: 300;
+            min-width: auto;
+        }
+
+        /* 响应式 */
+        @media (max-width: 768px) {
+            .scoreboard {
+                min-width: unset;
+                padding: 12px 16px 10px;
+                border-radius: 12px;
+            }
+            .team-name-wrapper {
+                max-width: 140px;
+                font-size: 18px;
+            }
+            .team-name-wrapper.long-text {
+                font-size: 15px;
+            }
+            .team-name-wrapper.very-long-text {
+                font-size: 13px;
+            }
+            .team-score {
+                font-size: 38px;
+            }
+            .vs-text {
+                font-size: 14px;
+            }
+            .match-footer {
+                gap: 16px;
+                flex-wrap: wrap;
+            }
+            .games-score,
+            .set-score {
+                font-size: 15px;
+                min-width: 18px;
+            }
+            .serve-indicator {
+                font-size: 11px;
+                padding: 1px 10px;
+            }
+            .match-title {
+                font-size: 12px;
+            }
+        }
+
+        @media (max-width: 480px) {
+            .scoreboard {
+                padding: 8px 10px 6px;
+                border-radius: 8px;
+            }
+            .team-name-wrapper {
+                max-width: 90px;
+                font-size: 14px;
+            }
+            .team-name-wrapper.long-text {
+                font-size: 12px;
+            }
+            .team-name-wrapper.very-long-text {
+                font-size: 10px;
+            }
+            .team-score {
+                font-size: 28px;
+            }
+            .vs-text {
+                font-size: 11px;
+            }
+            .games-score,
+            .set-score {
+                font-size: 12px;
+                min-width: 14px;
+            }
+            .serve-indicator {
+                font-size: 9px;
+                padding: 0 8px;
+            }
+            .games-label,
+            .sets-label {
+                font-size: 9px;
+            }
+            .match-title {
+                font-size: 10px;
+                padding-bottom: 6px;
+                margin-bottom: 8px;
+            }
+        }
+    </style>
+</head>
+<body>
+
+    <div class="scoreboard" id="scoreboard">
+        <!-- 顶部：赛事名称 -->
+        <div class="match-title" id="matchTitle">🏓 匹克球 · 直播计分</div>
+
+        <!-- 主体 -->
+        <div class="match-body">
+            <!-- 左队 -->
+            <div class="team team-left">
+                <div class="team-name-wrapper" id="homeNameWrapper">
+                    <span class="player-name" id="homePlayer">—</span>
+                    <span class="team-tag" id="homeTeamTag"></span>
+                </div>
+                <div class="team-score" id="homeScore">0</div>
+                <div class="serve-indicator" id="homeServe">
+                    🏐 发球 <span class="serve-num" id="homeServeNum">1</span>
+                </div>
+            </div>
+
+            <!-- VS -->
+            <div class="vs-divider">
+                <span class="vs-text">VS</span>
+            </div>
+
+            <!-- 右队 -->
+            <div class="team team-right">
+                <div class="team-name-wrapper" id="awayNameWrapper">
+                    <span class="player-name" id="awayPlayer">—</span>
+                    <span class="team-tag" id="awayTeamTag"></span>
+                </div>
+                <div class="team-score" id="awayScore">0</div>
+                <div class="serve-indicator" id="awayServe">
+                    🏐 发球 <span class="serve-num" id="awayServeNum">1</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- 底部：局分 + 盘分 -->
+        <div class="match-footer">
+            <div class="games-container">
+                <span class="games-label">局分</span>
+                <div class="games-scores">
+                    <span class="games-score g-left" id="homeGames">0</span>
+                    <span class="games-score g-sep">:</span>
+                    <span class="games-score g-right" id="awayGames">0</span>
+                </div>
+            </div>
+            <div class="sets-container">
+                <span class="sets-label">盘分</span>
+                <div class="sets-scores">
+                    <span class="set-score s-left" id="homeSets">0</span>
+                    <span class="set-score s-sep">:</span>
+                    <span class="set-score s-right" id="awaySets">0</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // ============================================================
+        //  配置
+        // ============================================================
+        const API_URL = '/data.php';
+        const REFRESH_INTERVAL = 2000;
+        const urlParams = new URLSearchParams(window.location.search);
+        const MATCH_ID = urlParams.get('match_id');
+
+        // DOM 引用
+        const els = {
+            homePlayer: document.getElementById('homePlayer'),
+            homeTeamTag: document.getElementById('homeTeamTag'),
+            homeNameWrapper: document.getElementById('homeNameWrapper'),
+            homeScore: document.getElementById('homeScore'),
+            homeGames: document.getElementById('homeGames'),
+            homeSets: document.getElementById('homeSets'),
+            homeServe: document.getElementById('homeServe'),
+            homeServeNum: document.getElementById('homeServeNum'),
+
+            awayPlayer: document.getElementById('awayPlayer'),
+            awayTeamTag: document.getElementById('awayTeamTag'),
+            awayNameWrapper: document.getElementById('awayNameWrapper'),
+            awayScore: document.getElementById('awayScore'),
+            awayGames: document.getElementById('awayGames'),
+            awaySets: document.getElementById('awaySets'),
+            awayServe: document.getElementById('awayServe'),
+            awayServeNum: document.getElementById('awayServeNum'),
+
+            matchTitle: document.getElementById('matchTitle'),
+        };
+
+        // ============================================================
+        //  工具：自动缩小长名字
+        // ============================================================
+        function adjustNameSize(wrapper) {
+            const text = wrapper.textContent.trim();
+            const len = text.length;
+            // 移除之前的类
+            wrapper.classList.remove('long-text', 'very-long-text');
+            if (len > 12) {
+                wrapper.classList.add('very-long-text');
+            } else if (len > 8) {
+                wrapper.classList.add('long-text');
+            }
+        }
+
+        // ============================================================
+        //  更新界面
+        // ============================================================
+        async function fetchAndUpdate() {
+            if (!MATCH_ID) {
+                document.querySelector('.scoreboard').innerHTML = `
+                    <div style="color:#ef4444;text-align:center;padding:20px;font-weight:600;">
+                        ⚠️ 缺少 match_id 参数<br>
+                        <span style="font-size:14px;color:#64748b;font-weight:400;">
+                            请使用 ?match_id=XXX 访问
+                        </span>
+                    </div>
+                `;
+                return;
+            }
+
+            try {
+                const url = `${API_URL}?action=get_live_scoreboard&match_id=${encodeURIComponent(MATCH_ID)}&_t=${Date.now()}`;
+                const resp = await fetch(url);
+                const data = await resp.json();
+
+                if (data.status !== 'success' || !data.data) {
+                    // 显示等待状态
+                    showWaitingState();
+                    return;
+                }
+
+                const d = data.data;
+
+                // ---- 队伍信息：队员名 + 队名 ----
+                // 假设后端返回 t1_player, t1_team, t2_player, t2_team
+                // 或沿用 t1, t2 作为完整显示名，解析格式： "球员名（队名）"
+                const parseName = (full) => {
+                    if (!full) return { player: '—', team: '' };
+                    const match = full.match(/^(.+?)\s*[（(]\s*(.+?)\s*[）)]$/);
+                    if (match) {
+                        return { player: match[1].trim(), team: match[2].trim() };
+                    }
+                    return { player: full, team: '' };
+                };
+
+                const home = parseName(d.t1);
+                const away = parseName(d.t2);
+
+                els.homePlayer.textContent = home.player;
+                els.homeTeamTag.textContent = home.team ? `（${home.team}）` : '';
+                els.awayPlayer.textContent = away.player;
+                els.awayTeamTag.textContent = away.team ? `（${away.team}）` : '';
+
+                // 触发自动缩小
+                adjustNameSize(els.homeNameWrapper);
+                adjustNameSize(els.awayNameWrapper);
+
+                // ---- 分数 ----
+                els.homeScore.textContent = d.t1_score ?? 0;
+                els.awayScore.textContent = d.t2_score ?? 0;
+                els.homeGames.textContent = d.t1_games ?? 0;
+                els.awayGames.textContent = d.t2_games ?? 0;
+                els.homeSets.textContent = d.t1_sets ?? 0;
+                els.awaySets.textContent = d.t2_sets ?? 0;
+
+                // ---- 赛事名称 ----
+                if (d.match_name) {
+                    els.matchTitle.textContent = d.match_name;
+                } else if (d.t1 && d.t2) {
+                    els.matchTitle.textContent = `${d.t1} vs ${d.t2}`;
+                } else {
+                    els.matchTitle.textContent = '🏓 匹克球 · 直播计分';
+                }
+
+                // ---- 发球方 + 发球次数（仅在 sideout 模式下显示） ----
+                const scoreRule = d.score_rule || 'rally'; // rally 或 sideout
+                const serveTeam = d.serve_team || 0; // 1=左, 2=右
+                const serveNum = d.serve_num || 1;
+
+                // 先隐藏所有发球标识
+                els.homeServe.classList.remove('visible');
+                els.awayServe.classList.remove('visible');
+
+                if (scoreRule === 'sideout' && serveTeam > 0) {
+                    if (serveTeam === 1) {
+                        els.homeServe.classList.add('visible');
+                        els.homeServeNum.textContent = serveNum;
+                    } else if (serveTeam === 2) {
+                        els.awayServe.classList.add('visible');
+                        els.awayServeNum.textContent = serveNum;
+                    }
+                }
+
+            } catch (err) {
+                console.warn('Scoreboard fetch error:', err);
+                // 静默失败，保留上次数据
+            }
+        }
+
+        // ============================================================
+        //  等待状态
+        // ============================================================
+        function showWaitingState() {
+            const defaultText = '等待比赛';
+            if (els.homePlayer.textContent === '—') {
+                els.homePlayer.textContent = defaultText;
+                els.awayPlayer.textContent = '数据加载中...';
+            }
+            els.homeTeamTag.textContent = '';
+            els.awayTeamTag.textContent = '';
+            els.homeScore.textContent = '—';
+            els.awayScore.textContent = '—';
+            els.homeGames.textContent = '0';
+            els.awayGames.textContent = '0';
+            els.homeSets.textContent = '0';
+            els.awaySets.textContent = '0';
+            els.homeServe.classList.remove('visible');
+            els.awayServe.classList.remove('visible');
+            adjustNameSize(els.homeNameWrapper);
+            adjustNameSize(els.awayNameWrapper);
+        }
+
+        // ============================================================
+        //  启动
+        // ============================================================
+        if (!MATCH_ID) {
+            document.querySelector('.scoreboard').innerHTML = `
+                <div style="color:#ef4444;text-align:center;padding:20px;font-weight:600;">
+                    ⚠️ 缺少 match_id 参数<br>
+                    <span style="font-size:14px;color:#64748b;font-weight:400;">
+                        请使用 ?match_id=XXX 访问
+                    </span>
+                </div>
+            `;
+        } else {
+            fetchAndUpdate();
+            setInterval(fetchAndUpdate, REFRESH_INTERVAL);
+        }
+    </script>
+
+</body>
+</html>

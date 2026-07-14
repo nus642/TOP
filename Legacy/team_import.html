@@ -1,0 +1,198 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pickle球 团队日程解析器</title>
+   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ccircle cx='50' cy='50' r='45' fill='%23a3e635'/%3E%3Ccircle cx='50' cy='20' r='7' fill='%231e293b' opacity='0.4'/%3E%3Ccircle cx='30' cy='32' r='7' fill='%231e293b' opacity='0.4'/%3E%3Ccircle cx='70' cy='32' r='7' fill='%231e293b' opacity='0.4'/%3E%3Ccircle cx='18' cy='55' r='7' fill='%231e293b' opacity='0.4'/%3E%3Ccircle cx='82' cy='55' r='7' fill='%231e293b' opacity='0.4'/%3E%3Ccircle cx='35' cy='75' r='7' fill='%231e293b' opacity='0.4'/%3E%3Ccircle cx='65' cy='75' r='7' fill='%231e293b' opacity='0.4'/%3E%3Ccircle cx='50' cy='50' r='7' fill='%231e293b' opacity='0.4'/%3E%3Ccircle cx='50' cy='85' r='7' fill='%231e293b' opacity='0.4'/%3E%3C/svg%3E">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body { font-family: 'Inter', system-ui; background-color: #0f172a; color: #ecfdf5; min-height: 100vh; }
+        .glass-panel { background: rgba(30, 41, 59, 0.8); border: 1px solid rgba(245, 158, 11, 0.2); border-radius: 1rem; padding: 1.5rem; box-shadow: 0 10px 25px rgba(0,0,0,0.5); }
+        .input-base { width: 100%; background: #0f172a; border: 1px solid #334155; padding: 0.75rem; border-radius: 0.5rem; color: white; outline: none; transition: 0.2s; }
+        .input-base:focus { border-color: #f59e0b; }
+        .custom-scrollbar::-webkit-scrollbar { width: 4px; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: #475569; border-radius: 2px; }
+		/* 专属 Pickleball 镂空洞洞球 UI 图标引擎 */
+.pb-icon {
+    display: inline-block;
+    width: 1.2em; 
+    height: 1.2em;
+    vertical-align: text-bottom;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ccircle cx='50' cy='50' r='45' fill='%23a3e635'/%3E%3Ccircle cx='50' cy='20' r='7' fill='%231e293b' opacity='0.4'/%3E%3Ccircle cx='30' cy='32' r='7' fill='%231e293b' opacity='0.4'/%3E%3Ccircle cx='70' cy='32' r='7' fill='%231e293b' opacity='0.4'/%3E%3Ccircle cx='18' cy='55' r='7' fill='%231e293b' opacity='0.4'/%3E%3Ccircle cx='82' cy='55' r='7' fill='%231e293b' opacity='0.4'/%3E%3Ccircle cx='35' cy='75' r='7' fill='%231e293b' opacity='0.4'/%3E%3Ccircle cx='65' cy='75' r='7' fill='%231e293b' opacity='0.4'/%3E%3Ccircle cx='50' cy='50' r='7' fill='%231e293b' opacity='0.4'/%3E%3Ccircle cx='50' cy='85' r='7' fill='%231e293b' opacity='0.4'/%3E%3C/svg%3E");
+    background-size: contain;
+    background-repeat: no-repeat;
+}
+    </style>
+</head>
+<body class="p-6 flex flex-col items-center">
+
+    <div class="w-full max-w-2xl">
+        <button onclick="history.back()" class="text-slate-400 hover:text-white mb-6 flex items-center gap-2 text-sm transition-colors">
+            ← 返回主控台
+        </button>
+
+        <div class="flex items-center gap-4 mb-6">
+            <div class="w-12 h-12 bg-amber-600 rounded-xl flex items-center justify-center text-2xl shadow-lg border border-amber-400"><i class="pb-icon"></i></div>
+            <div>
+                <h1 class="text-2xl font-black text-amber-500">网球记架构解析器 [团体日程]</h1>
+                <p class="text-xs text-slate-400">解析对阵名单，自动生成云端签到库与对阵房间</p>
+            </div>
+        </div>
+        
+        <div class="glass-panel mb-6">
+            <div class="mb-4">
+                <label class="block text-xs font-bold text-slate-400 mb-1">当前赛事码</label>
+                <input type="text" id="eventCode" class="input-base font-mono uppercase font-bold text-amber-400" placeholder="如 PICKLE123">
+            </div>
+            
+            <button id="importBtn" class="w-full bg-slate-700 hover:bg-slate-600 text-white py-3 rounded-lg font-bold transition-all border border-slate-500 shadow-md">
+                📂 浏览并导入《网球记》团体日程表 Excel
+            </button>
+            <input type="file" id="excelFile" accept=".xls,.xlsx" class="hidden">
+        </div>
+        
+        <div id="previewArea" class="glass-panel hidden transition-all duration-500">
+            <div class="flex justify-between items-center border-b border-slate-700 pb-2 mb-4">
+                <h2 class="text-sm font-bold text-emerald-400">解析结果预览验证</h2>
+                <span id="teamCountBadge" class="bg-emerald-900/50 text-emerald-300 px-2 py-1 rounded text-xs font-bold border border-emerald-700/50"></span>
+            </div>
+            
+            <div id="teamsPreview" class="space-y-4 max-h-80 overflow-y-auto custom-scrollbar pr-2 mb-4">
+                </div>
+            
+            <button id="confirmImportBtn" class="w-full bg-gradient-to-r from-amber-600 to-orange-600 hover:from-amber-500 hover:to-orange-500 text-white py-4 rounded-xl font-black tracking-widest shadow-[0_5px_15px_rgba(245,158,11,0.3)] active:scale-95 transition-transform">
+                ✅ 确认无误，一键建立所有排阵房间
+            </button>
+        </div>
+        
+        <div id="result" class="mt-4"></div>
+    </div>
+
+    <script>
+        const API = '/data.php';
+        let parsedData = { rooms: [] };
+        
+        const storedCode = localStorage.getItem('pickle_ref_event') || '';
+        if(storedCode) document.getElementById('eventCode').value = storedCode;
+        
+        document.getElementById('importBtn').onclick = () => document.getElementById('excelFile').click();
+        
+        document.getElementById('excelFile').onchange = async (e) => {
+            const file = e.target.files[0];
+            if (!file) return;
+            
+            const reader = new FileReader();
+            reader.onload = function(evt) {
+                const data = new Uint8Array(evt.target.result);
+                const workbook = XLSX.read(data, { type: 'array' });
+                const sheet = workbook.Sheets[workbook.SheetNames[0]];
+                const rows = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: '' });
+                
+                let teamsMap = {};
+                let matchRooms = [];
+                let roomCounter = 1;
+                
+                rows.forEach(row => {
+                    row.forEach(cell => {
+                        let text = String(cell).trim();
+                        if (text.includes('VS')) {
+                            let lines = text.split('\n').map(s => s.trim()).filter(s => s);
+                            let vsIdx = lines.findIndex(l => l.toUpperCase() === 'VS');
+                            
+                            if (vsIdx !== -1 && vsIdx > 0 && vsIdx < lines.length - 1) {
+                                let cleanName = (s) => s.replace(/^[A-Z]组\d+\s*/i, '').replace(/\[\d+\]$/, '').trim();
+                                
+                                let t1Team = "";
+                                if (lines[vsIdx - 1].startsWith('(') || lines[vsIdx - 1].startsWith('（')) {
+                                    t1Team = lines[vsIdx - 1].replace(/^[（\(]|[）\)]$/g, '');
+                                } else { t1Team = cleanName(lines[vsIdx - 1]); }
+
+                                let t2Team = "";
+                                if (vsIdx + 2 < lines.length && (lines[vsIdx + 2].startsWith('(') || lines[vsIdx + 2].startsWith('（'))) {
+                                    t2Team = lines[vsIdx + 2].replace(/^[（\(]|[）\)]$/g, '');
+                                } else { t2Team = cleanName(lines[vsIdx + 1]); }
+
+                                // 加入去重池
+                                if (!teamsMap[t1Team]) teamsMap[t1Team] = { team_name: t1Team, players: [] };
+                                if (!teamsMap[t2Team]) teamsMap[t2Team] = { team_name: t2Team, players: [] };
+
+                                let roomCode = 'T' + String(roomCounter).padStart(2, '0');
+                                roomCounter++;
+
+                                matchRooms.push({
+                                    roomCode: roomCode,
+                                    teams: [teamsMap[t1Team], teamsMap[t2Team]],
+                                    context: lines.slice(0, vsIdx - 1).join(' ') // 比如: 团体赛 第1轮
+                                });
+                            }
+                        }
+                    });
+                });
+                
+                parsedData.rooms = matchRooms;
+                renderPreview();
+            };
+            reader.readAsArrayBuffer(file);
+        };
+        
+        function renderPreview() {
+            const container = document.getElementById('teamsPreview');
+            document.getElementById('teamCountBadge').innerText = `解析出 ${parsedData.rooms.length} 场队际对抗赛`;
+            
+            let html = '';
+            for (let room of parsedData.rooms) {
+                html += `
+                    <div class="bg-slate-800/80 p-3 rounded-xl border border-slate-700 flex justify-between items-center">
+                        <div class="text-amber-400 font-bold bg-amber-900/30 px-3 py-1 rounded-lg border border-amber-500/50">
+                            房间 ${room.roomCode}
+                        </div>
+                        <div class="flex-1 text-center font-bold text-sm">
+                            <span class="text-blue-300">${room.teams[0].team_name}</span> 
+                            <span class="text-slate-500 mx-2 text-xs">VS</span> 
+                            <span class="text-emerald-300">${room.teams[1].team_name}</span>
+                        </div>
+                    </div>
+                `;
+            }
+            container.innerHTML = html;
+            document.getElementById('previewArea').classList.remove('hidden');
+        }
+        
+        document.getElementById('confirmImportBtn').onclick = async () => {
+            const eventCode = document.getElementById('eventCode').value.trim();
+            if (!eventCode) return alert('⚠️ 必须填写赛事码');
+            
+            const btn = document.getElementById('confirmImportBtn');
+            btn.innerText = '正在批量建立房间...'; btn.disabled = true;
+            
+            let successCount = 0;
+            for(let room of parsedData.rooms) {
+                const payload = {
+                    action: 'import_team_event',
+                    event_code: eventCode,
+                    room_code: room.roomCode,
+                    teams: room.teams
+                };
+                try {
+                    const res = await fetch(API, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+                    const data = await res.json();
+                    if(data.status === 'success') successCount++;
+                } catch(e) {}
+            }
+            
+            document.getElementById('result').innerHTML = `
+                <div class="bg-emerald-900/60 border border-emerald-500 p-4 rounded-xl text-center shadow-lg mt-4 animate-pulse">
+                    <div class="text-2xl mb-1">✅</div>
+                    <div class="text-emerald-300 font-bold mb-2">批量建立完成！</div>
+                    <div class="text-sm text-slate-300">
+                        共成功生成 <span class="font-black text-amber-400 text-lg mx-1">${successCount}</span> 个排阵房间<br>
+                        <span class="text-[10px] mt-2 block opacity-80">领队现在可以通过 T01、T02 等编号登入排阵台</span>
+                    </div>
+                </div>
+            `;
+            document.getElementById('previewArea').classList.add('hidden');
+        };
+    </script>
+</body>
+</html>

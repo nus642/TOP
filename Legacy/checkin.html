@@ -1,0 +1,551 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pickle球 运动员签到台</title>
+    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ccircle cx='50' cy='50' r='45' fill='%23a3e635'/%3E%3Ccircle cx='50' cy='20' r='7' fill='%231e293b' opacity='0.4'/%3E%3Ccircle cx='30' cy='32' r='7' fill='%231e293b' opacity='0.4'/%3E%3Ccircle cx='70' cy='32' r='7' fill='%231e293b' opacity='0.4'/%3E%3Ccircle cx='18' cy='55' r='7' fill='%231e293b' opacity='0.4'/%3E%3Ccircle cx='82' cy='55' r='7' fill='%231e293b' opacity='0.4'/%3E%3Ccircle cx='35' cy='75' r='7' fill='%231e293b' opacity='0.4'/%3E%3Ccircle cx='65' cy='75' r='7' fill='%231e293b' opacity='0.4'/%3E%3Ccircle cx='50' cy='50' r='7' fill='%231e293b' opacity='0.4'/%3E%3Ccircle cx='50' cy='85' r='7' fill='%231e293b' opacity='0.4'/%3E%3C/svg%3E">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body { font-family: 'Inter', system-ui; background-color: #0f172a; color: white; margin: 0; padding: 0; }
+        .card { background: #1e293b; border-radius: 1rem; padding: 1.5rem; border: 1px solid rgba(255,255,255,0.05); box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1); }
+        .input-base { width: 100%; background: #0f172a; border: 1px solid #334155; padding: 1rem; border-radius: 0.5rem; color: white; outline: none; font-size: 1rem; transition: border-color 0.2s; }
+        .input-base:focus { border-color: #10b981; }
+        .btn { padding: 1rem; border-radius: 0.5rem; font-weight: bold; font-size: 1.1rem; width: 100%; cursor: pointer; transition: transform 0.1s; border: none; color: white; }
+        .btn:active { transform: scale(0.98); }
+        .btn:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+        .hidden-panel { display: none !important; }
+        .player-found { border-left: 4px solid #10b981; }
+        .player-not-found { border-left: 4px solid #ef4444; }
+        .waiver-display {
+            height: 260px;
+            overflow-y: auto;
+            font-size: 0.85rem;
+            line-height: 1.7;
+            white-space: pre-wrap;
+            word-break: break-word;
+            background: #0f172a;
+            border: 1px solid #334155;
+            border-radius: 0.5rem;
+            padding: 1rem;
+            color: #cbd5e1;
+            resize: none;
+            cursor: default;
+        }
+        .waiver-display::-webkit-scrollbar { width: 4px; }
+        .waiver-display::-webkit-scrollbar-thumb { background: #475569; border-radius: 2px; }
+        .agree-checkbox { display: flex; align-items: center; gap: 0.75rem; margin-top: 1rem; }
+        .agree-checkbox input[type="checkbox"] { width: 1.2rem; height: 1.2rem; accent-color: #10b981; cursor: pointer; }
+        .agree-checkbox label { font-size: 0.95rem; color: #cbd5e1; cursor: pointer; }
+        .id-validate-info { font-size: 0.8rem; margin-top: 0.25rem; }
+        .id-validate-info.match { color: #34d399; }
+        .id-validate-info.mismatch { color: #f87171; }
+        .waiver-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem; }
+        .waiver-badge { font-size: 0.7rem; background: #0f172a; padding: 0.2rem 0.6rem; border-radius: 0.3rem; color: #94a3b8; border: 1px solid #334155; }
+        /* 欢迎语区域样式 */
+        #greetingArea {
+            font-size: 0.95rem;
+            padding: 0.8rem 1rem;
+            background: rgba(251, 191, 36, 0.08);
+            border: 1px solid rgba(251, 191, 36, 0.25);
+            border-radius: 0.75rem;
+            color: #fbbf24;
+            text-align: center;
+            margin-bottom: 1.2rem;
+            line-height: 1.6;
+            min-height: 3.5rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        #greetingArea .loading {
+            color: #94a3b8;
+            font-size: 0.85rem;
+        }
+    </style>
+</head>
+<body class="min-h-screen flex flex-col items-center justify-center p-4">
+
+    <!-- 登录面板 -->
+    <div id="loginPanel" class="card text-center max-w-sm w-full shadow-2xl relative overflow-hidden">
+        <div class="absolute top-0 right-0 bg-teal-600 text-white text-[9px] font-black px-3 py-1 rounded-bl-xl shadow-md border-b border-l border-teal-400/50 tracking-wider z-10">入场签到基站</div>
+        <h2 class="text-2xl font-black mb-2 text-teal-400 mt-4">选手免责签到台</h2>
+        <p class="text-xs text-slate-400 mb-6">请输入您所在的赛事识别代码</p>
+        <input type="text" id="eventCodeInput" class="input-base mb-6 text-center uppercase tracking-widest font-bold text-emerald-300" placeholder="赛事识别码 (如: PICKLE01)">
+        <button onclick="doLogin()" class="btn bg-teal-600 hover:bg-teal-500 shadow-lg">📡 接入签到系统</button>
+    </div>
+
+    <!-- 步骤1：身份校验 -->
+    <div id="step1" class="hidden-panel card max-w-md w-full relative">
+        <button onclick="logout()" class="absolute top-4 right-4 text-[10px] text-slate-500 underline">退回重选赛事</button>
+        <h2 class="text-xl font-bold mb-2 text-teal-400 text-center">入场身份校验</h2>
+        <p class="text-xs text-slate-400 mb-4 text-center">当前赛事: <span id="dispCode" class="text-emerald-400 font-mono font-bold"></span></p>
+
+        <!-- ★ AI 欢迎语区域 ★ -->
+        <div id="greetingArea">
+            <span class="loading">✨ 小P正在准备欢迎词...</span>
+        </div>
+
+        <div class="mb-4 relative">
+            <label class="block text-xs font-bold text-slate-400 mb-2 pl-1">您报名时提交的姓名：</label>
+            <input type="text" id="playerNameSearch" class="input-base font-bold text-emerald-300" placeholder="请输入您的真实姓名" autocomplete="off">
+            <div id="autoCompleteList" class="absolute z-50 w-full bg-slate-800 border border-slate-600 rounded-lg mt-1 hidden-panel max-h-48 overflow-y-auto shadow-2xl"></div>
+        </div>
+
+        <!-- 选手信息确认区 -->
+        <div id="playerInfoArea" class="hidden-panel mb-4 p-3 rounded-lg border border-slate-600 bg-slate-900/50">
+            <div class="flex justify-between items-center">
+                <span class="text-xs text-slate-400">匹配选手</span>
+                <span id="playerStatusBadge" class="text-xs font-bold px-2 py-1 rounded"></span>
+            </div>
+            <div class="flex flex-col gap-1 mt-2">
+                <div class="text-sm font-bold text-white" id="matchedPlayerName">—</div>
+                <div class="text-xs text-slate-300"><span class="text-slate-500">队伍：</span><span id="matchedPlayerTeam">—</span></div>
+                <div class="text-xs text-slate-300"><span class="text-slate-500">组别：</span><span id="matchedPlayerGroup">—</span></div>
+                <div id="idStatusArea" class="text-xs text-slate-400 mt-1"></div>
+            </div>
+        </div>
+
+        <div class="mb-6">
+            <label class="block text-xs font-bold text-slate-400 mb-2 pl-1">身份证号码后 4 位：</label>
+            <input type="tel" id="idLast4" class="input-base tracking-widest text-center font-mono text-xl" placeholder="XXXX" maxlength="4">
+            <div id="idValidateMsg" class="id-validate-info"></div>
+        </div>
+
+        <button onclick="goToSig()" class="btn bg-blue-600 hover:bg-blue-500 shadow-[0_4px_15px_rgba(37,99,235,0.3)]">下一步：阅读并签署免责书</button>
+    </div>
+
+    <!-- 步骤2：签署免责（只读告知书） -->
+    <div id="step2" class="hidden-panel card max-w-lg w-full">
+        <h2 class="text-xl font-bold mb-4 text-center text-rose-400 border-b border-slate-700 pb-3">📜 自愿参赛责任及风险告知书</h2>
+
+        <!-- 风险告知书只读展示区域 -->
+        <div class="mb-4">
+            <div class="waiver-header">
+                <span class="text-sm font-bold text-slate-300">告知书内容</span>
+                <span id="waiverBadge" class="waiver-badge">赛事统一版本</span>
+            </div>
+            <!-- ★★★ 只读展示区，禁止编辑 ★★★ -->
+            <div id="waiverDisplay" class="waiver-display">加载中...</div>
+        </div>
+
+        <!-- 勾选框 -->
+        <div class="agree-checkbox">
+            <input type="checkbox" id="agreeCheckbox" onchange="toggleSubmitButton()">
+            <label for="agreeCheckbox">本人已阅读并完全理解上述 <span style="color:#34d399;">风险告知内容</span>，愿意承担相关责任。</label>
+        </div>
+
+        <!-- 签名区域 -->
+        <h3 class="font-bold text-emerald-400 mb-2 text-sm mt-4">✍️ 请在下方空白处手写签名确认：</h3>
+        <div class="bg-white rounded-lg border-2 border-dashed border-slate-400 mb-4 overflow-hidden relative">
+            <canvas id="sigCanvas" class="touch-none cursor-crosshair w-full" style="height: 200px; display: block; background-color: #ffffff;"></canvas>
+            <button onclick="clearSig()" class="absolute bottom-2 right-2 bg-slate-200 text-slate-700 px-3 py-1 rounded text-xs font-bold border border-slate-400 opacity-80 hover:opacity-100">清除重写</button>
+        </div>
+
+        <div class="flex gap-3">
+            <button onclick="backToStep1()" class="btn bg-slate-700 hover:bg-slate-600 w-1/3 text-sm">返回</button>
+            <button onclick="submitCheckin()" id="submitBtn" class="btn bg-emerald-600 hover:bg-emerald-500 w-2/3 shadow-[0_4px_15px_rgba(16,185,129,0.4)] tracking-wider" disabled>确认签署并上链</button>
+        </div>
+    </div>
+
+    <!-- 步骤3：成功 -->
+    <div id="step3" class="hidden-panel card max-w-sm w-full text-center py-10 relative overflow-hidden">
+        <div class="absolute inset-0 bg-emerald-900/20 z-0"></div>
+        <div class="text-6xl mb-4 relative z-10 animate-bounce">✅</div>
+        <h2 class="text-2xl font-black text-emerald-400 mb-2 relative z-10">签到成功</h2>
+        <p class="text-slate-400 text-sm mb-8 relative z-10">您的免责声明已加密存管至云端法务库。<br>祝您比赛顺利，勇创佳绩！</p>
+        <button onclick="location.reload()" class="btn bg-slate-700 hover:bg-slate-600 text-sm w-3/4 mx-auto block relative z-10">返回首页给下一位签到</button>
+    </div>
+
+    <script>
+        const API = '/data.php';
+        const SPLIT_REGEX = /[\+＋\/／、＆&\|]/;
+        let eventCode = '';
+        let allPlayers = [];
+        let matchedPlayer = null;
+        let canvas, ctx;
+        let isDrawing = false;
+        let hasSigned = false;
+
+        const DEFAULT_WAIVER = `1. 本人自愿报名参加本次赛事及相关活动，已完全了解并理解本次赛事可能存在的风险（包括但不限于运动损伤、突发疾病、财产损失等）。\n\n2. 本人确认自身身体健康状况良好，没有任何不适合参与该项运动的疾病或症状。本人承诺在比赛中遵守赛事规则，服从裁判和工作人员的管理。\n\n3. 本人同意在赛事期间，如因个人原因、不可抗力或第三方原因导致的人身伤害或财产损失，赛事组织方及场地方免于承担任何法律与经济责任。\n\n4. 本人已仔细阅读并完全理解以上内容，签名即代表本人独立承担参与本次赛事的所有相关风险及责任。`;
+
+        // ======================== 安全加固：登录与恢复 ========================
+        window.onload = () => {
+            const urlParams = new URLSearchParams(window.location.search);
+            // 优先从 sessionStorage 恢复赛事码
+            let code = sessionStorage.getItem('pickle_checkin_code');
+            if (!code) {
+                code = urlParams.get('code');
+                if (code) {
+                    sessionStorage.setItem('pickle_checkin_code', code.toUpperCase());
+                }
+            }
+            if (code) {
+                document.getElementById('eventCodeInput').value = code;
+                // 清除 URL 参数
+                if (window.history && window.history.replaceState) {
+                    const url = new URL(window.location);
+                    url.searchParams.delete('code');
+                    window.history.replaceState({}, document.title, url.toString());
+                }
+                // 自动登录
+                setTimeout(doLogin, 100);
+            }
+            // 告知书占位
+            document.getElementById('waiverDisplay').textContent = '加载赛事告知书...';
+        };
+
+        window.doLogin = async () => {
+            const code = document.getElementById('eventCodeInput').value.trim().toUpperCase();
+            if (!code) return alert('请输入赛事码！');
+            eventCode = code;
+            sessionStorage.setItem('pickle_checkin_code', code);
+
+            // 清除 URL 参数
+            if (window.history && window.history.replaceState) {
+                const url = new URL(window.location);
+                url.searchParams.delete('code');
+                window.history.replaceState({}, document.title, url.toString());
+            }
+
+            document.getElementById('loginPanel').classList.add('hidden-panel');
+            document.getElementById('step1').classList.remove('hidden-panel');
+            document.getElementById('dispCode').innerText = code;
+
+            // 并行加载数据 + AI 问候语
+            await Promise.all([
+                loadPlayers(),
+                loadWaiverText(),
+                loadGreeting()   // ← 新增 AI 欢迎语
+            ]);
+        };
+
+        window.logout = () => {
+            sessionStorage.removeItem('pickle_checkin_code');
+            location.reload();
+        };
+
+        // ========== 加载 AI 欢迎语（智能小P） ==========
+        async function loadGreeting() {
+            const el = document.getElementById('greetingArea');
+            if (!eventCode) {
+                el.innerHTML = '<span class="loading">✨ 请先选择赛事</span>';
+                return;
+            }
+            try {
+                const res = await fetch(`${API}?action=ai_generate_greeting&event_code=${eventCode}&_t=${Date.now()}`);
+                const data = await res.json();
+                if (data.status === 'success' && data.greeting) {
+                    el.innerHTML = data.greeting;
+                } else {
+                    // 降级：本地生成
+                    const now = new Date();
+                    const dayOfWeek = ['星期日','星期一','星期二','星期三','星期四','星期五','星期六'][now.getDay()];
+                    const month = now.getMonth() + 1;
+                    const date = now.getDate();
+                    const hour = now.getHours();
+                    let timeGreeting = '下午好';
+                    if (hour < 6) timeGreeting = '夜深了';
+                    else if (hour < 12) timeGreeting = '早上好';
+                    else if (hour < 18) timeGreeting = '下午好';
+                    else timeGreeting = '晚上好';
+                    el.innerHTML = `✨ 小P欢迎你！${timeGreeting}，今天是 ${month}月${date}日 ${dayOfWeek}，祝你在赛场上尽情挥洒，取得好成绩！🎾`;
+                }
+            } catch (e) {
+                // 网络错误降级
+                el.innerHTML = '✨ 欢迎来到赛场！请完成免责签到，祝您比赛愉快！';
+                console.warn('AI 问候加载失败', e);
+            }
+        }
+
+        // ========== 加载赛事统一风险告知书（只读） ==========
+        async function loadWaiverText() {
+            if (!eventCode) return;
+            const display = document.getElementById('waiverDisplay');
+            const badge = document.getElementById('waiverBadge');
+            try {
+                const res = await fetch(`${API}?action=get_waiver_text&event_code=${eventCode}`);
+                const data = await res.json();
+                if (data.status === 'success' && data.data) {
+                    display.textContent = data.data;
+                    badge.textContent = '赛事统一版本';
+                } else {
+                    display.textContent = DEFAULT_WAIVER;
+                    badge.textContent = '默认模板';
+                }
+            } catch (e) {
+                display.textContent = DEFAULT_WAIVER;
+                badge.textContent = '默认模板 (加载失败)';
+            }
+        }
+
+        // ========== 勾选框控制 ==========
+        window.toggleSubmitButton = function() {
+            const checked = document.getElementById('agreeCheckbox').checked;
+            document.getElementById('submitBtn').disabled = !checked;
+        };
+
+        async function loadPlayers() {
+            try {
+                const res = await fetch(`${API}?action=get_players&event_code=${eventCode}`);
+                const data = await res.json();
+                if (data.status === 'success') {
+                    allPlayers = data.data || [];
+                    setupAutoComplete();
+                }
+            } catch (e) { console.error('加载名单失败'); }
+        }
+
+        function setupAutoComplete() {
+            const input = document.getElementById('playerNameSearch');
+            const list = document.getElementById('autoCompleteList');
+
+            input.addEventListener('input', function() {
+                let val = this.value.trim();
+                list.innerHTML = '';
+                const infoArea = document.getElementById('playerInfoArea');
+                infoArea.classList.add('hidden-panel');
+                matchedPlayer = null;
+                document.getElementById('idValidateMsg').textContent = '';
+
+                if (!val) { list.classList.add('hidden-panel'); return; }
+
+                const lowerVal = val.toLowerCase();
+                let matches = allPlayers.filter(p => p.name.toLowerCase().includes(lowerVal));
+
+                if (matches.length > 0) {
+                    matches.slice(0, 8).forEach(p => {
+                        let div = document.createElement('div');
+                        let statusText = p.checked_in ? '已签' : '待签';
+                        let statusColor = p.checked_in ? 'text-amber-400' : 'text-emerald-400';
+                        div.className = `p-3 border-b border-slate-700 hover:bg-slate-700 cursor-pointer flex justify-between items-center text-sm transition-colors`;
+                        div.innerHTML = `<span class="font-bold text-white">${p.name}</span> <span class="text-xs text-slate-400 bg-slate-900 px-2 py-0.5 rounded">${p.team || '未分组'} · <span class="${statusColor}">${statusText}</span></span>`;
+                        div.onclick = function() {
+                            input.value = p.name;
+                            list.classList.add('hidden-panel');
+                            showPlayerInfo(p);
+                        };
+                        list.appendChild(div);
+                    });
+                    list.classList.remove('hidden-panel');
+                } else {
+                    list.classList.add('hidden-panel');
+                }
+            });
+
+            input.addEventListener('blur', function() {
+                const val = this.value.trim();
+                if (!val) return;
+                const exactMatch = allPlayers.find(p => p.name.toLowerCase() === val.toLowerCase());
+                if (exactMatch) {
+                    showPlayerInfo(exactMatch);
+                } else {
+                    const fuzzy = allPlayers.filter(p => p.name.toLowerCase().includes(val.toLowerCase()));
+                    if (fuzzy.length === 1) {
+                        showPlayerInfo(fuzzy[0]);
+                    }
+                }
+            });
+
+            document.getElementById('idLast4').addEventListener('input', function() {
+                validateIdLast4();
+            });
+
+            document.addEventListener('click', function(e) { if (e.target !== input && e.target !== list) list.classList.add('hidden-panel'); });
+        }
+
+        function showPlayerInfo(player) {
+            matchedPlayer = player;
+            const area = document.getElementById('playerInfoArea');
+            area.classList.remove('hidden-panel');
+            document.getElementById('matchedPlayerName').innerText = player.name;
+            document.getElementById('matchedPlayerTeam').innerText = player.team || '未分配';
+            document.getElementById('matchedPlayerGroup').innerText = player.group || '—';
+
+            const idStatusArea = document.getElementById('idStatusArea');
+            if (player.id_last4) {
+                idStatusArea.innerHTML = `<span class="text-emerald-400">✔ 名单已登记身份证后四位</span>`;
+            } else {
+                idStatusArea.innerHTML = `<span class="text-amber-400">⚠ 名单未登记身份证，请输入后四位以便验证</span>`;
+            }
+
+            const badge = document.getElementById('playerStatusBadge');
+            if (player.checked_in) {
+                badge.innerText = '已签到';
+                badge.className = 'text-xs font-bold px-2 py-1 rounded bg-amber-900/50 text-amber-400';
+            } else {
+                badge.innerText = '待签到';
+                badge.className = 'text-xs font-bold px-2 py-1 rounded bg-emerald-900/50 text-emerald-400';
+            }
+            area.className = 'mb-4 p-3 rounded-lg border border-slate-600 bg-slate-900/50 player-found';
+            validateIdLast4();
+        }
+
+        function validateIdLast4() {
+            const input = document.getElementById('idLast4').value.trim();
+            const msg = document.getElementById('idValidateMsg');
+            if (!matchedPlayer) {
+                msg.textContent = '';
+                return;
+            }
+            if (input.length === 0) {
+                msg.textContent = '';
+                return;
+            }
+            if (input.length !== 4 || !/^\d{4}$/.test(input)) {
+                msg.textContent = '请输入4位数字';
+                msg.className = 'id-validate-info mismatch';
+                return;
+            }
+            if (matchedPlayer.id_last4) {
+                if (input === matchedPlayer.id_last4) {
+                    msg.textContent = '✅ 身份证后四位匹配';
+                    msg.className = 'id-validate-info match';
+                } else {
+                    msg.textContent = '❌ 身份证后四位不匹配，请核对';
+                    msg.className = 'id-validate-info mismatch';
+                }
+            } else {
+                msg.textContent = '✅ 已输入身份证后四位';
+                msg.className = 'id-validate-info match';
+            }
+        }
+
+        function goToSig() {
+            const name = document.getElementById('playerNameSearch').value.trim();
+            const id4 = document.getElementById('idLast4').value.trim();
+
+            if (!name) return alert('请输入您的姓名');
+            if (SPLIT_REGEX.test(name)) {
+                return alert('🚨 法务警告：免责声明必须【单人独立签署】！\n\n您输入了组合符号（如 + 或 / ）。请单独输入您本人的姓名完成签名，您的队友需单独操作签到。');
+            }
+            if (!id4 || id4.length !== 4) return alert('请输入正确的身份证后4位');
+
+            const player = allPlayers.find(p => p.name.toLowerCase() === name.toLowerCase());
+            if (!player) {
+                return alert('❌ 您在本次赛事的参赛名单中未找到。\n请核对姓名或联系裁判长核实。');
+            }
+            if (player.checked_in) {
+                return alert('⚠️ 您已经完成过签到，无需重复签署。');
+            }
+
+            if (player.id_last4 && player.id_last4 !== id4) {
+                return alert('❌ 身份证后四位不匹配，请重新输入。');
+            }
+
+            matchedPlayer = player;
+            document.getElementById('step1').classList.add('hidden-panel');
+            document.getElementById('step2').classList.remove('hidden-panel');
+            document.getElementById('agreeCheckbox').checked = false;
+            document.getElementById('submitBtn').disabled = true;
+            setTimeout(initCanvas, 100);
+        }
+
+        function backToStep1() {
+            document.getElementById('step2').classList.add('hidden-panel');
+            document.getElementById('step1').classList.remove('hidden-panel');
+        }
+
+        function initCanvas() {
+            if (canvas) {
+                ctx.fillStyle = '#ffffff';
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+                hasSigned = false;
+                return;
+            }
+            canvas = document.getElementById('sigCanvas');
+            const rect = canvas.parentElement.getBoundingClientRect();
+            canvas.width = rect.width;
+            canvas.height = 200;
+            ctx = canvas.getContext('2d');
+
+            ctx.fillStyle = '#ffffff';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            ctx.strokeStyle = '#0f172a';
+            ctx.lineWidth = 3;
+            ctx.lineCap = 'round';
+            ctx.lineJoin = 'round';
+
+            const getPos = e => {
+                const r = canvas.getBoundingClientRect();
+                const cx = e.touches ? e.touches[0].clientX : e.clientX;
+                const cy = e.touches ? e.touches[0].clientY : e.clientY;
+                return { x: cx - r.left, y: cy - r.top };
+            };
+            const startDraw = e => { isDrawing = true; hasSigned = true; ctx.beginPath(); ctx.moveTo(getPos(e).x, getPos(e).y); e.preventDefault(); };
+            const draw = e => { if (isDrawing) { const pos = getPos(e); ctx.lineTo(pos.x, pos.y); ctx.stroke(); } e.preventDefault(); };
+            const stopDraw = () => { isDrawing = false; };
+
+            canvas.addEventListener('mousedown', startDraw);
+            canvas.addEventListener('mousemove', draw);
+            canvas.addEventListener('mouseup', stopDraw);
+            canvas.addEventListener('mouseout', stopDraw);
+            canvas.addEventListener('touchstart', startDraw, { passive: false });
+            canvas.addEventListener('touchmove', draw, { passive: false });
+            canvas.addEventListener('touchend', stopDraw);
+        }
+
+        window.clearSig = () => { if (ctx && canvas) { ctx.fillStyle = '#ffffff'; ctx.fillRect(0, 0, canvas.width, canvas.height); hasSigned = false; } }
+
+        async function submitCheckin() {
+            const name = document.getElementById('playerNameSearch').value.trim();
+            const id4 = document.getElementById('idLast4').value.trim();
+
+            if (!matchedPlayer) {
+                const p = allPlayers.find(p => p.name.toLowerCase() === name.toLowerCase());
+                if (!p) return alert('参赛名单中未找到该姓名，请返回核对。');
+                if (p.checked_in) return alert('您已签到，无需重复提交。');
+                matchedPlayer = p;
+            }
+
+            if (matchedPlayer.id_last4 && matchedPlayer.id_last4 !== id4) {
+                return alert('❌ 身份证后四位不匹配，请返回核对。');
+            }
+
+            if (SPLIT_REGEX.test(name)) return alert('姓名包含非法组合符号，请使用个人真实姓名。');
+            if (!id4 || id4.length !== 4) return alert('请填写身份证后4位');
+            if (!hasSigned) return alert('请在手写区域签名');
+            if (!document.getElementById('agreeCheckbox').checked) {
+                return alert('请先勾选“本人已阅读并同意”');
+            }
+
+            const btn = document.getElementById('submitBtn');
+            btn.innerText = '信息加密上传中...';
+            btn.disabled = true;
+
+            // 提交时发送 waiver_text（可从展示区读取）
+            const waiverText = document.getElementById('waiverDisplay').textContent;
+
+            try {
+                const payload = {
+                    action: 'player_checkin',
+                    event_code: eventCode,
+                    player_name: matchedPlayer.name,
+                    id_last4: id4,
+                    signature: document.getElementById('sigCanvas').toDataURL('image/jpeg', 0.6),
+                    waiver_text: waiverText,
+                };
+
+                const res = await fetch(API, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+                const data = await res.json();
+                if (data.status === 'success') {
+                    document.getElementById('step2').classList.add('hidden-panel');
+                    document.getElementById('step3').classList.remove('hidden-panel');
+                } else {
+                    alert('上传失败: ' + (data.message || '未知错误'));
+                    btn.disabled = false;
+                    btn.innerText = '确认签署并上链';
+                }
+            } catch (e) {
+                alert('网络通信失败，请重试');
+                btn.disabled = false;
+                btn.innerText = '确认签署并上链';
+            }
+        }
+    </script>
+</body>
+</html>

@@ -1,0 +1,2391 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pickle球 裁判长总控台</title>
+    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ccircle cx='50' cy='50' r='45' fill='%23a3e635'/%3E%3Ccircle cx='50' cy='20' r='7' fill='%231e293b' opacity='0.4'/%3E%3Ccircle cx='30' cy='32' r='7' fill='%231e293b' opacity='0.4'/%3E%3Ccircle cx='70' cy='32' r='7' fill='%231e293b' opacity='0.4'/%3E%3Ccircle cx='18' cy='55' r='7' fill='%231e293b' opacity='0.4'/%3E%3Ccircle cx='82' cy='55' r='7' fill='%231e293b' opacity='0.4'/%3E%3Ccircle cx='35' cy='75' r='7' fill='%231e293b' opacity='0.4'/%3E%3Ccircle cx='65' cy='75' r='7' fill='%231e293b' opacity='0.4'/%3E%3Ccircle cx='50' cy='50' r='7' fill='%231e293b' opacity='0.4'/%3E%3Ccircle cx='50' cy='85' r='7' fill='%231e293b' opacity='0.4'/%3E%3C/svg%3E">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js" async></script>
+    <style>
+        * { box-sizing: border-box; }
+        body { font-family: 'Inter', sans-serif; background-color: #0f172a; color: white; padding: 0; margin: 0; overflow-x: hidden; }
+        .card { background: #1e293b; border-radius: 1rem; padding: 1.5rem; border: 1px solid rgba(255,255,255,0.05); box-shadow: 0 10px 15px -3px rgba(0,0,0,0.1); }
+        .input-base { width: 100%; background-color: #0f172a !important; border: 1px solid #334155; padding: 0.75rem; border-radius: 0.5rem; font-size: 0.85rem; color: #ffffff !important; outline: none; transition: 0.2s; }
+        .input-base:focus { border-color: #10b981; }
+        .btn { background: #3b82f6; padding: 0.75rem 1rem; border-radius: 0.5rem; font-weight: bold; cursor: pointer; text-align: center; color: white; transition: 0.1s; border: none; }
+        .btn:active { transform: scale(0.96); }
+        .btn-sm { padding: 0.4rem 0.75rem; font-size: 0.7rem; border-radius: 0.4rem; }
+        .custom-scrollbar::-webkit-scrollbar { width: 6px; height: 6px; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: #475569; border-radius: 4px; }
+        .hidden-panel { display: none !important; }
+        .toast { position: fixed; top: 20px; left: 50%; transform: translateX(-50%); background: #10b981; color: white; padding: 0.75rem 1.5rem; border-radius: 2rem; font-weight: bold; z-index: 1000; display: none; box-shadow: 0 10px 25px rgba(0,0,0,0.5); }
+
+        @keyframes marquee { 0% { transform: translateX(100vw); } 100% { transform: translateX(-100%); } }
+        .animate-marquee { display: inline-block; white-space: nowrap; animation: marquee 25s linear infinite; }
+        .animate-marquee:hover { animation-play-state: paused; }
+
+        .unified-card { background: rgba(30,41,59,0.55); border-radius: 0.75rem; padding: 0.65rem 0.8rem; border: 1px solid rgba(71,85,105,0.5); transition: 0.15s; }
+        .unified-card .row { display: flex; justify-content: space-between; align-items: center; }
+        .unified-card .label { font-weight: 700; font-size: 0.7rem; color: #fbbf24; letter-spacing: 0.02em; }
+        .unified-card .badge { font-size: 0.6rem; padding: 0.1rem 0.6rem; border-radius: 999px; font-weight: 600; background: rgba(51,65,85,0.6); color: #94a3b8; }
+        .unified-card .badge.live { background: rgba(16,185,129,0.25); color: #34d399; }
+        .unified-card .badge.umpiring { background: rgba(251,191,36,0.2); color: #fbbf24; }
+        .unified-card .vs { font-size: 0.7rem; color: #64748b; margin: 0 0.2rem; }
+        .unified-card .score { font-family: monospace; font-weight: 700; font-size: 0.8rem; color: #34d399; }
+        .unified-card .referee-name { font-size: 0.65rem; color: #94a3b8; }
+        .unified-card .meta { font-size: 0.6rem; color: #64748b; }
+        .unified-card .empty { font-size: 0.65rem; color: #475569; font-style: italic; }
+
+        @media (max-width: 640px) {
+            .unified-card { padding: 0.45rem 0.6rem; }
+            .unified-card .label { font-size: 0.6rem; }
+            .unified-card .badge { font-size: 0.5rem; padding: 0.05rem 0.4rem; }
+            .unified-card .vs { font-size: 0.6rem; }
+            .unified-card .score { font-size: 0.7rem; }
+            .unified-card .referee-name { font-size: 0.55rem; }
+            .unified-card .meta { font-size: 0.5rem; }
+            .unified-card .empty { font-size: 0.55rem; }
+            .unified-card .match-text { font-size: 0.6rem; }
+        }
+
+        .radar-room-card { background: rgba(15,23,42,0.7); border-radius: 0.75rem; padding: 0.75rem; border: 1px solid rgba(71,85,105,0.4); }
+        @media (max-width: 640px) {
+            .radar-room-card { padding: 0.5rem; }
+            .radar-room-card .room-title { font-size: 0.7rem; }
+            .radar-room-card .team-name { font-size: 0.6rem; }
+            .radar-room-card .action-btn { font-size: 0.55rem; padding: 0.15rem 0.5rem; }
+        }
+
+        .tool-btn { background: #1e293b; border: 1px solid #334155; padding: 0.4rem 0.7rem; border-radius: 0.4rem; font-size: 0.7rem; font-weight: 600; color: #cbd5e1; cursor: pointer; transition: all 0.15s; text-align: center; white-space: nowrap; text-decoration: none; display: inline-flex; align-items: center; justify-content: center; gap: 0.3rem; }
+        .tool-btn:hover { background: #2d3748; border-color: #10b981; color: #fff; }
+        .tool-btn.primary { background: #0f172a; border-color: #475569; }
+        .tool-btn.primary:hover { border-color: #fbbf24; color: #fbbf24; }
+        .tool-btn.amber { background: #78350f; border-color: #b45309; color: #fbbf24; }
+        .tool-btn.amber:hover { background: #92400e; border-color: #f59e0b; }
+        .tool-btn.green { background: #064e3b; border-color: #059669; color: #34d399; }
+        .tool-btn.green:hover { background: #065f46; border-color: #10b981; }
+
+        .radar-stats { display: flex; flex-wrap: wrap; gap: 0.5rem 1rem; font-size: 0.7rem; color: #94a3b8; padding: 0.3rem 0 0.5rem 0; border-bottom: 1px solid #1e293b; margin-bottom: 0.5rem; }
+        .radar-stats .stat-item { display: flex; align-items: center; gap: 0.25rem; }
+        .radar-stats .stat-value { font-weight: 700; color: #e2e8f0; }
+        .radar-stats .stat-value.green { color: #34d399; }
+        .radar-stats .stat-value.amber { color: #fbbf24; }
+        .radar-stats .stat-value.blue { color: #60a5fa; }
+        .radar-stats .stat-value.pink { color: #f472b6; }
+
+        .btn-lib {
+            font-size: 0.7rem;
+            padding: 0.3rem 0.9rem;
+            background: #0f172a;
+            border: 1px solid #475569;
+            border-radius: 0.5rem;
+            color: #94a3b8;
+            transition: 0.2s;
+            cursor: pointer;
+        }
+        .btn-lib:hover {
+            border-color: #818cf8;
+            color: #a5b4fc;
+            background: #1e293b;
+        }
+    </style>
+</head>
+<body class="min-h-screen flex flex-col relative">
+
+    <!-- 登录页 -->
+    <div id="loginPage" class="card text-center max-w-sm mx-auto mt-20 relative">
+        <button onclick="openSuperAdmin()" class="absolute top-4 right-4 opacity-30 hover:opacity-100 transition-opacity text-xl" title="无限哥超级大盘">👑</button>
+        <h2 class="text-2xl font-black mb-6 text-amber-500">Pickle球赛事指挥中心</h2>
+        <input type="text" id="eventCodeInput" class="input-base mb-3 text-center uppercase font-bold text-emerald-300" placeholder="请输入赛事代码 (如 PICKLE01)">
+        <input type="password" id="masterPwd" class="input-base mb-5" placeholder="裁判长授权密码">
+        <button onclick="handleLogin()" id="loginBtn" class="btn w-full mb-6 shadow-lg">进入总控大厅</button>
+        <div class="border-t border-slate-700 pt-6"><button onclick="document.getElementById('createModal').classList.remove('hidden-panel')" class="btn bg-emerald-600 w-full hover:bg-emerald-500">➕ 创建全新赛事体系</button></div>
+        <div class="text-[10px] text-slate-500 mt-6 text-center leading-relaxed">【系统授权与免责声明】<br>本系统由 无限哥团队研发，仅授权受邀单位内部使用。<br>系统不对赛事数据泄露或纠纷负责，一切解释权归赛事主委会所有。</div>
+    </div>
+
+    <!-- 创建赛事弹窗 -->
+    <div id="createModal" class="hidden-panel fixed inset-0 bg-black/80 z-[9999] flex items-center justify-center p-4">
+        <div class="bg-slate-800 p-6 rounded-xl w-full max-w-md border border-slate-600 shadow-2xl"><h3 class="text-xl font-bold text-emerald-400 mb-4 text-center">🆕 创建全新数字赛事</h3>
+            <input type="password" id="c_superPwd" class="input-base mb-3" placeholder="无限哥超管密码 (必填)">
+            <input type="text" id="c_name" class="input-base mb-3" placeholder="赛事命名 (如: 周末精英赛)">
+            <select id="c_mode" class="input-base mb-3 font-bold text-emerald-300 text-center bg-slate-900 appearance-none">
+                <option value="ind">👤 个人/双打单项赛 (Ind Mode)</option>
+                <option value="team">🏆 团体对抗赛 (Team Mode)</option>
+            </select>
+            <input type="text" id="c_code" class="input-base mb-3" placeholder="自定义赛事码 (选填)">
+            <input type="text" id="c_courts" class="input-base mb-3" placeholder="物理场号，用空格隔开 (如: 1 2 3)">
+            <input type="text" id="c_pwd" class="input-base mb-5" placeholder="赛内调度密码 (裁判登录用)">
+            <div class="flex gap-3"><button onclick="document.getElementById('createModal').classList.add('hidden-panel')" class="btn bg-slate-600 w-1/3">取消</button><button onclick="submitCreateEvent()" id="realCreateBtn" class="btn bg-emerald-600 w-2/3">确认创建</button></div>
+        </div>
+    </div>
+	
+	<!-- 编辑赛事弹窗 -->
+<div id="editEventModal" class="hidden-panel fixed inset-0 bg-black/80 z-[99999] flex items-center justify-center p-4">
+    <div class="bg-slate-800 p-6 rounded-xl w-full max-w-md border border-amber-500/50 shadow-2xl">
+        <h3 class="text-xl font-bold text-amber-400 mb-4 text-center">✏️ 编辑赛事信息</h3>
+        <input type="hidden" id="editEventCode">
+        <input type="text" id="editEventName" class="input-base mb-3" placeholder="赛事名称">
+        <input type="number" id="editEventDays" class="input-base mb-3" placeholder="比赛天数（数字）" min="1">
+        <input type="text" id="editEventPassword" class="input-base mb-3" placeholder="裁判长密码">
+        <input type="text" id="editNewEventCode" class="input-base mb-4" placeholder="修改赛事码（留空则不修改）">
+        <div class="text-xs text-amber-300/70 mb-4 border border-amber-500/20 bg-amber-950/30 p-2 rounded">⚠️ 修改赛事码会迁移所有数据，操作不可逆！</div>
+        <div class="flex gap-3">
+            <button onclick="closeEditModal()" class="btn bg-slate-600 w-1/3">取消</button>
+            <button onclick="saveEventEdit()" id="saveEditBtn" class="btn bg-amber-600 w-2/3">保存修改</button>
+        </div>
+    </div>
+</div>
+
+    <!-- 队名别名弹窗 -->
+    <div id="aliasModal" class="hidden-panel fixed inset-0 bg-black/80 z-[99999] flex items-center justify-center p-4">
+        <div class="bg-slate-800 p-6 rounded-xl w-full max-w-md border border-amber-500/40 shadow-2xl">
+            <h3 class="text-lg font-bold text-amber-400 mb-2 flex items-center gap-1"><span>🔍</span> 队名智能不一致对齐核碰</h3>
+            <p class="text-sm text-slate-300 mb-4">系统检测到赛程表中的队伍名称在已有大名单中没有完全一致的匹配，但发现高度相似度。请裁判长人工决策：</p>
+            <div class="bg-slate-950 p-4 rounded-lg mb-4 text-xs font-mono space-y-2">
+                <div>📋 日程表队名: <span id="aliasSchedName" class="text-pink-400 font-bold"></span></div>
+                <div>🗂️ 系统大名单: <span id="aliasDbName" class="text-emerald-400 font-bold"></span></div>
+            </div>
+            <p class="text-xs text-slate-400 mb-4">如果您点“是的”，系统将自动建立别名映射，该房间及后续排阵将直接绑定该大名单队伍。</p>
+            <div class="flex gap-3">
+                <button id="aliasNoBtn" class="btn bg-slate-600 w-1/2 text-xs">不是，按新战队建立</button>
+                <button id="aliasYesBtn" class="btn bg-emerald-600 w-1/2 text-xs">是的，这是同一支队</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 超管大盘 -->
+    <div id="superAdminPanel" class="hidden-panel card max-w-5xl mx-auto mt-10">
+        <h2 class="text-xl font-bold text-amber-500 mb-4 flex items-center gap-2">👑 核心调度大盘</h2>
+        <div id="saEventList" class="space-y-3 max-h-[60vh] overflow-y-auto custom-scrollbar pr-2 mb-4"></div>
+        <button onclick="document.getElementById('superAdminPanel').classList.add('hidden-panel'); document.getElementById('loginPage').classList.remove('hidden-panel');" class="w-full bg-slate-700 py-3 rounded-lg text-white font-bold transition-colors hover:bg-slate-600">退出大盘返回首页</button>
+    </div>
+
+    <!-- 手动新增队员弹窗 -->
+    <div id="addMemberModal" class="hidden-panel fixed inset-0 bg-black/80 z-[9999] flex items-center justify-center p-4">
+        <div class="bg-slate-800 p-6 rounded-xl w-full max-w-md border border-slate-600 shadow-2xl">
+            <h3 class="text-lg font-bold text-emerald-400 mb-4 text-center">➕ 手动新增队员 / 建立队伍</h3>
+            <select id="addMemberTeamSelect" class="input-base mb-3 font-bold text-emerald-300 appearance-none bg-slate-900" onchange="toggleNewTeamInput()"></select>
+            <input type="text" id="newTeamNameInput" class="input-base mb-3 hidden-panel border-amber-500/50" placeholder="✏️ 请输入新队伍的名称 (必填)">
+            <input type="text" id="addMemberName" class="input-base mb-4" placeholder="👤 队员姓名 (必填)">
+            <div class="flex gap-3">
+                <button onclick="document.getElementById('addMemberModal').classList.add('hidden-panel')" class="btn bg-slate-600 w-1/3">取消</button>
+                <button onclick="confirmAddMember()" id="addMemberConfirmBtn" class="btn bg-emerald-600 w-2/3">确认添加入库</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 主控面板 -->
+    <div id="mainPanel" class="hidden-panel flex-grow w-full flex flex-col pb-10">
+
+        <!-- 顶部跑马灯 -->
+        <div class="w-full bg-slate-900/90 border-b border-emerald-500/30 py-2 shadow-lg relative z-50 overflow-hidden" style="height: 40px;">
+            <div id="carouselContent" class="text-emerald-400 font-black text-xs md:text-sm tracking-widest flex items-center h-full w-full"></div>
+        </div>
+
+        <!-- 顶部工具栏 -->
+        <div class="max-w-[1400px] w-full mx-auto px-4 mt-4">
+            <div class="flex flex-col md:flex-row justify-between items-center mb-6 gap-3 bg-slate-800 p-5 rounded-xl border border-slate-700 shrink-0 shadow-lg">
+                <div class="flex items-center gap-3">
+                    <div class="w-10 h-10 bg-blue-600 rounded-lg flex items-center justify-center font-black text-xl shadow-lg">⚙️</div>
+                    <div><h1 class="text-xl font-black text-white" id="mainTitle">中枢控制台</h1><div class="text-[10px] text-slate-400" id="sysModeLabel">系统识别中...</div></div>
+                </div>
+                <div class="flex items-center gap-3 flex-wrap justify-center">
+                    <span class="text-sm font-bold">赛事代码: <span id="currentEventCode" class="font-mono bg-slate-900 px-3 py-1.5 rounded text-emerald-400 border border-slate-700 shadow-inner tracking-widest"></span></span>
+                    <button onclick="forceRefresh()" class="bg-slate-700 hover:bg-slate-600 px-3 py-1.5 rounded font-bold text-sm transition-colors">🔄 刷新网络</button>
+                    <button onclick="generateRefereeLink()" class="bg-purple-600 hover:bg-purple-500 px-3 py-1.5 rounded font-bold text-sm transition-colors shadow-md">📤 分发裁判链接</button>
+                    <button onclick="handleLogout()" class="bg-red-700 hover:bg-red-600 px-3 py-1.5 rounded font-bold text-sm transition-colors">退出锁屏</button>
+                </div>
+            </div>
+
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
+
+                <div class="lg:col-span-2 flex flex-col gap-6">
+
+                    <!-- 个人赛工具（仅在 ind 模式显示） -->
+                    <div id="indToolsBlock" class="card hidden-panel border-blue-500/30">
+                        <h2 class="text-sm font-bold text-blue-400 mb-4 flex items-center gap-2"><span>👤</span> 个人/双打赛 · 调度中心</h2>
+                        <div class="flex gap-2 mb-3">
+                            <input type="file" id="signFile" accept=".xls,.xlsx,.csv" class="hidden" onchange="handleImportSignFile(event)">
+                            <button onclick="document.getElementById('signFile').click()" class="btn bg-slate-700 hover:bg-slate-600 text-white flex-1 text-xs">📥 导入名单(签到/签表)</button>
+                            <input type="file" id="scheduleFile" accept=".xls,.xlsx,.csv" class="hidden" onchange="handleImportScheduleFile(event)">
+                            <button onclick="document.getElementById('scheduleFile').click()" class="btn bg-indigo-700 hover:bg-indigo-600 text-white flex-1 text-xs shadow-lg">📊 智能解析 (日程/循环网格表)</button>
+                        </div>
+                        <div class="mt-4 border-t border-slate-700 pt-4">
+                            <h3 class="text-xs font-bold text-slate-400 mb-2">⚡ 极速盲派下发 (支持前置自定义编号)</h3>
+                            <div class="flex gap-2">
+                                <input type="text" id="manualDispatchInput" placeholder="例: S-01 张三/李四 vs 王五/赵六" class="input-base text-xs font-black placeholder:font-normal">
+                                <button onclick="handleManualDispatch()" class="bg-blue-600 hover:bg-blue-500 text-white px-4 py-2 rounded-lg text-xs font-bold whitespace-nowrap active:scale-95 shadow-md">一键下发</button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 团体赛工具（仅在 team 模式显示） -->
+                    <div id="teamToolsBlock" class="card hidden-panel border-amber-500/30">
+    <!-- ===== 步骤引导卡片 ===== -->
+    <div class="bg-slate-900/60 rounded-xl p-4 mb-4 border border-amber-500/20">
+        <div class="text-sm font-bold text-amber-400 mb-2 flex items-center gap-2">
+            <span>📋</span> 团体赛操作指引（建议按顺序执行）
+        </div>
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-3 text-xs">
+            <!-- 步骤1 -->
+            <div class="bg-slate-800/80 p-3 rounded-lg border border-slate-700 flex flex-col items-start gap-1">
+                <span class="font-black text-emerald-400 flex items-center gap-1"><span class="bg-emerald-900/60 px-2 py-0.5 rounded-full text-[10px]">1</span> 建立名单库</span>
+                <span class="text-slate-400">导入选手信息，系统自动编号</span>
+                <div class="flex gap-2 mt-1">
+                    <button onclick="document.getElementById('teamSignFile').click()" class="bg-slate-700 hover:bg-slate-600 px-3 py-1 rounded text-[10px] text-white shadow">📥 导入名单</button>
+                    <button onclick="openAddMemberModal()" class="bg-slate-700 hover:bg-slate-600 px-3 py-1 rounded text-[10px] text-white shadow">➕ 手动新增</button>
+                    <button onclick="window.open('players.html?code='+currentEventCode)" class="bg-blue-900/50 hover:bg-blue-800 px-3 py-1 rounded text-[10px] text-blue-300 shadow">📂 名单库</button>
+                </div>
+            </div>
+            <!-- 步骤2（可选） -->
+            <div class="bg-slate-800/80 p-3 rounded-lg border border-slate-700 flex flex-col items-start gap-1">
+                <span class="font-black text-amber-400 flex items-center gap-1"><span class="bg-amber-900/60 px-2 py-0.5 rounded-full text-[10px]">2</span> 绑定签位（可选）</span>
+                <span class="text-slate-400">解析签表，为队伍分配组别+序号</span>
+                <div class="flex gap-2 mt-1">
+                    <input type="file" id="drawFile" accept=".xls,.xlsx,.csv" class="hidden" onchange="handleImportDrawFile(event)">
+                    <button onclick="document.getElementById('drawFile').click()" class="bg-amber-700 hover:bg-amber-600 px-3 py-1 rounded text-[10px] text-white shadow">📊 解析签表</button>
+                    <button onclick="if(confirm('为所有未分配签位的队伍生成短编码？')){generateTeamCodesFromGroups();}" class="bg-indigo-700 hover:bg-indigo-600 px-3 py-1 rounded text-[10px] text-white shadow">🔄 生成编码</button>
+                </div>
+            </div>
+            <!-- 步骤3 -->
+            <div class="bg-slate-800/80 p-3 rounded-lg border border-slate-700 flex flex-col items-start gap-1">
+                <span class="font-black text-orange-400 flex items-center gap-1"><span class="bg-orange-900/60 px-2 py-0.5 rounded-full text-[10px]">3</span> 生成赛程房间</span>
+                <span class="text-slate-400">解析日程表，创建对阵房间</span>
+                <div class="flex gap-2 mt-1">
+                    <input type="file" id="teamExcelFile" accept=".xls,.xlsx,.csv" class="hidden" onchange="handleImportTeamFile(event)">
+                    <button onclick="document.getElementById('teamExcelFile').click()" class="bg-orange-700 hover:bg-orange-600 px-3 py-1 rounded text-[10px] text-white shadow">📊 解析日程</button>
+                    <span class="text-[10px] text-slate-500 flex items-center">或手动建房: 
+                        <input type="text" id="manualTeam1" placeholder="A" class="input-base text-xs py-1 w-16 bg-slate-800 border-slate-600 mx-1">
+                        vs
+                        <input type="text" id="manualTeam2" placeholder="B" class="input-base text-xs py-1 w-16 bg-slate-800 border-slate-600 mx-1">
+                        <button onclick="createManualTeamRoom()" class="bg-amber-600 hover:bg-amber-500 px-2 py-1 rounded text-[10px] text-white">创建</button>
+                    </span>
+                </div>
+            </div>
+        </div>
+        <div class="text-[10px] text-slate-500 mt-2 border-t border-slate-700 pt-2 text-center">
+            💡 提示：步骤1和3为必须，步骤2可跳过（系统将自动生成短编码）
+        </div>
+    </div>
+
+    <!-- ===== 以下为原有功能（保持兼容） ===== -->
+    <div class="bg-slate-900/50 p-3 rounded-lg border border-slate-700 mb-3">
+        <h3 class="text-[11px] font-bold text-amber-400 mb-2">📋 赛事对阵模板 (领队将严格按此排阵)</h3>
+        <div id="templateContainer" class="space-y-2 mb-2 max-h-40 overflow-y-auto custom-scrollbar pr-2"></div>
+        <div class="flex gap-2 mt-3 pt-2 border-t border-slate-700">
+            <button onclick="addTemplateMatch()" class="bg-slate-700 hover:bg-slate-600 px-3 py-1.5 rounded text-[10px] text-white transition-colors">➕ 加一盘</button>
+            <button onclick="saveTemplate()" class="bg-amber-600 hover:bg-amber-500 px-4 py-1.5 rounded text-[10px] text-white font-bold ml-auto shadow-md transition-colors">💾 保存模板</button>
+        </div>
+    </div>
+
+    <div id="teamRadarArea" class="mt-2 border-t border-slate-700/50 pt-3">
+        <div class="flex items-center justify-between flex-wrap gap-2 mb-1">
+            <span class="text-xs font-bold text-indigo-300 flex items-center gap-1.5"><span>👁️</span> 监控雷达 <span class="text-[9px] text-slate-500 font-normal ml-1">(签到统计)</span></span>
+            <button onclick="window.open('players.html?code='+$('currentEventCode').innerText)" class="btn-lib">📂 进名单库</button>
+        </div>
+        <div id="teamRadarStats" class="radar-stats"></div>
+    </div>
+
+    <!-- ★ 团体房间列表 ★ -->
+    <div id="teamRoomContainer" class="mt-3">
+        <!-- 工具栏：搜索 + 一键清空 -->
+        <div class="flex flex-wrap items-center justify-between gap-2 mb-3">
+            <div class="flex items-center gap-2 flex-1 min-w-[180px]">
+                <span class="text-[10px] text-slate-400 font-bold">🔍 搜索房间</span>
+                <input type="text" id="roomSearchInput" placeholder="输入队伍名称快速筛选..." class="input-base text-xs py-1.5 flex-1 min-w-[120px]" oninput="filterTeamRooms()">
+            </div>
+            <button onclick="clearAllTeamRooms()" class="bg-red-900/50 hover:bg-red-800 text-red-300 px-3 py-1.5 rounded text-xs font-bold shadow-md border border-red-500/30 transition-colors">
+                🗑️ 一键清空所有房间
+            </button>
+        </div>
+        <!-- 房间卡片网格 -->
+        <div id="roomRadarGrid" class="grid grid-cols-1 md:grid-cols-2 gap-3 max-h-[400px] overflow-y-auto custom-scrollbar pr-1"></div>
+    </div>
+    <button id="pushTeamMatchesBtn" onclick="handlePushTeamMatches()" class="w-full mt-3 bg-gradient-to-r from-amber-600 to-orange-600 py-2.5 rounded-lg text-xs font-black shadow-lg hover:opacity-90 active:scale-95 transition-all text-white tracking-widest border border-amber-400/50">⚡ 扫描核碰双方盲排，并下发至裁判队列</button>
+</div>
+
+                    <!-- 场地与裁判矩阵 -->
+                    <div class="card border-slate-700">
+                        <div class="flex justify-between items-center mb-4">
+                            <h2 class="text-sm font-bold text-slate-300 flex items-center gap-2"><span>📍</span> 比赛场地实况 · 裁判矩阵</h2>
+                            <div class="flex items-center gap-3">
+                                <button onclick="window.open('umpire.html?code='+$('currentEventCode').innerText)" class="bg-blue-900/40 hover:bg-blue-800 border border-blue-500/30 text-blue-300 px-3 py-1 rounded text-[10px] font-bold transition-colors shadow">📂 裁判数据库</button>
+                                <span class="text-[10px] bg-emerald-900 text-emerald-400 px-2 py-0.5 rounded animate-pulse shadow-md">LIVE</span>
+                            </div>
+                        </div>
+                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-4" id="courtsGrid"></div>
+                        <div class="border-t border-slate-700/50 pt-4">
+                            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3" id="refereesGrid"></div>
+                        </div>
+                    </div>
+
+                    <!-- 待办与完赛 -->
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div class="card border-slate-700 flex flex-col m-0 h-full">
+                            <div class="flex justify-between items-center mb-4">
+                                <h2 class="text-sm font-bold text-slate-300">⏳ 待办提取池</h2>
+                                <div class="flex gap-2">
+                                    <button onclick="handleClearTasks()" class="bg-red-900/50 hover:bg-red-800 text-red-300 px-3 py-1.5 rounded text-xs font-bold transition-colors shadow">🗑️ 清空队列</button>
+                                    <span class="text-[10px] bg-blue-900 text-blue-300 px-2 py-0.5 rounded flex items-center" id="taskCount">0 场</span>
+                                </div>
+                            </div>
+                            <div id="tasksList" class="space-y-2 max-h-64 overflow-y-auto custom-scrollbar flex-grow"></div>
+                        </div>
+                        <div class="card border-slate-700 flex flex-col m-0 h-full">
+                            <div class="flex justify-between items-center mb-4"><h2 class="text-sm font-bold text-slate-300">🏁 最新完赛成绩</h2></div>
+                            <div id="recordsList" class="space-y-2 max-h-64 overflow-y-auto custom-scrollbar flex-grow"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 右侧边栏 -->
+                <div class="flex flex-col gap-6">
+                    <div class="card border-blue-500/30">
+                        <h2 class="text-sm font-bold text-blue-400 mb-4 flex items-center gap-2"><span>📺</span> 大屏实况广播 (Dashboard)</h2>
+                        <div class="bg-blue-900/20 border border-blue-500/20 p-3 rounded-lg mb-3">
+                            <div class="text-[10px] text-blue-300 mb-1">大屏幕滚动播报内容：</div>
+                            <div id="currentDashboardDisplay" class="text-sm font-bold text-white break-words">无</div>
+                        </div>
+                        <div class="flex gap-2">
+                            <input type="text" id="dashboardBroadcastInput" placeholder="输入大屏公告..." class="input-base text-xs flex-1">
+                            <button onclick="handleSendBroadcast('broadcast', false)" class="btn bg-blue-600 hover:bg-blue-500 text-white text-xs px-3 rounded font-bold whitespace-nowrap shadow-md">发布</button>
+                            <button onclick="handleSendBroadcast('broadcast', true)" class="btn bg-slate-700 hover:bg-slate-600 text-slate-300 text-xs px-3 rounded font-bold whitespace-nowrap shadow-md border border-slate-500">撤销</button>
+                        </div>
+                    </div>
+
+                    <div class="card border-amber-500/30 bg-amber-900/10">
+                        <h2 class="text-sm font-bold text-amber-400 mb-4 flex items-center gap-2"><span>📋</span> 赛事风险告知书</h2>
+                        <div class="bg-amber-900/20 border border-amber-500/20 p-3 rounded-lg mb-3">
+                            <div class="text-[10px] text-amber-300 mb-1">当前赛事统一告知书（选手签署时将显示此内容）</div>
+                            <div class="flex flex-col gap-2">
+                                <textarea id="waiverTextEditor" class="input-base text-xs font-mono h-48 resize-y" placeholder="输入或粘贴风险告知书内容..."></textarea>
+                                <div class="flex gap-2 items-center">
+                                    <button onclick="document.getElementById('waiverFileUpload').click()" class="bg-slate-700 hover:bg-slate-600 text-xs px-3 py-1.5 rounded text-slate-300 font-bold transition-colors">📄 上传文件</button>
+                                    <input type="file" id="waiverFileUpload" accept=".txt,.docx,.pdf" class="hidden" onchange="handleWaiverFileUpload(event)">
+                                    <span id="waiverUploadStatus" class="text-[10px] text-slate-500">未选择</span>
+                                    <button onclick="resetWaiverText()" class="bg-slate-700 hover:bg-slate-600 text-xs px-3 py-1.5 rounded text-slate-300 font-bold transition-colors ml-auto">恢复默认</button>
+                                </div>
+                            </div>
+                        </div>
+                        <button onclick="saveWaiverText()" id="saveWaiverBtn" class="w-full bg-amber-600 hover:bg-amber-500 py-2 rounded-lg text-xs font-bold text-white transition-colors shadow-md">💾 保存告知书至赛事库</button>
+                    </div>
+
+                    <div class="card border-purple-500/30">
+                        <h2 class="text-sm font-bold text-purple-400 mb-4 flex items-center gap-2"><span>👨‍⚖️</span> 裁判长提示词 (发送至裁判端)</h2>
+                        <div class="bg-purple-900/20 border border-purple-500/20 p-3 rounded-lg mb-3">
+                            <div class="text-[10px] text-purple-300 mb-1">当前向全体裁判下发的提示指令：</div>
+                            <div id="currentRefereePromptDisplay" class="text-sm font-bold text-white break-words">无</div>
+                        </div>
+                        <div class="flex gap-2">
+                            <input type="text" id="refereePromptInput" placeholder="例: 赛前务必核对双方球拍..." class="input-base text-xs flex-1">
+                            <button onclick="handleSendBroadcast('referee_msg', false)" class="btn bg-purple-600 hover:bg-purple-500 text-white text-xs px-3 rounded font-bold whitespace-nowrap shadow-md">下发</button>
+                            <button onclick="handleSendBroadcast('referee_msg', true)" class="btn bg-slate-700 hover:bg-slate-600 text-slate-300 text-xs px-3 rounded font-bold whitespace-nowrap shadow-md border border-slate-500">撤销</button>
+                        </div>
+                    </div>
+
+                    <div class="card border-teal-500/30 flex-grow">
+                        <h2 class="text-sm font-bold text-teal-400 mb-4 flex items-center gap-2"><span>📢</span> 赛事自定义辅屏轮播 (图片/文案)</h2>
+                        <div id="noticeListContainer" class="space-y-2 mb-3 max-h-32 overflow-y-auto custom-scrollbar"></div>
+                        <div class="bg-slate-900/50 p-3 rounded-lg border border-slate-700 flex flex-col gap-2">
+                            <input type="text" id="noticeTextInput" placeholder="辅屏文案 (建议15字以内)" class="input-base text-xs">
+                            <div class="flex gap-2 items-center">
+                                <button onclick="document.getElementById('noticeImageFile').click()" class="bg-slate-700 hover:bg-slate-600 text-xs px-3 py-2 rounded text-slate-300 font-bold whitespace-nowrap transition-colors">📸 选图</button>
+                                <input type="file" id="noticeImageFile" accept="image/*" class="hidden" onchange="compressAndPreviewNoticeImage(event)"><img id="noticePreview" src="" class="h-8 rounded hidden object-contain"><button onclick="appendNotice()" class="bg-teal-600 hover:bg-teal-500 text-white px-3 py-2 rounded text-xs font-bold ml-auto active:scale-95 transition-transform whitespace-nowrap">➕ 入列</button>
+                            </div>
+                        </div>
+                        <div class="flex gap-2 mt-3 pt-3 border-t border-slate-700"><button onclick="handleSaveNotice()" id="saveNoticeBtn" class="bg-teal-600 hover:bg-teal-500 text-white px-4 py-2 rounded text-xs font-bold w-full shadow-lg active:scale-95 transition-transform">☁️ 发布轮播队列</button><button onclick="handleClearNotice()" class="bg-red-900/40 border border-red-500/30 hover:bg-red-800 text-red-300 py-2 px-3 rounded text-xs font-bold whitespace-nowrap transition-colors">🗑️ 强制下架</button></div>
+                    </div>
+
+                    <!-- 监控雷达（个人模式） -->
+                    <div id="radarCard" class="card bg-gradient-to-b from-slate-800 to-slate-900 border-indigo-500/30 p-0 overflow-hidden">
+                        <div class="p-5">
+                            <div class="flex justify-between items-center mb-4">
+                                <h2 id="radarTitle" class="text-sm font-bold text-indigo-300 flex items-center gap-2"><span>👁️</span> 监控雷达 <span class="text-[10px] text-slate-400 ml-1 font-normal">(签到统计)</span></h2>
+                                <button onclick="window.open('players.html?code='+$('currentEventCode').innerText)" class="btn-lib">📂 进名单库</button>
+                            </div>
+                            <div id="indRadarStats" class="radar-stats"></div>
+                        </div>
+                    </div>
+
+                    <!-- 归档 -->
+                    <div class="card border-emerald-900/30 bg-emerald-900/10 p-5 flex-grow flex flex-col">
+                        <h2 class="text-sm font-bold text-emerald-400 mb-4 flex items-center gap-2"><span>📁</span> 完赛归档与数字法务</h2>
+                        <button onclick="window.open('/data.php?action=download_all_zip&event_code='+currentEventCode)" class="w-full bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 py-4 rounded-xl text-sm font-black text-white mb-4 shadow-[0_5px_15px_rgba(16,185,129,0.3)] transition-all active:scale-95 tracking-widest border border-emerald-400/50">📦 一键打包下载全案资料 (ZIP)</button>
+                        <div class="grid grid-cols-2 gap-2 mb-4"><button onclick="window.open('/data.php?action=download&event_code='+currentEventCode)" class="w-full bg-slate-800 border border-slate-600 hover:bg-slate-700 py-2 rounded-lg text-[10px] font-bold transition-colors">📊 仅下成绩单(CSV)</button><button onclick="window.open('/data.php?action=download_waivers&event_code='+currentEventCode)" class="w-full bg-slate-800 border border-slate-600 hover:bg-slate-700 py-2 rounded-lg text-[10px] font-bold text-emerald-400 transition-colors">📜 仅下免责表(CSV)</button></div>
+                        <div class="mt-auto border-t border-slate-700 pt-4"><button onclick="handleResetEvent()" class="w-full bg-red-950/40 border border-red-500/30 hover:bg-red-800 py-3 rounded-xl text-xs font-bold text-red-400 transition-colors">🚨 彻底删除当前赛事</button></div>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+    </div>
+
+    <div id="toast" class="toast hidden-panel"></div>
+
+    <script>
+        const API_URL = '/data.php';
+        const SPLIT_REGEX = /[\+＋\/／、＆&\|]/;
+        const INVALID_MATCH_REGEX = /胜方|负方|第\d+名|第[一二三四五六七八九十]名|组第|胜者|负者/i;
+        const NAME_REGEX = /姓名|名单|参赛搭档|选手|运动员/i;
+
+        let currentEventCode = null;
+        let globalDashboardData = null;
+        let dashInterval;
+        let noticeImageBase64 = '';
+        let noticeArray = [];
+        let teamTemplate = [];
+        let sysConfigData = null;
+        let globalReferees = [];
+        let currentMasterPwd = '';
+
+        window.teamAliasMap = {};
+
+        const urlParams = new URLSearchParams(window.location.search);
+        let sysMode = urlParams.get('mode') || 'ind';
+        const $ = id => document.getElementById(id);
+
+        // ======================== DEFAULT_WAIVER_TEXT ========================
+        const DEFAULT_WAIVER_TEXT = `1. 本人自愿报名参加本次赛事及相关活动，已完全了解并理解本次赛事可能存在的风险（包括但不限于运动损伤、突发疾病、财产损失等）。\n\n2. 本人确认自身身体健康状况良好，没有任何不适合参与该项运动的疾病或症状。本人承诺在比赛中遵守赛事规则，服从裁判和工作人员的管理。\n\n3. 本人同意在赛事期间，如因个人原因、不可抗力或第三方原因导致的人身伤害或财产损失，赛事组织方及场地方免于承担任何法律与经济责任。\n\n4. 本人已仔细阅读并完全理解以上内容，签名即代表本人独立承担参与本次赛事的所有相关风险及责任。`;
+
+        // ======================== 工具函数 ========================
+        function showToast(msg, isError = false) {
+            const t = $('toast');
+            t.innerText = msg;
+            t.style.background = isError ? '#dc2626' : '#10b981';
+            t.style.display = 'block';
+            setTimeout(() => t.style.display = 'none', 3000);
+        }
+
+        async function apiGet(action, params = {}) {
+            let baseCode = params.event_code || currentEventCode || $('eventCodeInput').value.trim();
+            let url = `${API_URL}?action=${action}&event_code=${baseCode}&_t=${Date.now()}`;
+            for (let k in params) {
+                if (k === 'event_code') continue;
+                if (params[k] !== undefined && params[k] !== null) url += `&${k}=${encodeURIComponent(params[k])}`;
+            }
+            try {
+                const res = await fetch(url);
+                if (!res.ok) throw new Error('HTTP ' + res.status);
+                return await res.json();
+            } catch (e) {
+                return { status: 'error', message: e.message };
+            }
+        }
+
+        async function apiPost(action, data = {}) {
+            data.action = action;
+            data.event_code = currentEventCode || $('eventCodeInput').value.trim();
+            try {
+                const res = await fetch(API_URL, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(data)
+                });
+                if (!res.ok) throw new Error('HTTP ' + res.status);
+                return await res.json();
+            } catch (e) {
+                return { status: 'error', message: e.message };
+            }
+        }
+
+        function copyToClip(text) {
+            navigator.clipboard.writeText(text).then(() => {
+                showToast('🔗 链接已成功复制到剪贴板！');
+            }).catch(e => {
+                prompt('自动复制失败，请手动复制：', text);
+            });
+        }
+
+        // ======================== 初始化模式 ========================
+        function initMode() {
+            const indBlock = $('indToolsBlock');
+            const teamBlock = $('teamToolsBlock');
+            if (sysMode === 'team') {
+                $('mainTitle').innerText = '中枢指挥台 [团体架构]';
+                $('sysModeLabel').innerText = '当前: 团队对抗模式';
+                indBlock.classList.add('hidden-panel');
+                teamBlock.classList.remove('hidden-panel');
+                $('radarCard').classList.add('hidden-panel');
+            } else {
+                $('mainTitle').innerText = '中枢指挥台 [单项架构]';
+                $('sysModeLabel').innerText = '当前: 个人/双打晋级模式';
+                indBlock.classList.remove('hidden-panel');
+                teamBlock.classList.add('hidden-panel');
+                $('radarCard').classList.remove('hidden-panel');
+            }
+        }
+
+        // ======================== 登录与会话管理 ========================
+        window.handleLogin = async () => {
+            const code = $('eventCodeInput').value.trim().toUpperCase();
+            const pwd = $('masterPwd').value;
+            if (!code || !pwd) return showToast('⚠️ 赛事及密码必填', true);
+            const btn = $('loginBtn');
+            btn.innerText = "鉴权网关穿透中...";
+            btn.disabled = true;
+            currentEventCode = code;
+            currentMasterPwd = pwd;
+            try {
+                const config = await apiGet('get_event_config');
+                if (config.status === 'error') {
+                    showToast('❌ 查无此赛事', true);
+                    currentEventCode = null;
+                    currentMasterPwd = '';
+                    sessionStorage.removeItem('pickle_master_code');
+                    sessionStorage.removeItem('pickle_master_pwd');
+                } else if (config.data.referee_password !== pwd) {
+                    showToast('❌ 密码错误', true);
+                    currentEventCode = null;
+                    currentMasterPwd = '';
+                } else {
+                    sysConfigData = config.data;
+                    if (config.data.event_type) {
+                        sysMode = config.data.event_type;
+                    }
+                    sessionStorage.setItem('pickle_master_code', code);
+                    sessionStorage.setItem('pickle_master_pwd', pwd);
+                    $('loginPage').classList.add('hidden-panel');
+                    $('mainPanel').classList.remove('hidden-panel');
+                    $('currentEventCode').innerText = currentEventCode;
+                    if (window.history && window.history.replaceState) {
+                        const url = new URL(window.location);
+                        url.searchParams.delete('code');
+                        url.searchParams.delete('pwd');
+                        window.history.replaceState({}, document.title, url.toString());
+                    }
+                    initMode();
+                    await loadWaiverText();
+                    if (sysMode === 'team') loadTeamTemplate();
+                    loadDashboard();
+                    loadReferees();
+                    loadNoticesForCarousel();
+                    if (dashInterval) clearInterval(dashInterval);
+                    dashInterval = setInterval(() => {
+                        if (currentEventCode) { loadDashboard(); loadReferees(); }
+                    }, 4000);
+                    const noticeRes = await apiGet('get_event_notice');
+                    if (noticeRes.status === 'success' && noticeRes.data) {
+                        noticeArray = noticeRes.data || [];
+                        renderNoticeList();
+                    }
+                }
+            } catch (e) {
+                showToast('❌ 网络异常：' + e.message, true);
+                currentEventCode = null;
+                currentMasterPwd = '';
+            }
+            btn.innerText = "进入总控大厅";
+            btn.disabled = false;
+        };
+
+        window.onload = async () => {
+            initMode();
+            const savedCode = sessionStorage.getItem('pickle_master_code');
+            const savedPwd = sessionStorage.getItem('pickle_master_pwd');
+            if (savedCode && savedPwd) {
+                $('eventCodeInput').value = savedCode;
+                $('masterPwd').value = savedPwd;
+                await window.handleLogin();
+            }
+            const uCode = urlParams.get('code');
+            const uPwd = urlParams.get('pwd');
+            if (uCode && uPwd && !savedCode) {
+                $('eventCodeInput').value = uCode;
+                $('masterPwd').value = uPwd;
+                await window.handleLogin();
+            }
+        };
+
+        window.handleLogout = () => {
+            sessionStorage.removeItem('pickle_master_code');
+            sessionStorage.removeItem('pickle_master_pwd');
+            if (dashInterval) clearInterval(dashInterval);
+            currentEventCode = null;
+            currentMasterPwd = '';
+            $('loginPage').classList.remove('hidden-panel');
+            $('mainPanel').classList.add('hidden-panel');
+            $('eventCodeInput').value = '';
+            $('masterPwd').value = '';
+        };
+
+        // ======================== 分发裁判链接 ========================
+        window.generateRefereeLink = function() {
+            if (!currentEventCode || !sysConfigData || !sysConfigData.referee_password) {
+                showToast('⚠️ 请先登录赛事，且确保已获取到裁判密码', true);
+                return;
+            }
+            const code = currentEventCode;
+            const pwd = sysConfigData.referee_password;
+            const link = `${window.location.origin}/referee.html?code=${code}&pwd=${encodeURIComponent(pwd)}`;
+            if (navigator.clipboard && navigator.clipboard.writeText) {
+                navigator.clipboard.writeText(link).then(() => {
+                    showToast(`✅ 已复制裁判链接！可直接转给裁判员\n${link}`, false);
+                }).catch(() => { fallbackCopy(link); });
+            } else { fallbackCopy(link); }
+        };
+
+        function fallbackCopy(text) {
+            const input = document.createElement('input');
+            input.value = text;
+            document.body.appendChild(input);
+            input.select();
+            try {
+                document.execCommand('copy');
+                showToast(`✅ 已复制裁判链接！可直接转给裁判员\n${text}`, false);
+            } catch (e) {
+                showToast(`📋 请手动复制以下链接：\n${text}`, false);
+            }
+            document.body.removeChild(input);
+        }
+
+        // ======================== 风险告知书 ========================
+        async function loadWaiverText() {
+            if (!currentEventCode) return;
+            try {
+                const res = await apiGet('get_waiver_text');
+                if (res.status === 'success' && res.data) {
+                    $('waiverTextEditor').value = res.data;
+                    return;
+                }
+                const config = await apiGet('get_event_config');
+                if (config.status === 'success' && config.data && config.data.waiver_text) {
+                    $('waiverTextEditor').value = config.data.waiver_text;
+                } else {
+                    $('waiverTextEditor').value = DEFAULT_WAIVER_TEXT;
+                }
+            } catch (e) {
+                console.warn('加载风险告知书失败', e);
+                $('waiverTextEditor').value = DEFAULT_WAIVER_TEXT;
+            }
+        }
+
+        window.saveWaiverText = async function() {
+            const text = $('waiverTextEditor').value.trim();
+            if (!text) {
+                if (!confirm('告知书内容为空，确定要清空吗？')) return;
+            }
+            const btn = $('saveWaiverBtn');
+            btn.innerText = '保存中...';
+            btn.disabled = true;
+            try {
+                const pwd = currentMasterPwd || sessionStorage.getItem('pickle_master_pwd') || '';
+                const res = await apiPost('set_waiver_text', { waiver_text: text, password: pwd });
+                if (res.status === 'success') {
+                    showToast('✅ 风险告知书已更新');
+                } else {
+                    showToast('保存失败：' + (res.message || ''), true);
+                }
+            } catch (e) {
+                showToast('网络错误', true);
+            }
+            btn.innerText = '💾 保存告知书至赛事库';
+            btn.disabled = false;
+        };
+
+        window.handleWaiverFileUpload = function(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+            const statusEl = $('waiverUploadStatus');
+            statusEl.textContent = file.name + ' (解析中...)';
+
+            const fileType = file.name.split('.').pop().toLowerCase();
+            const reader = new FileReader();
+
+            if (fileType === 'txt') {
+                reader.onload = function(e) {
+                    $('waiverTextEditor').value = e.target.result;
+                    statusEl.textContent = file.name + ' (已加载)';
+                };
+                reader.readAsText(file);
+            } else if (fileType === 'docx') {
+                const script = document.createElement('script');
+                script.src = 'https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.6.0/mammoth.browser.min.js';
+                script.onload = function() {
+                    reader.onload = function(e) {
+                        const arrayBuffer = e.target.result;
+                        mammoth.extractRawText({ arrayBuffer: arrayBuffer })
+                            .then(result => {
+                                $('waiverTextEditor').value = result.value;
+                                statusEl.textContent = file.name + ' (已加载)';
+                            })
+                            .catch(err => {
+                                alert('解析 docx 失败：' + err.message);
+                                statusEl.textContent = '解析失败';
+                            });
+                    };
+                    reader.readAsArrayBuffer(file);
+                };
+                document.head.appendChild(script);
+            } else if (fileType === 'pdf') {
+                const script = document.createElement('script');
+                script.src = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.min.js';
+                script.onload = function() {
+                    pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.worker.min.js';
+                    reader.onload = function(e) {
+                        const arrayBuffer = e.target.result;
+                        pdfjsLib.getDocument({ data: arrayBuffer }).promise
+                            .then(pdf => {
+                                let fullText = '';
+                                const pagePromises = [];
+                                for (let i = 1; i <= pdf.numPages; i++) {
+                                    pagePromises.push(pdf.getPage(i).then(page => page.getTextContent()));
+                                }
+                                return Promise.all(pagePromises);
+                            })
+                            .then(pagesContent => {
+                                let fullText = '';
+                                pagesContent.forEach(content => {
+                                    content.items.forEach(item => { fullText += item.str + ' '; });
+                                    fullText += '\n';
+                                });
+                                $('waiverTextEditor').value = fullText.trim();
+                                statusEl.textContent = file.name + ' (已加载)';
+                            })
+                            .catch(err => {
+                                alert('解析 PDF 失败：' + err.message);
+                                statusEl.textContent = '解析失败';
+                            });
+                    };
+                    reader.readAsArrayBuffer(file);
+                };
+                document.head.appendChild(script);
+            } else {
+                alert('不支持的文件格式，请上传 .txt, .docx 或 .pdf');
+                statusEl.textContent = '不支持';
+            }
+            event.target.value = '';
+        };
+
+        window.resetWaiverText = function() {
+            if (confirm('确定恢复默认风险告知书内容吗？')) {
+                $('waiverTextEditor').value = DEFAULT_WAIVER_TEXT;
+                $('waiverUploadStatus').textContent = '已恢复默认';
+            }
+        };
+
+        // ======================== 团体房间管理 ========================
+        window.createManualTeamRoom = async function() {
+            let teamA = $('manualTeam1').value.trim();
+            let teamB = $('manualTeam2').value.trim();
+            if (!teamA || !teamB) return showToast('请填写两队名称', true);
+            let roomCode = 'T' + String(Date.now()).slice(-4);
+            let payload = {
+                room_code: roomCode,
+                teams: [
+                    { team_name: teamA, players: [], team_code: 'T' + String(Math.floor(Math.random() * 100)).padStart(2, '0') },
+                    { team_name: teamB, players: [], team_code: 'T' + String(Math.floor(Math.random() * 100)).padStart(2, '0') }
+                ],
+                status: 'team_confirming'
+            };
+            const res = await apiPost('import_team_event', payload);
+            if (res.status === 'success') {
+                showToast(`✅ 房间 ${roomCode} 已建立`);
+                $('manualTeam1').value = '';
+                $('manualTeam2').value = '';
+                loadDashboard();
+            } else {
+                showToast('建立失败', true);
+            }
+        };
+		
+		window.clearAllTeamRooms = async () => {
+    if (!confirm('⚠️ 确定要清空所有团体房间吗？\n此操作将删除所有房间及其排阵数据，不可恢复！')) return;
+    const pwd = currentMasterPwd || sessionStorage.getItem('pickle_master_pwd') || '';
+    const res = await apiPost('clear_all_team_rooms', { password: pwd });
+    if (res.status === 'success') {
+        showToast('✅ 所有团体房间已清空');
+        loadDashboard();
+    } else {
+        showToast('清空失败：' + (res.message || ''), true);
+    }
+};
+
+window.filterTeamRooms = function() {
+    const keyword = document.getElementById('roomSearchInput').value.trim().toLowerCase();
+    const containers = document.querySelectorAll('#roomRadarGrid .radar-room-card');
+    containers.forEach(card => {
+        card.style.display = card.innerText.toLowerCase().includes(keyword) ? '' : 'none';
+    });
+};
+
+        window.changeEventMode = async (code, newMode, pwd) => {
+            if (!confirm(`确定要切换赛事模式吗？\n切换后可能会影响赛程的显示逻辑。`)) return;
+            const res = await apiPost('change_event_mode', { super_pwd: pwd, event_code: code, new_mode: newMode });
+            if (res.status === 'success') { showToast('✅ 模式切换成功'); window.openSuperAdmin(pwd); } else showToast('切换失败', true);
+        };
+		
+		async function syncTeamPlayerIds(room, teamName, teamCode) {
+    try {
+        await apiPost('sync_team_player_ids', { room_code: room, team_name: teamName, team_code: teamCode });
+    } catch (e) {}
+}
+
+		window.handleImportDrawFile = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = async (evt) => {
+        const data = new Uint8Array(evt.target.result);
+        const workbook = XLSX.read(data, { type: 'array' });
+        const rows = XLSX.utils.sheet_to_json(workbook.Sheets[workbook.SheetNames[0]], { header: 1, defval: '' });
+        
+        // 使用 parseRoundRobinData 提取组别和签位
+        const roomMap = new Map(); // 临时存储，实际我们只需要 teams 信息
+        const groupTeamMap = new Map(); // 用来存放 group|teamName -> sign
+        // 调用 parseRoundRobinData 获取 teams 信息（复用现有逻辑）
+        // 但 parseRoundRobinData 会生成房间，我们只需要提取队伍签位，所以可单独解析
+        let groups = {};
+        // 快速解析：找到表头并提取
+        let headerRowIdx = rows.findIndex(r => r.some(c => String(c).includes('组别') || String(c).includes('小组') || String(c).includes('A组')));
+        if (headerRowIdx === -1) return showToast('未找到签表表头', true);
+        let headers = rows[headerRowIdx];
+        let groupIdx = headers.findIndex(h => String(h).includes('组别') || String(h).includes('小组'));
+        let teamNameCol = -1;
+        for (let i = 0; i < headers.length; i++) {
+            let h = String(headers[i] || '');
+            if (h.includes('A组') || h.includes('B组') || h.includes('组')) continue;
+            if (h.includes('名') || h.includes('胜') || h.includes('局') || h.includes('分') || h.includes('率')) continue;
+            if (h.match(/^[A-Z]\d+$/)) continue;
+            if (i > 0) { teamNameCol = i; break; }
+        }
+        if (teamNameCol === -1) teamNameCol = 1;
+        let currentGroupName = '';
+        for (let i = headerRowIdx + 1; i < rows.length; i++) {
+            let row = rows[i];
+            let firstCell = String(row[0] || '').trim();
+            if (!firstCell || /胜负|局|分|率/.test(firstCell)) continue;
+            if (/^[A-Z]组/.test(firstCell)) {
+                currentGroupName = firstCell;
+                continue;
+            }
+            let teamRaw = String(row[teamNameCol] || '').trim();
+            if (!teamRaw) continue;
+            let sign = '';
+            let firstCellClean = firstCell.replace(/^\s*/, '').replace(/\s*$/, '');
+            if (/^[A-Z]\d+$/.test(firstCellClean)) sign = firstCellClean;
+            else if (/^[A-Z]\d+/.test(firstCellClean)) sign = firstCellClean.match(/^[A-Z]\d+/)[0];
+            if (!sign) continue;
+            let group = currentGroupName.replace(/组$/, '') || '未知';
+            let cleanTeam = teamRaw.replace(/[（(][^）)]*[）)]/g, '').trim();
+            let key = `${group}|${cleanTeam}`;
+            groupTeamMap.set(key, sign);
+        }
+
+        // 更新 team_event 中的 team_code
+        let teamEvent = await apiGet('get_full_dashboard').then(d => d.team_event || {});
+        let updated = 0;
+        for (let room in teamEvent) {
+            let teams = teamEvent[room].teams;
+            for (let t of teams) {
+                let key = `${t.group}|${t.team_name}`;
+                if (groupTeamMap.has(key)) {
+                    let sign = groupTeamMap.get(key);
+                    if (t.team_code !== sign) {
+                        t.team_code = sign;
+                        updated++;
+                        // 同步选手编号
+                        await syncTeamPlayerIds(room, t.team_name, sign);
+                    }
+                }
+            }
+            // 保存更新后的 room
+            await apiPost('import_team_event', {
+                room_code: room,
+                teams: teams,
+                status: teamEvent[room].status
+            });
+        }
+        showToast(`✅ 签表解析完成，更新了 ${updated} 个队伍的签位编号`);
+        loadDashboard();
+    };
+    reader.readAsArrayBuffer(file);
+};
+
+window.generateTeamCodesFromGroups = async () => {
+    let teamEvent = await apiGet('get_full_dashboard').then(d => d.team_event || {});
+    let groupCounter = {};
+    let updated = 0;
+    for (let room in teamEvent) {
+        let teams = teamEvent[room].teams;
+        let modified = false;
+        for (let t of teams) {
+            if (t.team_code && !/^[A-Z]\d+$/.test(t.team_code)) continue; // 已有签位不覆盖
+            let group = t.group || '未知';
+            if (!groupCounter[group]) groupCounter[group] = 0;
+            groupCounter[group]++;
+            let newCode = group + '-T' + String(groupCounter[group]).padStart(2, '0');
+            t.team_code = newCode;
+            modified = true;
+            updated++;
+            await syncTeamPlayerIds(room, t.team_name, newCode);
+        }
+        if (modified) {
+            await apiPost('import_team_event', {
+                room_code: room,
+                teams: teams,
+                status: teamEvent[room].status
+            });
+        }
+    }
+    showToast(`✅ 生成了 ${updated} 个队伍的短编码（格式：组别-T序号）`);
+    loadDashboard();
+};
+
+        // ======================== 超管大盘 ========================
+        window.openSuperAdmin = async (silentPwd = null) => {
+            const pwd = silentPwd || prompt('🔒 核心大盘鉴权\n请输入系统管理密码：');
+            if (!pwd) return;
+            try {
+                const res = await apiPost('super_admin_get_events', { super_pwd: pwd });
+                if (res.status !== 'success') return showToast('鉴权失败：密码错误或越权！', true);
+                $('loginPage').classList.add('hidden-panel');
+                $('superAdminPanel').classList.remove('hidden-panel');
+                let html = '';
+                res.data.forEach(e => {
+                    let mLink = `${window.location.origin}/master.html?mode=${e.type}&code=${e.code}&pwd=${e.pwd}`;
+                    let nextMode = e.type === 'team' ? 'ind' : 'team';
+                    let nextModeLabel = e.type === 'team' ? '转为个人单项赛' : '转为团体对抗赛';
+                    html += `
+<div class="bg-slate-800 p-4 rounded-xl border border-slate-700 flex flex-col md:flex-row justify-between items-center gap-3 shadow-md">
+    <div class="text-left w-full md:w-auto">
+        <div class="text-emerald-400 font-black text-sm mb-1">${e.name} <span class="bg-slate-900 text-slate-400 px-2 py-0.5 rounded text-[10px] border border-slate-700 ml-1 shadow-inner">${e.type === 'team' ? '🏆 团体赛' : '👤 个人赛'}</span></div>
+        <div class="text-xs text-slate-400">赛事码: <span class="font-mono text-amber-400 font-bold">${e.code}</span> | 密码: <span class="font-mono text-pink-400">${e.pwd}</span> | 天数: <span class="font-mono text-blue-400">${e.days || 1}</span></div>
+    </div>
+    <div class="flex gap-2 flex-wrap justify-center w-full md:w-auto shrink-0">
+        <button onclick="editEvent('${e.code}')" class="bg-amber-600 hover:bg-amber-500 px-3 py-2 rounded text-[11px] text-white font-bold shadow-md transition-colors active:scale-95">✏️ 编辑</button>
+        <button onclick="window.copyToClip('${mLink}')" class="bg-blue-600 hover:bg-blue-500 px-3 py-2 rounded text-[11px] text-white font-bold shadow-md transition-colors active:scale-95">🔗 复制主控链接</button>
+        <button onclick="changeEventMode('${e.code}', '${nextMode}', '${pwd}')" class="bg-indigo-600 hover:bg-indigo-500 px-3 py-2 rounded text-[11px] text-white font-bold shadow-md transition-colors active:scale-95">🔄 ${nextModeLabel}</button>
+        <button onclick="deleteEventSA('${e.code}', '${pwd}')" class="bg-red-900/60 hover:bg-red-800 text-red-300 border border-red-500/30 px-3 py-2 rounded text-[11px] font-bold shadow-md transition-colors active:scale-95">🗑️ 彻底删除</button>
+    </div>
+</div>`;
+                });
+                $('saEventList').innerHTML = html || '<div class="text-center text-slate-500 py-10 italic">数字枢纽无任何在库赛事...</div>';
+            } catch (e) {
+                showToast('通信断层', true);
+            }
+        };
+
+        window.deleteEventSA = async (code, pwd) => {
+            if (!confirm(`🚨 危险操作！\n确定要彻底删除赛事【${code}】的所有数据吗？此操作不可逆！`)) return;
+            try {
+                const res = await apiPost('super_admin_delete_event', { super_pwd: pwd, target_code: code });
+                if (res.status === 'success') { showToast('🗑️ 赛事已彻底删除'); window.openSuperAdmin(pwd); } else showToast('删除失败', true);
+            } catch (e) {
+                showToast('网络故障', true);
+            }
+        };
+
+        window.submitCreateEvent = async () => {
+            const superPwd = $('c_superPwd').value.trim();
+            const nm = $('c_name').value.trim();
+            const cc = $('c_code').value.trim();
+            const crts = $('c_courts').value.trim() || '1 2 3 4';
+            const pw = $('c_pwd').value.trim();
+            const mode = $('c_mode').value;
+            if (!superPwd || !nm || !pw) return showToast('必填项缺失', true);
+            const btn = $('realCreateBtn');
+            btn.innerText = '生成中...';
+            btn.disabled = true;
+            let attemptCode = cc ? cc.toUpperCase() : 'PICKLE' + Math.floor(1000 + Math.random() * 9000).toString();
+            try {
+                let courtsArray = crts.split(/[\s,，]+/).map(c => c.trim()).filter(c => c);
+                let res = await apiPost('create_event', { super_pwd: superPwd, event_name: nm, event_type: mode, courts: courtsArray, referee_password: pw, custom_code: attemptCode });
+                if (res.status === 'error' && res.message && res.message.includes('已存在')) {
+                    attemptCode = attemptCode + Math.floor(10 + Math.random() * 90).toString();
+                    res = await apiPost('create_event', { super_pwd: superPwd, event_name: nm, event_type: mode, courts: courtsArray, referee_password: pw, custom_code: attemptCode });
+                    if (res.status === 'success') alert(`⚠️ 提示：赛事码冲突！系统智能分配新码：【 ${attemptCode} 】`);
+                }
+                if (res.status === 'success') { showToast('🎉 创建成功！正在接入...'); window.location.href = `master.html?mode=${mode}&code=${res.event_code || attemptCode}&pwd=${pw}`; } else { showToast('创建失败: ' + (res.message || ''), true); }
+            } catch (e) {
+                showToast('网络错误', true);
+            }
+            btn.innerText = '确认创建';
+            btn.disabled = false;
+        };
+
+        // ======================== 跑马灯 ========================
+        async function loadNoticesForCarousel() {
+            if (!currentEventCode) return;
+            try {
+                // 暂时仅显示品牌广告，避免 AI 调用可能带来的副作用
+                const brand = "🚀 Pickle球赛事智能管理系统 | 执裁全程无纸化 | 完美适配网球记 | 🔥 无限哥团队心血打造";
+                const container = $('carouselContent');
+                container.innerHTML = `<div class="animate-marquee px-4 w-full">${brand}</div>`;
+            } catch (e) {
+                // 忽略错误
+            }
+        }
+
+        // ======================== 数据加载 ========================
+        async function loadDashboard() {
+            try {
+                const bRes = await apiGet('get_broadcast');
+                if (bRes.status === 'success' && $('currentDashboardDisplay')) $('currentDashboardDisplay').innerText = bRes.message || '无';
+                const rRes = await apiGet('get_referee_msg');
+                if (rRes.status === 'success' && $('currentRefereePromptDisplay')) $('currentRefereePromptDisplay').innerText = rRes.message || '无';
+
+                const pRes = await apiGet('get_players');
+                const playersData = pRes.status === 'success' ? pRes.data : [];
+
+                const data = await apiGet('get_full_dashboard');
+                if (!data || data.status !== 'success') return;
+                globalDashboardData = data;
+
+                // 场地卡片
+                let cHtml = '';
+                for (let c in data.courts) {
+                    let info = data.courts[c];
+                    let isLive = info.status === '比赛中';
+                    let statusClass = isLive ? 'badge live' : 'badge';
+                    let statusText = info.status || '空闲';
+                    let matchDisplay = isLive ? `<span class="match-text text-[0.65rem] sm:text-xs text-slate-300 truncate">${info.match_name || '自由赛'}</span>` : `<span class="empty">空闲中</span>`;
+                    let scoreRef = isLive ? `<div class="row mt-1"><span class="score">${info.score || '0-0'}</span><span class="referee-name">👨‍⚖️ ${info.referee || '待分配'}</span></div>` : '';
+                    cHtml += `<div class="unified-card"><div class="row"><span class="label"># ${c}</span><span class="${statusClass}">${statusText}</span></div>${matchDisplay}${scoreRef}</div>`;
+                }
+                if (data.tasks) {
+                    Object.values(data.tasks).forEach(t => {
+                        if (t.status === '比赛中' && (!t.court || t.court.trim() === '')) {
+                            cHtml += `<div class="unified-card border-indigo-500/30"><div class="row"><span class="label text-indigo-400">⚡ 游离</span><span class="badge live">比赛中</span></div><span class="match-text text-[0.65rem] sm:text-xs text-slate-300 truncate">${t.t1} <span class="vs">vs</span> ${t.t2}</span><div class="row mt-1"><span class="score">${t.live_score || '0-0'}</span><span class="meta">🆔 ${t.id}</span></div></div>`;
+                        }
+                    });
+                }
+                $('courtsGrid').innerHTML = cHtml || '<div class="col-span-full text-center text-slate-500 text-xs py-4">暂无场地数据</div>';
+
+                // 裁判卡片
+                const refs = data.referees || [];
+                let rHtml = refs.map(ref => {
+                    let isUmpiring = ref.status === '执裁中';
+                    let statusClass = isUmpiring ? 'badge umpiring' : 'badge';
+                    let statusText = ref.status || '待命';
+                    return `<div class="unified-card"><div class="row"><span class="font-bold text-slate-200 text-[0.7rem] sm:text-sm truncate">👨‍⚖️ ${ref.name}</span><span class="${statusClass}">${statusText}</span></div><div class="row mt-0.5"><span class="meta">${ref.current_court ? `#${ref.current_court} 场` : '—'}</span><span class="meta">已裁 ${ref.match_count||0} 场</span></div></div>`;
+                }).join('');
+                $('refereesGrid').innerHTML = rHtml || '<div class="col-span-full text-center text-slate-500 text-xs py-4">暂无裁判数据</div>';
+
+                // 待办队列
+                let tasksArr = Object.values(data.tasks);
+                tasksArr = tasksArr.filter(t => sysMode === 'team' ? t.is_team === true : t.is_team !== true);
+                $('taskCount').innerText = `${tasksArr.length} 场`;
+                $('tasksList').innerHTML = tasksArr.map(t => {
+                    const courtDisplay = t.court ? `<span class="text-amber-400 font-mono text-[10px] bg-amber-900/30 px-1.5 py-0.5 rounded">#${t.court}</span>` : `<span class="text-slate-600 text-[10px]">未分配</span>`;
+                    const liveBadge = (t.status === '比赛中' && t.live_score) ? `<span class="text-emerald-400 font-bold ml-2 text-[10px] animate-pulse">${t.live_score}</span>` : '';
+                    return `<div class="bg-slate-900/40 p-2 rounded border border-slate-700/50 flex justify-between items-center text-xs">
+                        <div class="flex items-center gap-2 flex-1 min-w-0"><span class="font-black text-blue-300 w-20 truncate">${t.id}</span><span class="text-slate-300 truncate">${t.t1} <span class="text-slate-600 mx-1">vs</span> ${t.t2}</span>${courtDisplay}${liveBadge}</div>
+                        <div class="flex gap-1 shrink-0">
+                            <button onclick="editCourt('${t.id}')" class="text-amber-400 hover:text-amber-300 bg-amber-900/30 hover:bg-amber-800 px-2 py-1 rounded text-[10px] font-bold transition-colors">改场</button>
+                            <button onclick="manualScoreTask('${t.id}', '${t.t1}', '${t.t2}')" class="text-emerald-400 hover:text-emerald-300 bg-emerald-900/30 hover:bg-emerald-800 px-2 py-1 rounded text-[10px] font-bold transition-colors">✍️ 录分</button>
+                            <button onclick="window.delTask('${t.id}')" class="text-red-400 hover:text-red-300 ml-1 px-2 font-black">✕</button>
+                        </div>
+                    </div>`;
+                }).join('') || '<div class="text-xs text-slate-500 text-center py-2">无该模式队列</div>';
+
+                // 完赛记录
+                let recordsArr = data.records.slice(0, 20);
+                recordsArr = recordsArr.filter(r => sysMode === 'team' ? r.is_team === true : r.is_team !== true);
+                $('recordsList').innerHTML = recordsArr.map(r => {
+                    return `<div class="bg-slate-900/40 p-2.5 rounded border border-slate-700/50 text-xs mb-2"><div class="flex justify-between items-center mb-1"><span class="font-black text-slate-300">${r.id} <span class="text-slate-500 ml-1">#${r.court}场</span></span><span class="text-emerald-400 font-black">${r.score}</span></div><div class="text-slate-400 flex justify-between items-center"><span class="truncate pr-2">${r.t1} vs ${r.t2}</span></div></div>`;
+                }).join('') || '<div class="text-xs text-slate-500 text-center py-2">尚无完赛成绩</div>';
+
+                // 团队雷达统计
+                if (sysMode === 'team') {
+                    // 同步队伍名称
+                    let teamEvent = data.team_event || {};
+                    let updated = false;
+                    let validTeamNames = new Set();
+                    playersData.forEach(p => { if (p.team) validTeamNames.add(p.team); });
+
+                    for (let room in teamEvent) {
+                        let roomData = teamEvent[room];
+                        let teams = roomData.teams || [];
+                        let modified = false;
+                        for (let i = 0; i < teams.length; i++) {
+                            let oldName = teams[i].team_name;
+                            if (!validTeamNames.has(oldName)) {
+                                let newName = null;
+                                for (let vn of validTeamNames) {
+                                    if (vn.includes(oldName) || oldName.includes(vn)) {
+                                        newName = vn;
+                                        break;
+                                    }
+                                }
+                                if (newName) {
+                                    teams[i].team_name = newName;
+                                    modified = true;
+                                    updated = true;
+                                    console.log(`自动同步队伍名：${oldName} -> ${newName}`);
+                                }
+                            }
+                        }
+                        if (modified) {
+                            await apiPost('import_team_event', {
+                                room_code: room,
+                                teams: teams,
+                                status: roomData.status || 'team_confirming'
+                            });
+                        }
+                    }
+
+                    const totalPlayers = playersData.length;
+                    const checkedPlayers = playersData.filter(p => p.checked_in).length;
+                    const teamMap = new Map();
+                    playersData.forEach(p => { if (p.team) { if (!teamMap.has(p.team)) teamMap.set(p.team, []); teamMap.get(p.team).push(p); } });
+                    const totalTeams = teamMap.size;
+                    let completedTeams = 0;
+                    for (let [teamName, members] of teamMap) { if (members.every(m => m.checked_in)) completedTeams++; }
+                    const statsHtml = `<div class="stat-item">👥 总人数 <span class="stat-value">${totalPlayers}</span></div><div class="stat-item">✅ 已签到 <span class="stat-value green">${checkedPlayers}</span></div><div class="stat-item">🏁 完成签到队伍 <span class="stat-value blue">${completedTeams}</span> / <span class="stat-value">${totalTeams}</span></div>`;
+                    const statsEl = $('teamRadarStats');
+                    if (statsEl) statsEl.innerHTML = statsHtml;
+                }
+                if (sysMode === 'ind') {
+                    const totalPlayers = playersData.length;
+                    const checkedPlayers = playersData.filter(p => p.checked_in).length;
+                    const statsHtml = `<div class="stat-item">👥 总人数 <span class="stat-value">${totalPlayers}</span></div><div class="stat-item">✅ 已签到 <span class="stat-value green">${checkedPlayers}</span></div>`;
+                    const statsEl = $('indRadarStats');
+                    if (statsEl) statsEl.innerHTML = statsHtml;
+                }
+
+                // 团队房间
+                if (sysMode === 'team') {
+                    let lineupHtml = '';
+                    if (data.team_event) {
+                        for (const [room, roomData] of Object.entries(data.team_event)) {
+                            let tHtml = [];
+                            let submittedCount = 0;
+                            roomData.teams.forEach(t => {
+                                let realName = window.teamAliasMap[t.team_name] || t.team_name;
+                                let teamRoster = playersData.filter(p => p.team === realName);
+                                let total = teamRoster.length;
+                                let checked = teamRoster.filter(p => p.checked_in).length;
+                                let isTeamLineupSubmitted = data.team_lineups && data.team_lineups[`${room}_${t.team_name}`];
+                                if (isTeamLineupSubmitted) submittedCount++;
+                                let statusText = roomData.status === 'completed' ? '对决已下发' : (isTeamLineupSubmitted ? '阵容已定' : `选手已到(${checked}/${total})`);
+                                let statusColor = roomData.status === 'completed' ? 'text-blue-400' : (isTeamLineupSubmitted ? 'text-emerald-400' : 'text-amber-400');
+                                let teamCodeDisplay = t.team_code ? `<span onclick="editTeamCode('${room}', '${t.team_name}')" class="bg-slate-700 px-1.5 py-0.5 rounded cursor-pointer hover:bg-slate-600 border border-slate-500 text-[10px] text-white mr-1" title="点击修改队伍编号">${t.team_code}</span>` : '';
+                                tHtml.push(`<div class="team-name text-xs font-bold ${statusColor} flex items-center">${teamCodeDisplay} <span onclick="editTeamName('${room}', '${t.team_name}')" class="cursor-pointer hover:text-amber-300">${t.team_name}</span> <span class="bg-slate-900/80 px-1 rounded text-[10px] ml-1">[${statusText}]</span></div>`);
+                            });
+                            let actionArea = '';
+                            if (submittedCount === 2 && roomData.status !== 'completed') {
+                                actionArea = `<button onclick="forceResolveSubMatches('${room}')" class="action-btn bg-gradient-to-r from-emerald-600 to-teal-500 border border-emerald-400 text-white font-black text-[11px] px-3 py-1.5 rounded animate-pulse shadow-md whitespace-nowrap active:scale-95 transition-transform">⚡ 解析并下发</button>`;
+                            } else if (roomData.status === 'completed') {
+                                actionArea = `<span class="text-slate-500 italic text-[11px] font-bold">矩阵已上链</span>`;
+                            } else {
+                                actionArea = `<span class="text-amber-400/70 text-[10px] italic">等待交卷...</span>`;
+                            }
+                            lineupHtml += `<div class="radar-room-card"><div class="flex justify-between items-center border-b border-slate-800 pb-1.5 mb-1.5"><span class="room-title font-mono text-indigo-400 font-black text-sm bg-indigo-950/40 px-2.5 py-0.5 rounded border border-indigo-500/30">空间: ${room}</span><button onclick="event.stopPropagation(); window.delRoom('${room}')" class="text-red-500 text-xs font-bold hover:underline">✕ 解散</button></div><div class="space-y-0.5">${tHtml.join('')}</div><div class="flex justify-between items-center bg-black/20 p-1.5 rounded-lg mt-1 border border-slate-700/50"><span class="text-[10px] text-slate-400">核碰机:</span>${actionArea}</div></div>`;
+                        }
+                    }
+                    const radarContainer = $('roomRadarGrid');
+                    if (radarContainer) {
+                        radarContainer.innerHTML = lineupHtml || '<div class="text-[11px] text-slate-500 text-center py-6 italic col-span-full">当前没有任何进行中的团体对抗房间...</div>';
+                    }
+                }
+            } catch (e) {
+                console.warn('loadDashboard error', e);
+            }
+        }
+
+        async function loadReferees() {
+            try {
+                const data = await apiGet('get_referees');
+                if (data.status === 'success') { globalReferees = data.data; }
+            } catch (e) {}
+        }
+
+        window.forceRefresh = () => { if (currentEventCode) { loadDashboard(); loadReferees(); showToast('手动同步完成'); } };
+
+        // ======================== 核心操作 ========================
+        window.delTask = async (id) => {
+            if (confirm('确认撤销该对阵任务？')) {
+                let res = await apiPost('delete_task', { match_id: id });
+                if (res && res.status === 'success') showToast('✅ 撤销成功');
+                await loadDashboard();
+            }
+        };
+        window.delRoom = async (room) => {
+            if (confirm(`确认解散房间 ${room} 及其排阵数据？`)) {
+                let res = await apiPost('delete_team_room', { room_code: room });
+                if (res && res.status === 'success') showToast('✅ 房间解散成功');
+                await loadDashboard();
+            }
+        };
+        window.handleClearRadar = async () => {
+            if (confirm('警告：确定要一键彻底清空排阵雷达里的所有房间吗？')) {
+                let res = await apiPost('clear_team_radar');
+                if (res && res.status === 'success') showToast('🗑️ 雷达已彻底清空');
+                await loadDashboard();
+            }
+        };
+        window.handleClearTasks = async () => {
+            if (confirm('警告：确定清空所有待办对局队列？')) {
+                let res = await apiPost('clear_all_tasks');
+                if (res && res.status === 'success') showToast('🗑️ 待办队列已清空');
+                await loadDashboard();
+            }
+        };
+
+        window.editCourt = async (taskId) => {
+            const newCourt = prompt(`请输入【${taskId}】的新场地号：`, '');
+            if (newCourt === null) return;
+            const courtNum = newCourt.trim();
+            if (!courtNum) return showToast('场地号不能为空', true);
+            try {
+                const res = await apiPost('update_task_court', { match_id: taskId, court: courtNum });
+                if (res.status === 'success') { showToast(`✅ 已成功将 ${taskId} 改到 ${courtNum} 号场`); loadDashboard(); } else { showToast('修改失败：' + (res.message || ''), true); }
+            } catch (e) {
+                showToast('网络错误', true);
+            }
+        };
+
+        window.handleSendBroadcast = async (channel, isClear = false) => {
+            let inputId = channel === 'broadcast' ? 'dashboardBroadcastInput' : 'refereePromptInput';
+            let msg = isClear ? '' : $(inputId).value.trim();
+            if (!isClear && !msg) return showToast('请输入下发内容', true);
+            let actionName = channel === 'broadcast' ? 'set_broadcast' : 'set_referee_msg';
+            let pwd = currentMasterPwd || sessionStorage.getItem('pickle_master_pwd') || '';
+            const res = await apiPost(actionName, { message: msg, pwd: pwd });
+            if (res.status === 'success') { showToast(isClear ? '指令已撤销' : '指令已下发全网'); if (!isClear) $(inputId).value = ''; loadDashboard(); } else { showToast('下发失败：' + (res.message || ''), true); }
+        };
+
+        window.handleResetEvent = async () => {
+            if (!confirm('🚨 确定物理清洗当前赛事数据吗？')) return;
+            const pwd = prompt('请输入密码：');
+            try {
+                const check = await apiGet('get_event_config');
+                if (check.data.referee_password !== pwd) return showToast('❌ 密码错误', true);
+                const res = await apiGet('reset_event');
+                if (res.status === 'success') { showToast('数据已清空'); setTimeout(() => location.reload(), 1500); }
+            } catch (e) {
+                showToast('网络错误', true);
+            }
+        };
+
+        // ======================== 轮播通告 ========================
+        window.compressAndPreviewNoticeImage = (e) => {
+            const file = e.target.files[0];
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = (event) => {
+                const img = new Image();
+                img.onload = () => {
+                    const canvas = document.createElement('canvas');
+                    let width = img.width,
+                        height = img.height;
+                    if (width > 800) { height = Math.round((height * 800) / width);
+                        width = 800; }
+                    canvas.width = width;
+                    canvas.height = height;
+                    const ctx = canvas.getContext('2d');
+                    ctx.drawImage(img, 0, 0, width, height);
+                    noticeImageBase64 = canvas.toDataURL('image/jpeg', 0.6);
+                    $('noticePreview').src = noticeImageBase64;
+                    $('noticePreview').classList.remove('hidden-panel');
+                };
+                img.src = event.target.result;
+            };
+            reader.readAsDataURL(file);
+        };
+
+        window.renderNoticeList = () => {
+            let html = '';
+            noticeArray.forEach((n, i) => {
+                html += `<div class="flex justify-between items-center bg-slate-800 p-2 rounded border border-slate-600"><div class="flex items-center gap-2 overflow-hidden w-4/5">${n.image ? `<img src="${n.image}" class="h-6 w-10 object-contain bg-black/50 rounded shrink-0">` : '<div class="h-6 w-10 bg-slate-700 rounded text-[8px] flex items-center justify-center text-slate-500 shrink-0">无图</div>'}<span class="text-xs text-slate-300 truncate">${n.text || '(无文字)'}</span></div><button onclick="noticeArray.splice(${i}, 1); renderNoticeList()" class="text-red-400 font-bold px-2 shrink-0">✕</button></div>`;
+            });
+            $('noticeListContainer').innerHTML = html || '<div class="text-[10px] text-slate-500 italic py-2">尚未添加任何内容</div>';
+        };
+
+        window.appendNotice = () => {
+            let txt = $('noticeTextInput').value.trim();
+            if (!txt && !noticeImageBase64) return showToast('文字和图片不能同时为空', true);
+            noticeArray.push({ text: txt, image: noticeImageBase64 });
+            $('noticeTextInput').value = '';
+            noticeImageBase64 = '';
+            $('noticePreview').src = '';
+            $('noticePreview').classList.add('hidden-panel');
+            renderNoticeList();
+        };
+
+        window.handleSaveNotice = async () => {
+            const btn = $('saveNoticeBtn');
+            btn.innerText = '发布中...';
+            btn.disabled = true;
+            try {
+                const res = await apiPost('set_event_notice', { notices: noticeArray });
+                if (res.status === 'success') { showToast('✅ 轮播列队已推送到全网终端！'); loadNoticesForCarousel(); } else showToast('发布失败', true);
+            } catch (e) {
+                showToast('网络错误', true);
+            }
+            btn.innerText = '☁️ 发布轮播队列';
+            btn.disabled = false;
+        };
+
+        window.handleClearNotice = async () => {
+            if (!confirm('确定全网下线通告信息吗？')) return;
+            try {
+                const res = await apiPost('set_event_notice', { notices: [] });
+                if (res.status === 'success') { showToast('✅ 广告已下线'); noticeArray = [];
+                    renderNoticeList();
+                    loadNoticesForCarousel(); }
+            } catch (e) {
+                showToast('下线失败', true);
+            }
+        };
+
+        // ======================== 队员管理 ========================
+        window.openAddMemberModal = async () => {
+            const res = await apiGet('get_all_teams');
+            const select = $('addMemberTeamSelect');
+            select.innerHTML = '<option value="NEW">➕ 创建新队伍/独立选手</option>';
+            if (res.status === 'success' && res.data && res.data.length > 0) {
+                let seen = new Set();
+                res.data.forEach(team => {
+                    if (!seen.has(team.team_name)) {
+                        seen.add(team.team_name);
+                        const option = document.createElement('option');
+                        option.value = JSON.stringify({ room: team.room_code, name: team.team_name });
+                        option.textContent = `[${team.room_code}] ${team.team_name}`;
+                        select.appendChild(option);
+                    }
+                });
+            }
+            window.toggleNewTeamInput();
+            $('addMemberModal').classList.remove('hidden-panel');
+        };
+
+        window.toggleNewTeamInput = () => {
+            const val = $('addMemberTeamSelect').value;
+            const nameInput = $('newTeamNameInput');
+            if (val === 'NEW') { nameInput.classList.remove('hidden-panel'); } else { nameInput.classList.add('hidden-panel'); }
+        };
+
+        window.confirmAddMember = async () => {
+            const selectVal = $('addMemberTeamSelect').value;
+            let teamName = "";
+            let roomCode = "系统池";
+            if (selectVal === 'NEW') {
+                teamName = $('newTeamNameInput').value.trim();
+                if (!teamName) return showToast('请输入新队伍名称', true);
+            } else {
+                const parsed = JSON.parse(selectVal);
+                teamName = parsed.name;
+                roomCode = parsed.room || "系统池";
+            }
+            const playerName = $('addMemberName').value.trim();
+            if (!playerName) return showToast('请输入队员姓名', true);
+            const btn = $('addMemberConfirmBtn');
+            btn.innerText = '拉取存管中...';
+            btn.disabled = true;
+            try {
+                const pRes = await apiGet('get_players');
+                let dbPlayers = pRes.status === 'success' ? pRes.data : [];
+                let maxP = 0;
+                dbPlayers.forEach(p => { if (p.id_code && p.id_code.startsWith('P')) { let num = parseInt(p.id_code.substring(1)); if (!isNaN(num) && num > maxP) maxP = num; } });
+                maxP++;
+                let newIdCode = 'P' + String(maxP).padStart(3, '0');
+                if (dbPlayers.some(p => p.name === playerName && p.team === teamName)) {
+                    showToast('🚨 该队员已存在该队伍阵容中', true);
+                    btn.innerText = '确认添加入库';
+                    btn.disabled = false;
+                    return;
+                }
+                dbPlayers.push({ id_code: newIdCode, group: roomCode, position: dbPlayers.length + 1, name: playerName, team: teamName, checked_in: false });
+                const res = await apiPost('set_players', { players: dbPlayers });
+                if (res.status === 'success') {
+                    showToast(`✅ 队员 ${playerName} 注册成功！分配身份标识: ${newIdCode}`);
+                    $('addMemberModal').classList.add('hidden-panel');
+                    $('addMemberName').value = '';
+                    if ($('newTeamNameInput')) $('newTeamNameInput').value = '';
+                    loadDashboard();
+                } else { showToast('添加失败', true); }
+            } catch (e) {
+                showToast('网络错误', true);
+            } finally {
+                btn.innerText = '确认添加入库';
+                btn.disabled = false;
+            }
+        };
+
+        window.editTeamCode = async (room, teamName) => {
+    const newCode = prompt(`为队伍「${teamName}」设置新的编号（如 T01）：`, '');
+    if (newCode === null) return;
+    if (!newCode.trim()) return showToast('编号不能为空', true);
+    const res = await apiPost('update_team_code', { room_code: room, team_name: teamName, team_code: newCode.trim() });
+    if (res.status === 'success') {
+        if (confirm('是否同步更新该队所有选手的编号？\n（选手编号将变为：队伍编号-序号）')) {
+            const syncRes = await apiPost('sync_team_player_ids', {
+                room_code: room,
+                team_name: teamName,
+                team_code: newCode.trim()
+            });
+            if (syncRes.status === 'success') {
+                showToast('✅ 队伍编号已更新，选手编号已同步');
+            } else {
+                showToast('⚠️ 队伍编号已更新，但选手编号同步失败', true);
+            }
+        } else {
+            showToast('✅ 队伍编号已更新');
+        }
+        loadDashboard();
+    } else {
+        showToast(res.message || '更新失败', true);
+    }
+};
+
+        window.editTeamName = async (room, oldName) => {
+            const newName = prompt(`将队伍「${oldName}」更名为：`, oldName);
+            if (!newName || newName === oldName) return;
+
+            let teamEvent = (await apiGet('get_full_dashboard')).team_event || {};
+            if (teamEvent[room]) {
+                let teams = teamEvent[room].teams;
+                let found = false;
+                for (let t of teams) {
+                    if (t.team_name === oldName) {
+                        t.team_name = newName;
+                        found = true;
+                        break;
+                    }
+                }
+                if (found) {
+                    await apiPost('import_team_event', {
+                        room_code: room,
+                        teams: teams,
+                        status: teamEvent[room].status
+                    });
+
+                    let players = (await apiGet('get_players')).data || [];
+                    let changed = false;
+                    players.forEach(p => {
+                        if (p.team === oldName) {
+                            p.team = newName;
+                            changed = true;
+                        }
+                    });
+                    if (changed) {
+                        await apiPost('set_players', { players: players });
+                    }
+                    showToast('✅ 队伍名称已同步更新到选手库和房间');
+                    loadDashboard();
+                }
+            }
+        };
+
+        // ======================== 团体模板 ========================
+        async function loadTeamTemplate() {
+            const res = await apiGet('get_team_template');
+            if (res.status === 'success') { teamTemplate = res.data || [];
+                renderTeamTemplate(); }
+        }
+
+        function renderTeamTemplate() {
+            let html = '';
+            teamTemplate.forEach((t, i) => {
+                html += `<div class="flex gap-2 items-center bg-slate-800 p-2 rounded-lg border border-slate-700"><span class="text-[10px] font-black text-amber-400 w-8 shrink-0">盘${i+1}</span><select class="input-base p-1 text-[11px] font-bold h-8" onchange="teamTemplate[${i}].type=this.value"><option value="MD" ${t.type==='MD'?'selected':''}>男双</option><option value="WD" ${t.type==='WD'?'selected':''}>女双</option><option value="XD" ${t.type==='XD'?'selected':''}>混双</option><option value="MS" ${t.type==='MS'?'selected':''}>男单</option><option value="WS" ${t.type==='WS'?'selected':''}>女单</option></select><input type="text" class="input-base p-1 text-[11px] h-8" placeholder="备注(如:公开组)" value="${t.remark||''}" onchange="teamTemplate[${i}].remark=this.value"><button onclick="teamTemplate.splice(${i},1);renderTeamTemplate()" class="text-red-400 hover:text-red-300 font-bold px-2">✕</button></div>`;
+            });
+            $('templateContainer').innerHTML = html || '<div class="text-[10px] text-slate-500 italic py-2">未设置对阵模板，领队为自由排阵</div>';
+        }
+        window.addTemplateMatch = () => { teamTemplate.push({ type: 'MD', remark: '' });
+            renderTeamTemplate(); };
+        window.saveTemplate = async () => {
+            const btn = event.target;
+            btn.innerText = "保存中...";
+            await apiPost('set_team_template', { template: teamTemplate });
+            showToast('✅ 模板已保存');
+            btn.innerText = "💾 保存模板";
+        };
+
+        // ======================== 手动派发 ========================
+        window.handleManualDispatch = async () => {
+            let input = $('manualDispatchInput').value.trim();
+            if (!input) return showToast('请输入对阵信息', true);
+            let customId = '';
+            let matchStr = input;
+            let spaceIdx = input.indexOf(' ');
+            if (spaceIdx !== -1) {
+                let firstPart = input.substring(0, spaceIdx);
+                if (!firstPart.toLowerCase().includes('vs')) { customId = firstPart;
+                    matchStr = input.substring(spaceIdx + 1); }
+            }
+            let sides = matchStr.split(/\s+vs\s+|\s+-\s+|vs/i).filter(s => s.trim() !== '');
+            if (sides.length !== 2) return showToast('格式有误，需包含 vs 或 -', true);
+            const pRes = await apiGet('get_players');
+            let db = pRes.status === 'success' ? pRes.data : [];
+            const resolveSide = (rawStr) => {
+                let parts = rawStr.split(SPLIT_REGEX).map(s => s.trim()).filter(s => s);
+                let matchedPlayers = [];
+                parts.forEach(k => {
+                    let upperK = k.toUpperCase();
+                    let directMatches = db.filter(x => (x.id_code && x.id_code.toUpperCase() === upperK) || x.name.toUpperCase() === upperK);
+                    if (directMatches.length > 0) matchedPlayers.push(...directMatches);
+                    else {
+                        let prefixMatches = db.filter(x => (x.id_code && x.id_code.toUpperCase().startsWith(upperK + '-')));
+                        if (prefixMatches.length > 0) matchedPlayers.push(...prefixMatches);
+                        else matchedPlayers.push({ name: k, team: k });
+                    }
+                });
+                let uniqueP = [];
+                let seen = new Set();
+                matchedPlayers.forEach(p => { if (!seen.has(p.name)) { seen.add(p.name);
+                        uniqueP.push(p); } });
+                let names = uniqueP.map(p => p.name).slice(0, 2);
+                let teams = uniqueP.map(p => p.team).filter(t => t);
+                let teamName = teams.length > 0 ? Array.from(new Set(teams)).join('/') : names.join(' & ');
+                return { names: names, team: teamName };
+            };
+            let t1Info = resolveSide(sides[0]);
+            let t2Info = resolveSide(sides[1]);
+            let isDbl = t1Info.names.length > 1 || t2Info.names.length > 1;
+            let newTask = { id: customId ? customId : `M-${Date.now().toString().slice(-4)}`, t1: t1Info.team, t1p1: t1Info.names[0] || '', t1p2: t1Info.names[1] || '', t2: t2Info.team, t2p1: t2Info.names[0] || '', t2p2: t2Info.names[1] || '', type: isDbl ? 'doubles' : 'singles', format: 1, meth: 'rally', is_team: false };
+            const res = await apiPost('set_bulk_tasks', { tasks: [newTask] });
+            if (res.status === 'success') { showToast('✅ 下发成功！已推送至裁判池');
+                $('manualDispatchInput').value = '';
+                loadDashboard(); } else showToast('下发失败', true);
+        };
+
+        // ======================== 团体房间解析与核碰 ========================
+        window.forceResolveSubMatches = async (room) => {
+            if (!globalDashboardData || !globalDashboardData.team_event || !globalDashboardData.team_event[room]) return;
+            let rData = globalDashboardData.team_event[room];
+            let t1Name = rData.teams[0].team_name;
+            let t2Name = rData.teams[1].team_name;
+            let tl1 = globalDashboardData.team_lineups ? globalDashboardData.team_lineups[`${room}_${t1Name}`] : null;
+            let tl2 = globalDashboardData.team_lineups ? globalDashboardData.team_lineups[`${room}_${t2Name}`] : null;
+            let newTasks = [];
+            if (tl1 && tl2 && tl1.matches && tl2.matches) {
+                let mCount = Math.min(tl1.matches.length, tl2.matches.length);
+                for (let i = 0; i < mCount; i++) {
+                    let m1 = tl1.matches[i];
+                    let m2 = tl2.matches[i];
+                    newTasks.push({ id: `${room}-${String(i+1).padStart(2,'0')}`, court: '', target_score: 21, cap_score: 21, format: m1.format || 1, meth: 'rally', t1: t1Name, t1p1: m1.players[0] || '', t1p2: m1.players[1] || '', t2: t2Name, t2p1: m2.players[0] || '', t2p2: m2.players[1] || '', type: (m1.players[1] || m2.players[1]) ? 'doubles' : 'singles', is_team: true });
+                }
+                await apiPost('import_team_event', { room_code: room, teams: rData.teams, status: 'completed' });
+                await apiPost('set_bulk_tasks', { tasks: newTasks });
+                showToast(`🎉 空间房间 ${room} 子比赛强制解算成功！下发 ${newTasks.length} 场对决！`);
+                loadDashboard();
+            }
+        };
+
+        window.handlePushTeamMatches = async () => {
+            if (!globalDashboardData || !globalDashboardData.team_event) return showToast('暂无进行中的团队空间');
+            $('pushTeamMatchesBtn').innerText = '扫描核碰中...';
+            $('pushTeamMatchesBtn').disabled = true;
+            let newTasks = [];
+            let pushedRooms = 0;
+            for (let room in globalDashboardData.team_event) {
+                let rData = globalDashboardData.team_event[room];
+                if (rData.status === 'completed') continue;
+                let t1Name = rData.teams[0].team_name;
+                let t2Name = rData.teams[1].team_name;
+                let tl1 = globalDashboardData.team_lineups ? globalDashboardData.team_lineups[`${room}_${t1Name}`] : null;
+                let tl2 = globalDashboardData.team_lineups ? globalDashboardData.team_lineups[`${room}_${t2Name}`] : null;
+                if (tl1 && tl2 && tl1.matches && tl2.matches) {
+                    let mCount = Math.min(tl1.matches.length, tl2.matches.length);
+                    for (let i = 0; i < mCount; i++) {
+                        let m1 = tl1.matches[i];
+                        let m2 = tl2.matches[i];
+                        newTasks.push({ id: `${room}-${String(i+1).padStart(2,'0')}`, court: '', target_score: 21, cap_score: 21, format: m1.format || 1, meth: 'rally', t1: t1Name, t1p1: m1.players[0] || '', t1p2: m1.players[1] || '', t2: t2Name, t2p1: m2.players[0] || '', t2p2: m2.players[1] || '', type: (m1.players[1] || m2.players[1]) ? 'doubles' : 'singles', is_team: true });
+                    }
+                    await apiPost('import_team_event', { room_code: room, teams: rData.teams, status: 'completed' });
+                    pushedRooms++;
+                } else {
+                    if (confirm(`⚠️ 房间 ${room} (${t1Name} vs ${t2Name}) 尚未完成排阵！\n是否使用特权【强行下发空白对阵】？`)) {
+                        let pwd = prompt('请输入裁判长授权密码：');
+                        if (pwd === $('masterPwd').value) {
+                            for (let i = 0; i < 3; i++) { newTasks.push({ id: `${room}-${String(i+1).padStart(2,'0')}`, court: '', target_score: 21, cap_score: 21, format: 1, meth: 'rally', t1: t1Name, t1p1: '待定', t1p2: '待定', t2: t2Name, t2p1: '待定', t2p2: '待定', type: 'doubles', is_team: true }); }
+                            await apiPost('import_team_event', { room_code: room, teams: rData.teams, status: 'completed' });
+                            pushedRooms++;
+                        } else { showToast('密码错误，已取消强发', true); }
+                    }
+                }
+            }
+            if (newTasks.length > 0) {
+                await apiPost('set_bulk_tasks', { tasks: newTasks });
+                showToast(`🎉 匹配成功！核碰了 ${pushedRooms} 个房间，下发 ${newTasks.length} 场比赛！`);
+                loadDashboard();
+            } else {
+                showToast('⏳ 扫描完成：暂无符合下发条件的房间');
+            }
+            $('pushTeamMatchesBtn').innerText = '⚡ 扫描核碰双方盲排，并下发至裁判队列';
+            $('pushTeamMatchesBtn').disabled = false;
+        };
+
+        // ======================== 手动录分 ========================
+        window.manualScoreTask = async (taskId, t1Name, t2Name) => {
+            let score = prompt('请输入比分（格式：左方比分-右方比分，例如 21-15）：');
+            if (!score) return;
+            let parts = score.split('-');
+            if (parts.length !== 2) return showToast('格式错误，请用 - 分隔', true);
+            let t1Score = parseInt(parts[0].trim()),
+                t2Score = parseInt(parts[1].trim());
+            if (isNaN(t1Score) || isNaN(t2Score)) return showToast('请输入有效数字', true);
+            let winner = t1Score > t2Score ? t1Name : t2Name;
+            let payload = { action: 'save_score', id: taskId, court: '1', t1: t1Name, t2: t2Name, score: score, winner: winner, details: '裁判长手动录入：' + score, referee: '裁判长手动', referee_id: 'master', is_team: false };
+            const res = await apiPost('save_score', payload);
+            if (res.status === 'success') { showToast('✅ 赛果已录入并归档');
+                await apiPost('delete_task', { match_id: taskId });
+                loadDashboard(); } else { showToast('录入失败', true); }
+        };
+
+        // ======================== Excel 导入（个人赛） ========================
+        window.handleImportSignFile = (e) => {
+            const btnId = e.target.id;
+            const btnElem = $(btnId === 'teamSignFile' ? 'importTeamSignBtn' : 'signFile');
+            if (btnElem) { btnElem.innerText = '读取中...';
+                btnElem.disabled = true; }
+            const file = e.target.files[0];
+            if (!file) {
+                if (btnElem) { btnElem.innerText = btnId === 'teamSignFile' ? '📥 导入名单' : '📥 导入名单(签到/签表)';
+                    btnElem.disabled = false; }
+                return;
+            }
+            const reader = new FileReader();
+            reader.onload = async (evt) => {
+                const data = new Uint8Array(evt.target.result);
+                const workbook = XLSX.read(data, { type: 'array' });
+                if (sysMode === 'team') {
+                    let isCheckin = false,
+                        isDraw = false;
+                    for (let sheetName of workbook.SheetNames) {
+                        const rows = XLSX.utils.sheet_to_json(workbook.Sheets[sheetName], { header: 1, defval: '' });
+                        if (rows.findIndex(r => r.some(c => NAME_REGEX.test(String(c)))) !== -1) isCheckin = true;
+                        if (rows.some(r => r[1] && /^[A-Z]\d+$/.test(String(r[1]).trim()))) isDraw = true;
+                    }
+                    let dbRes = await apiGet('get_players');
+                    let dbPlayers = dbRes.status === 'success' ? dbRes.data : [];
+                    if (isCheckin) {
+                        let added = 0;
+                        for (let sheetName of workbook.SheetNames) {
+                            const rows = XLSX.utils.sheet_to_json(workbook.Sheets[sheetName], { header: 1, defval: '' });
+                            let hIdx = rows.findIndex(r => r.some(c => NAME_REGEX.test(String(c))));
+                            if (hIdx === -1) continue;
+                            let headers = rows[hIdx];
+                            let nameIdx = headers.findIndex(h => NAME_REGEX.test(String(h)));
+                            let teamIdx = headers.findIndex(h => /队名|单位|学校|队伍/.test(String(h)));
+                            let groupIdx = headers.findIndex(h => /项目名称|组别|所在小组|项目/i.test(String(h)));
+                            let teamCounters = {};
+                            let currentTeamName = '未知队伍',
+                                currentGroupName = '系统池';
+                            for (let i = hIdx + 1; i < rows.length; i++) {
+                                let name = String(rows[i][nameIdx] || '').trim();
+                                if (!name) continue;
+                                name = name.replace(/^\d+[.、\s]+|^\d+号\s*/, '').trim();
+                                let rowTeam = teamIdx !== -1 ? String(rows[i][teamIdx] || '').trim() : '';
+                                let rowGroup = groupIdx !== -1 ? String(rows[i][groupIdx] || '').trim() : '';
+                                if (rowTeam) currentTeamName = rowTeam.replace(/[\r\n]+/g, '');
+                                if (rowGroup) currentGroupName = rowGroup.replace(/[\r\n]+/g, '');
+                                if (!teamCounters[currentTeamName]) teamCounters[currentTeamName] = 0;
+                                let names = name.split(SPLIT_REGEX).map(s => s.trim()).filter(s => s);
+                                names.forEach(n => {
+                                    let exists = dbPlayers.find(p => p.name === n && p.team === currentTeamName);
+                                    if (!exists) {
+                                        teamCounters[currentTeamName]++;
+                                        let id_code = `${currentTeamName}-${String(teamCounters[currentTeamName]).padStart(2, '0')}`;
+                                        dbPlayers.push({ id_code, group: currentGroupName, position: dbPlayers.length + 1, name: n, team: currentTeamName, checked_in: false });
+                                        added++;
+                                    }
+                                });
+                            }
+                        }
+                        await apiPost('set_players', { players: dbPlayers });
+                        showToast(`✅ 团体大名单导入成功，新增 ${added} 人`);
+                    }
+                    if (isDraw) {
+                        let newTeamMap = {};
+                        for (let sheetName of workbook.SheetNames) {
+                            const rows = XLSX.utils.sheet_to_json(workbook.Sheets[sheetName], { header: 1, defval: '' });
+                            let currentGroup = "";
+                            for (let i = 0; i < rows.length; i++) {
+                                let r = rows[i];
+                                if (r[1] && /^[A-Z]\d+$/.test(String(r[1]).trim())) { currentGroup = String(r[1]).trim(); } else if (currentGroup && String(r[0]).match(/^\d+(\.\d+)?$/) && r[1]) {
+                                    let tName = String(r[1]).trim();
+                                    if (tName && !/胜负|第1名|排名/.test(tName)) { let tIdx = parseInt(r[0]);
+                                        newTeamMap[tName] = `${currentGroup}-${tIdx}`; }
+                                }
+                            }
+                        }
+                        let updated = 0,
+                            teamCounters = {};
+                        dbPlayers.forEach(p => {
+                            if (p.team && newTeamMap[p.team]) {
+                                if (!teamCounters[p.team]) teamCounters[p.team] = 1;
+                                else teamCounters[p.team]++;
+                                p.id_code = `${newTeamMap[p.team]}-${String(teamCounters[p.team]).padStart(2, '0')}`;
+                                p.group = newTeamMap[p.team].split('-')[0];
+                                updated++;
+                            }
+                        });
+                        await apiPost('set_players', { players: dbPlayers });
+                        showToast(`✅ 团体签表导入成功，强行刷新了 ${updated} 人编号`);
+                    }
+                    if (e.target) e.target.value = '';
+                    if (btnElem) { btnElem.innerText = '📥 导入名单';
+                        btnElem.disabled = false; }
+                    loadDashboard();
+                    return;
+                }
+
+                // 个人赛导入
+                let newPlayers = [];
+                for (let sheetName of workbook.SheetNames) {
+                    const rows = XLSX.utils.sheet_to_json(workbook.Sheets[sheetName], { header: 1, defval: '' });
+                    let hIdx = -1;
+                    for (let i = 0; i < Math.min(15, rows.length); i++) {
+                        if (rows[i].some(c => NAME_REGEX.test(String(c)))) { hIdx = i; break; }
+                    }
+                    if (hIdx !== -1) {
+                        let headers = rows[hIdx];
+                        let nameIdx = headers.findIndex(h => NAME_REGEX.test(String(h)));
+                        let groupIdx = headers.findIndex(h => /项目名称|组别|所在小组|项目/i.test(String(h)));
+                        let teamIdx = headers.findIndex(h => /队名|单位|学校|队伍/.test(String(h)));
+                        let idCodeIdx = headers.findIndex(h => /序号|编号|签位/.test(String(h)));
+                        for (let i = hIdx + 1; i < rows.length; i++) {
+                            let rawName = String(rows[i][nameIdx] || '').trim();
+                            if (!rawName) continue;
+                            rawName = rawName.replace(/^\d+[.、\s]+|^\d+号\s*/, '').trim();
+                            let group = groupIdx !== -1 ? String(rows[i][groupIdx] || '').trim() : '系统池';
+                            let team = teamIdx !== -1 ? String(rows[i][teamIdx] || '').trim() : '';
+                            let id_code = '';
+                            if (idCodeIdx !== -1 && rows[i][idCodeIdx]) { let val = String(rows[i][idCodeIdx]).trim();
+                                if (val.endsWith('.0')) val = val.replace('.0', '');
+                                id_code = 'P' + val.padStart(3, '0'); }
+                            let names = rawName.split(SPLIT_REGEX).map(s => s.trim()).filter(s => s);
+                            names.forEach((cln, idx) => {
+                                let finalId = id_code ? (names.length > 1 ? `${id_code}-${idx+1}` : id_code) : '';
+                                newPlayers.push({ id_code: finalId, group: group, name: cln, team: team || rawName, checked_in: false });
+                            });
+                        }
+                    } else {
+                        for (let i = 0; i < rows.length; i++) {
+                            let col0 = String(rows[i][0] || '').trim();
+                            let col1 = String(rows[i][1] || '').trim();
+                            if (/^([A-Z]\d+|\d+(\.\d+)?)$/.test(col0) && col1 && !col1.includes('胜负') && !col1.includes('排名')) {
+                                let names = col1.split(SPLIT_REGEX).map(s => s.trim()).filter(s => s);
+                                names.forEach((cln, idx) => {
+                                    let finalId = names.length > 1 ? `${col0}-${idx+1}` : col0;
+                                    newPlayers.push({ id_code: finalId, group: sheetName, name: cln, team: col1, checked_in: false });
+                                });
+                            }
+                        }
+                    }
+                }
+                if (newPlayers.length === 0) {
+                    $('signFile').value = '';
+                    if (btnElem) { btnElem.innerText = '📥 导入名单(签到/签表)';
+                        btnElem.disabled = false; }
+                    return showToast('❌ 无法从文件中提取到运动员信息', true);
+                }
+                $('signFile').value = '';
+                let pRes = await apiGet('get_players');
+                let existPlayers = pRes.status === 'success' ? pRes.data : [];
+                let currentMax = 0;
+                existPlayers.forEach(p => { if (p.id_code && p.id_code.startsWith('P')) { let num = parseInt(p.id_code.substring(1)); if (!isNaN(num) && num > currentMax) currentMax = num; } });
+                let existNames = new Set(existPlayers.map(p => p.name));
+                let addedCount = 0,
+                    skipCount = 0;
+                newPlayers.forEach(p => {
+                    if (!existNames.has(p.name)) {
+                        if (!p.id_code) { currentMax++;
+                            p.id_code = 'P' + String(currentMax).padStart(3, '0'); }
+                        p.position = existPlayers.length + 1;
+                        existPlayers.push(p);
+                        existNames.add(p.name);
+                        addedCount++;
+                    } else { skipCount++; }
+                });
+                const res = await apiPost('set_players', { players: existPlayers });
+                if (res.status === 'success') { showToast(`✅ 萃取完毕！新增 ${addedCount} 人`);
+                    loadDashboard(); } else { showToast('球员库建立失败', true); }
+                if (btnElem) { btnElem.innerText = '📥 导入名单(签到/签表)';
+                    btnElem.disabled = false; }
+            };
+            reader.readAsArrayBuffer(file);
+        };
+
+        // ======================== 解析日程（个人赛） ========================
+        window.handleImportScheduleFile = (e) => {
+            const file = e.target.files[0];
+            if (!file) return;
+            const btnElem = $('scheduleFile');
+            if (btnElem) { btnElem.innerText = '解析中...';
+                btnElem.disabled = true; }
+            const reader = new FileReader();
+            reader.onload = async (evt) => {
+                const data = new Uint8Array(evt.target.result);
+                const workbook = XLSX.read(data, { type: 'array' });
+                const rows = XLSX.utils.sheet_to_json(workbook.Sheets[workbook.SheetNames[0]], { header: 1, defval: '' });
+                let tasks = await robustParseTennisScheduleAsync(rows, false);
+                if (tasks.length === 0) { tasks = parseRoundRobinData(rows, false);
+                    if (tasks.length > 0) showToast(`🎯 检测到循环赛表，已自动生成 ${tasks.length} 场数学配对赛！`); }
+                if (tasks.length === 0) {
+                    $('scheduleFile').value = '';
+                    if (btnElem) { btnElem.innerHTML = '📊 智能解析 (日程/循环网格表)';
+                        btnElem.disabled = false; }
+                    return showToast('⚠️ 未能提取到有效对阵信息', true);
+                }
+                let playersSet = new Set();
+                tasks.forEach(t => { if (t.t1p1) playersSet.add(t.t1p1);
+                    if (t.t1p2) playersSet.add(t.t1p2);
+                    if (t.t2p1) playersSet.add(t.t2p1);
+                    if (t.t2p2) playersSet.add(t.t2p2); });
+                const { existPlayers, maxP } = await fetchMaxPlayerId();
+                let currentMax = maxP;
+                let existNames = new Set(existPlayers.map(p => p.name));
+                playersSet.forEach(name => {
+                    if (!existNames.has(name) && !INVALID_MATCH_REGEX.test(name)) { currentMax++;
+                        existPlayers.push({ id_code: 'P' + String(currentMax).padStart(3, '0'), group: '赛程提取', position: existPlayers.length + 1, name: name, team: '', checked_in: false });
+                        existNames.add(name); }
+                });
+                await apiPost('set_players', { players: existPlayers });
+                const res = await apiPost('set_bulk_tasks', { tasks });
+                if (res.status === 'success') { showToast(`🎉 成功下发 ${tasks.length} 场对决任务并自动扩充人员库！`);
+                    loadDashboard(); }
+                $('scheduleFile').value = '';
+                if (btnElem) { btnElem.innerHTML = '📊 智能解析 (日程/循环网格表)';
+                    btnElem.disabled = false; }
+            };
+            reader.readAsArrayBuffer(file);
+        };
+
+        // ======================== 解析团体日程 ========================
+        window.handleImportTeamFile = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    const btnElem = $('importTeamBtn');
+    if (btnElem) { btnElem.innerText = '解析中...'; btnElem.disabled = true; }
+    const reader = new FileReader();
+    reader.onload = async (evt) => {
+        let knownTeams = [];
+        let groupTeamMap = new Map(); // key: group|team_name, value: team_name
+        let allPlayers = [];
+        try {
+            let pRes = await apiGet('get_players');
+            if (pRes.status === 'success' && pRes.data) {
+                allPlayers = pRes.data;
+                allPlayers.forEach(p => {
+                    const group = p.group || '未知组别';
+                    const team = p.team || '';
+                    if (team) {
+                        const key = `${group}|${team}`;
+                        if (!groupTeamMap.has(key)) {
+                            groupTeamMap.set(key, team);
+                        }
+                    }
+                    knownTeams.push(team);
+                });
+                knownTeams = [...new Set(knownTeams)];
+            }
+        } catch (err) { console.warn('获取大名单失败，继续解析', err); }
+        
+        const data = new Uint8Array(evt.target.result);
+        const workbook = XLSX.read(data, { type: 'array' });
+        const sheetName = workbook.SheetNames[0];
+        const rows = XLSX.utils.sheet_to_json(workbook.Sheets[sheetName], { header: 1, defval: '' });
+        
+        let rooms = [];
+        try { rooms = await robustParseTennisScheduleAsync(rows, true, knownTeams, groupTeamMap, allPlayers); } catch (e) { console.warn(e); }
+        if (rooms.length === 0) { try { rooms = parseRoundRobinData(rows, true, knownTeams, groupTeamMap); } catch (e) {} }
+        if (rooms.length === 0) { rooms = bruteForceParseVS(rows, groupTeamMap); }
+        
+        if (rooms.length === 0) {
+            $('teamExcelFile').value = '';
+            if (btnElem) { btnElem.innerHTML = '📊 解析日程'; btnElem.disabled = false; }
+            return showToast('⚠️ 未能从表格中提取到任何对阵信息\n请确认表格包含 "VS" 行', true);
+        }
+        
+        let sCount = 0;
+        for (let r of rooms) {
+            try {
+                const roomCode = r.roomCode || ('T' + String(sCount + 1).padStart(2, '0'));
+                // 为队伍生成 team_code（如果未提供）
+                let teamsWithCode = r.teams.map((t, idx) => {
+    // 如果已有 team_code（如签表解析得到的 A1），则保留
+    if (t.team_code && t.team_code.trim() !== '') {
+        return { ...t, team_code: t.team_code };
+    }
+    // 否则生成基于房间号和队伍序号的编码：T{房间号}-{序号}
+    // 房间号取 roomCode 的数字部分，如 T01 → 01
+    let roomNum = roomCode.replace(/\D/g, '') || String(sCount + 1).padStart(2, '0');
+    let teamIdx = String(idx + 1).padStart(2, '0');
+    let newCode = `T${roomNum}-${teamIdx}`;
+    return { ...t, team_code: newCode };
+});
+                
+                const payload = {
+                    room_code: roomCode,
+                    teams: teamsWithCode.map(t => ({
+                        team_name: t.team_name || t.name || '未知队伍',
+                        players: t.players || [],
+                        team_code: t.team_code,
+                        group: t.group || '未知组别'
+                    })),
+                    status: 'team_confirming'
+                };
+                
+                const res = await apiPost('import_team_event', payload);
+                if (res.status === 'success') {
+                    sCount++;
+                    // 为每个队伍同步选手编号
+                    for (let team of teamsWithCode) {
+                        await syncTeamPlayerIds(roomCode, team.team_name, team.team_code);
+                    }
+                }
+            } catch (e) {}
+        }
+        showToast(`✅ 解析完毕！成功生成了 ${sCount} 个排阵房间！`);
+        if (btnElem) { btnElem.innerHTML = '📊 解析日程'; btnElem.disabled = false; }
+        $('teamExcelFile').value = '';
+        loadDashboard();
+    };
+    reader.readAsArrayBuffer(file);
+};
+
+        // ======================== 辅助解析函数 ========================
+        function bruteForceParseVS(rows, groupTeamMap = new Map()) {
+    const rooms = [];
+    let counter = 1;
+    let currentGroup = '未知组别';
+    
+    const getTeam = (name) => {
+        let clean = name.replace(/^[A-Z]组\d+\s*/i, '').replace(/\[\d+\]/g, '').replace(/[（(][^）)]*[）)]/g, '').trim();
+        const key = `${currentGroup}|${clean}`;
+        if (groupTeamMap.has(key)) return groupTeamMap.get(key);
+        return clean;
+    };
+    
+    for (let row of rows) {
+        const rowText = row.join(' ');
+        if (rowText.includes('公开组')) currentGroup = '公开组';
+        else if (rowText.includes('常青组')) currentGroup = '常青组';
+        else if (rowText.includes('常青')) currentGroup = '常青组';
+        else if (rowText.includes('公开')) currentGroup = '公开组';
+        
+        for (let cell of row) {
+            const text = String(cell).toUpperCase().trim();
+            if (text.includes('VS')) {
+                const parts = text.split(/\s+VS\s+/i);
+                if (parts.length >= 2) {
+                    let t1 = parts[0].replace(/^[A-Z]组\d+\s*/i, '').replace(/\[\d+\]/g, '').replace(/[（(][^）)]*[）)]/g, '').trim();
+                    let t2 = parts[1].replace(/^[A-Z]组\d+\s*/i, '').replace(/\[\d+\]/g, '').replace(/[（(][^）)]*[）)]/g, '').trim();
+                    if (t1 && t2 && t1.length < 30 && t2.length < 30) {
+                        rooms.push({
+                            roomCode: 'T' + String(counter++).padStart(2, '0'),
+                            teams: [
+                                { team_name: getTeam(t1), players: [], group: currentGroup },
+                                { team_name: getTeam(t2), players: [], group: currentGroup }
+                            ]
+                        });
+                    }
+                }
+            }
+        }
+    }
+    return rooms;
+}
+
+        async function fetchMaxPlayerId() {
+            try {
+                const pRes = await apiGet('get_players');
+                const existPlayers = pRes.status === 'success' ? pRes.data : [];
+                let maxP = 0;
+                existPlayers.forEach(p => { if (p.id_code && p.id_code.startsWith('P')) { let num = parseInt(p.id_code.substring(1)); if (!isNaN(num) && num > maxP) maxP = num; } });
+                return { existPlayers, maxP };
+            } catch (e) {
+                return { existPlayers: [], maxP: 0 };
+            }
+        }
+
+        // ======================== 循环赛/分组赛解析 ========================
+        function parseRoundRobinData(rows, isTeamMode, knownTeams = [], groupTeamMap = new Map()) {
+    let tasks = [];
+    let roomMap = new Map();
+    let rCounter = 1;
+    let headerRowIdx = rows.findIndex(r => r.some(c => String(c).includes('组别') || String(c).includes('小组') || String(c).includes('A组')));
+
+    const normalizeTeamName = (rawName) => {
+        let clean = rawName.replace(/[（(][^）)]*[）)]/g, '').trim();
+        clean = clean.replace(/^[A-Za-z]组\d+\s*/, '').trim();
+        if (!isTeamMode || knownTeams.length === 0) return clean;
+        if (knownTeams.includes(clean)) return clean;
+        let match = knownTeams.find(kt => clean.includes(kt) || kt.includes(clean));
+        return match || clean;
+    };
+
+    if (headerRowIdx !== -1) {
+        let headers = rows[headerRowIdx];
+        let groupIdx = headers.findIndex(h => String(h).includes('组别') || String(h).includes('小组'));
+        let playerIdx = headers.findIndex(h => NAME_REGEX.test(String(h)));
+        // 动态查找队名列
+        let teamNameCol = -1;
+        for (let i = 0; i < headers.length; i++) {
+            let h = String(headers[i] || '');
+            if (h.includes('A组') || h.includes('B组') || h.includes('组')) continue;
+            if (h.includes('名') || h.includes('胜') || h.includes('局') || h.includes('分') || h.includes('率')) continue;
+            if (h.match(/^[A-Z]\d+$/)) continue;
+            if (i > 0) { teamNameCol = i; break; }
+        }
+        if (teamNameCol === -1) teamNameCol = 1;
+
+        let groups = {};
+        let currentGroupName = '';
+        for (let i = headerRowIdx + 1; i < rows.length; i++) {
+            let row = rows[i];
+            let firstCell = String(row[0] || '').trim();
+            if (!firstCell || /胜负|局|分|率/.test(firstCell)) continue;
+            if (/^[A-Z]组/.test(firstCell)) {
+                currentGroupName = firstCell;
+                continue;
+            }
+            let teamRaw = String(row[teamNameCol] || '').trim();
+            if (!teamRaw) continue;
+            // 提取签位
+            let sign = '';
+            let firstCellClean = firstCell.replace(/^\s*/, '').replace(/\s*$/, '');
+            if (/^[A-Z]\d+$/.test(firstCellClean)) {
+                sign = firstCellClean;
+            } else if (/^[A-Z]\d+/.test(firstCellClean)) {
+                sign = firstCellClean.match(/^[A-Z]\d+/)[0];
+            }
+            let group = currentGroupName.replace(/组$/, '') || '未知';
+            let cleanTeam = normalizeTeamName(teamRaw);
+            let key = `${group}|${cleanTeam}`;
+            if (groupTeamMap.has(key)) {
+                cleanTeam = groupTeamMap.get(key);
+            } else {
+                let matched = Array.from(groupTeamMap.keys()).find(k => k.startsWith(group + '|') && (k.includes(cleanTeam) || cleanTeam.includes(k.split('|')[1])));
+                if (matched) {
+                    cleanTeam = groupTeamMap.get(matched);
+                }
+            }
+            if (!groups[group]) groups[group] = {};
+            if (!groups[group][cleanTeam]) {
+                groups[group][cleanTeam] = { name: cleanTeam, sign: sign, group: group };
+            }
+        }
+
+        for (let gName in groups) {
+            let teams = Object.values(groups[gName]);
+            if (isTeamMode) {
+                for (let i = 0; i < teams.length; i++) {
+                    for (let j = i + 1; j < teams.length; j++) {
+                        let t1 = teams[i];
+                        let t2 = teams[j];
+                        let roomKey = `${t1.name}_VS_${t2.name}_${gName}`;
+                        if (!roomMap.has(roomKey)) {
+                            roomMap.set(roomKey, {
+                                roomCode: 'T' + String(rCounter++).padStart(2, '0'),
+                                teams: [
+                                    { team_name: t1.name, players: [], group: gName, team_code: t1.sign || '' },
+                                    { team_name: t2.name, players: [], group: gName, team_code: t2.sign || '' }
+                                ],
+                                status: 'team_confirming'
+                            });
+                        }
+                    }
+                }
+            } else {
+                // 个人赛模式：生成双打或单打对阵
+                let abbr = 'MS';
+                let matchIdx = 1;
+                for (let i = 0; i < teams.length; i++) {
+                    for (let j = i + 1; j < teams.length; j++) {
+                        let t1 = teams[i].name;
+                        let t2 = teams[j].name;
+                        let isDbl = SPLIT_REGEX.test(t1) || SPLIT_REGEX.test(t2);
+                        let p1Arr = t1.split(SPLIT_REGEX);
+                        let p2Arr = t2.split(SPLIT_REGEX);
+                        tasks.push({
+                            id: `${gName}组-${String(matchIdx++).padStart(2, '0')}`,
+                            t1: t1,
+                            t1p1: p1Arr[0] || '',
+                            t1p2: p1Arr[1] || '',
+                            t2: t2,
+                            t2p1: p2Arr[0] || '',
+                            t2p2: p2Arr[1] || '',
+                            type: isDbl ? 'doubles' : 'singles',
+                            format: 1,
+                            meth: 'rally',
+                            is_team: false
+                        });
+                    }
+                }
+            }
+        }
+        if (tasks.length > 0 || roomMap.size > 0) return isTeamMode ? Array.from(roomMap.values()) : tasks;
+    }
+
+    // 回退逻辑（兼容旧格式）
+    let currentGroupName = '';
+    let currentGroupPlayers = [];
+    const processGroup = () => {
+        if (currentGroupPlayers.length < 2) return;
+        let matchIdx = 1;
+        for (let i = 0; i < currentGroupPlayers.length; i++) {
+            for (let j = i + 1; j < currentGroupPlayers.length; j++) {
+                let t1 = currentGroupPlayers[i];
+                let t2 = currentGroupPlayers[j];
+                if (isTeamMode) {
+                    let roomKey = `${t1}_VS_${t2}`;
+                    if (!roomMap.has(roomKey)) {
+                        roomMap.set(roomKey, {
+                            roomCode: currentGroupName + '-' + String(matchIdx++).padStart(2, '0'),
+                            teams: [
+                                { team_name: t1, players: [], group: currentGroupName },
+                                { team_name: t2, players: [], group: currentGroupName }
+                            ],
+                            status: 'team_confirming'
+                        });
+                    }
+                } else {
+                    let isDbl = SPLIT_REGEX.test(t1) || SPLIT_REGEX.test(t2);
+                    let p1Arr = t1.split(SPLIT_REGEX);
+                    let p2Arr = t2.split(SPLIT_REGEX);
+                    tasks.push({
+                        id: `${currentGroupName}-${String(matchIdx++).padStart(2, '0')}`,
+                        t1: t1,
+                        t1p1: p1Arr[0] || '',
+                        t1p2: p1Arr[1] || '',
+                        t2: t2,
+                        t2p1: p2Arr[0] || '',
+                        t2p2: p2Arr[1] || '',
+                        type: isDbl ? 'doubles' : 'singles',
+                        format: 1,
+                        meth: 'rally',
+                        is_team: false
+                    });
+                }
+            }
+        }
+    };
+
+    rows.forEach(row => {
+        let col0 = String(row[0] || '').trim();
+        let col1 = String(row[1] || '').trim();
+        if (col1 && (col1.includes('组') || String(row[2]) === '1' || String(row[2]) === '1.0')) {
+            processGroup();
+            currentGroupName = col1.replace(/成绩|积分|表/g, '').trim();
+            if (!currentGroupName.includes('组')) currentGroupName = 'Group ' + currentGroupName;
+            currentGroupPlayers = [];
+        } else if (currentGroupName && col0.match(/^\d+(\.\d+)?$/) && col1) {
+            if (!/胜负|排名|积分|场次/.test(col1)) {
+                let clean = normalizeTeamName(col1);
+                currentGroupPlayers.push(clean);
+            }
+        }
+    });
+    processGroup();
+
+    return isTeamMode ? Array.from(roomMap.values()) : tasks;
+}
+
+        // ======================== 智能解析网球记日程 ========================
+        async function robustParseTennisScheduleAsync(rows, isTeamMode, knownTeams = [], groupTeamMap = new Map(), allPlayers = []) {
+    let tasks = [];
+    let roomMap = new Map();
+    let rCounter = 1;
+    let currentGroup = '未知组别';
+    const cleanExt = (s) => {
+        if (!s) return "未知";
+        let clean = s.replace(/\[\d+\]/g, '').replace(/[（(][^）)]*[）)]/g, '').trim();
+        clean = clean.replace(/^[A-Za-z]组\d+\s*/, '').trim();
+        return clean;
+    };
+
+    const getTeamByGroup = (teamName, group) => {
+        const key = `${group}|${teamName}`;
+        if (groupTeamMap.has(key)) return groupTeamMap.get(key);
+        const matched = allPlayers.find(p => {
+            const pGroup = p.group || '未知组别';
+            const pTeam = p.team || '';
+            return pGroup === group && (pTeam.includes(teamName) || teamName.includes(pTeam));
+        });
+        if (matched) return matched.team;
+        const fallback = knownTeams.find(kt => kt.includes(teamName) || teamName.includes(kt));
+        return fallback || teamName;
+    };
+
+    for (let rIdx = 0; rIdx < rows.length; rIdx++) {
+        let row = rows[rIdx];
+        const rowText = row.join(' ');
+        if (rowText.includes('公开组')) currentGroup = '公开组';
+        else if (rowText.includes('常青组')) currentGroup = '常青组';
+        else if (rowText.includes('常青')) currentGroup = '常青组';
+        else if (rowText.includes('公开')) currentGroup = '公开组';
+
+        for (let cIdx = 0; cIdx < row.length; cIdx++) {
+            let cell = row[cIdx];
+            let text = String(cell).trim().replace(/&amp;/g, '&');
+            if (text.toUpperCase().includes('VS')) {
+                let lines = text.split(/<br\s*\/?>|\n|\r/i).map(s => s.trim()).filter(s => s);
+                let vsIdx = lines.findIndex(l => l.toUpperCase() === 'VS');
+                if (vsIdx !== -1 && vsIdx > 0 && vsIdx < lines.length - 1) {
+                    const extractInfo = (arr) => {
+                        if (!arr || arr.length === 0) return { name: '未知', team: '未知', group: currentGroup };
+                        let rawLine = arr[arr.length - 1];
+                        if (arr.length >= 2 && (rawLine.startsWith('(') || rawLine.startsWith('（'))) {
+                            rawLine = arr[arr.length - 2];
+                        }
+                        let cleanLine = cleanExt(rawLine);
+                        if (!cleanLine) cleanLine = '未知队伍';
+                        cleanLine = cleanLine.replace(/^[A-Za-z]组\d+\s*/, '').trim();
+                        let teamName = getTeamByGroup(cleanLine, currentGroup);
+                        return { name: teamName, team: teamName, group: currentGroup };
+                    };
+                    let upper = lines.slice(0, vsIdx);
+                    let lower = lines.slice(vsIdx + 1);
+                    let t1Info = extractInfo(upper);
+                    let t2Info = extractInfo(lower);
+
+                    if (isTeamMode) {
+                        let roomKey = `${t1Info.team}_VS_${t2Info.team}_${currentGroup}`;
+                        if (!roomMap.has(roomKey)) {
+                            roomMap.set(roomKey, {
+                                roomCode: 'T' + String(rCounter++).padStart(2, '0'),
+                                teams: [
+                                    { team_name: t1Info.team, players: [], group: t1Info.group },
+                                    { team_name: t2Info.team, players: [], group: t2Info.group }
+                                ],
+                                status: 'team_confirming'
+                            });
+                        }
+                    } else {
+                        // 个人赛模式
+                        if (INVALID_MATCH_REGEX.test(t1Info.name) || INVALID_MATCH_REGEX.test(t2Info.name)) continue;
+                        let typeLine = (upper.length > 1 && upper[0] && (upper[0].includes('紧跟前场') || upper[0].includes('时间') || upper[0].includes('场地'))) ? (upper[1] || '') : (upper[0] || '');
+                        let abbr = (typeLine.toUpperCase().includes("双") || typeLine.toUpperCase().includes("D")) ? "MD" : "MS";
+                        let isDbl = SPLIT_REGEX.test(t1Info.name) || SPLIT_REGEX.test(t2Info.name);
+                        let p1Arr = t1Info.name.split(SPLIT_REGEX);
+                        let p2Arr = t2Info.name.split(SPLIT_REGEX);
+                        tasks.push({
+                            id: `${abbr}-${String(rCounter++).padStart(3, '0')}`,
+                            t1: t1Info.team,
+                            t1p1: p1Arr[0] || '',
+                            t1p2: p1Arr[1] || '',
+                            t2: t2Info.team,
+                            t2p1: p2Arr[0] || '',
+                            t2p2: p2Arr[1] || '',
+                            type: isDbl ? 'doubles' : 'singles',
+                            format: 1,
+                            meth: 'rally',
+                            is_team: false,
+                            group: currentGroup
+                        });
+                    }
+                }
+            }
+        }
+    }
+    return isTeamMode ? Array.from(roomMap.values()) : tasks;
+}
+
+        // ======================== 编辑赛事弹窗 ========================
+        window.editEvent = async (code) => {
+            const res = await apiGet('get_event_config', { event_code: code });
+            if (res.status !== 'success') {
+                showToast('无法获取赛事配置', true);
+                return;
+            }
+            const conf = res.data;
+            document.getElementById('editEventCode').value = code;
+            document.getElementById('editEventName').value = conf.event_name || '';
+            document.getElementById('editEventDays').value = conf.event_days || 1;
+            document.getElementById('editEventPassword').value = conf.referee_password || '';
+            document.getElementById('editNewEventCode').value = '';
+            document.getElementById('editEventModal').classList.remove('hidden-panel');
+        };
+
+        window.closeEditModal = () => {
+            document.getElementById('editEventModal').classList.add('hidden-panel');
+        };
+
+        window.saveEventEdit = async () => {
+            const code = document.getElementById('editEventCode').value;
+            const name = document.getElementById('editEventName').value.trim();
+            const days = parseInt(document.getElementById('editEventDays').value) || 1;
+            const pwd = document.getElementById('editEventPassword').value.trim();
+            const newCode = document.getElementById('editNewEventCode').value.trim().toUpperCase();
+
+            if (!name || !pwd) {
+                showToast('名称和密码不能为空', true);
+                return;
+            }
+
+            const btn = document.getElementById('saveEditBtn');
+            btn.innerText = '保存中...';
+            btn.disabled = true;
+
+            const superPwd = prompt('请输入超管密码以确认修改：');
+            if (!superPwd) { btn.disabled = false;
+                btn.innerText = '保存修改'; return; }
+
+            try {
+                let updateRes = await apiPost('update_event_config', {
+                    super_pwd: superPwd,
+                    target_code: code,
+                    event_name: name,
+                    event_days: days,
+                    referee_password: pwd
+                });
+                if (updateRes.status !== 'success') {
+                    showToast('更新配置失败：' + (updateRes.message || ''), true);
+                    btn.disabled = false;
+                    btn.innerText = '保存修改';
+                    return;
+                }
+
+                if (newCode && newCode !== code) {
+                    const codeRes = await apiPost('update_event_code', {
+                        super_pwd: superPwd,
+                        old_code: code,
+                        new_code: newCode
+                    });
+                    if (codeRes.status !== 'success') {
+                        showToast('修改赛事码失败：' + (codeRes.message || ''), true);
+                        btn.disabled = false;
+                        btn.innerText = '保存修改';
+                        return;
+                    }
+                    showToast(`✅ 赛事码已更新为 ${newCode}，请使用新码登录`);
+                    await openSuperAdmin(superPwd);
+                } else {
+                    showToast('✅ 赛事信息已更新');
+                    await openSuperAdmin(superPwd);
+                }
+                closeEditModal();
+            } catch (e) {
+                showToast('网络异常：' + e.message, true);
+            } finally {
+                btn.disabled = false;
+                btn.innerText = '保存修改';
+            }
+        };
+
+        // ======================== 交互式队名对齐 ========================
+        function interactivelyAlignTeamName(rawName, knownTeams) {
+            let clean = rawName.replace(/^[A-Za-z\d+\u4e00-\u9fa5]+组\s*\d*|\d+号\s*/, '').replace(/\[\d+\]/g, '').trim();
+            if (knownTeams.includes(clean)) return clean;
+            for (let kt of knownTeams) {
+                if (clean.includes(kt) || kt.includes(clean)) {
+                    if (window.teamAliasMap[rawName]) return window.teamAliasMap[rawName];
+                    return new Promise((resolve) => {
+                        $('aliasSchedName').innerText = rawName;
+                        $('aliasDbName').innerText = kt;
+                        $('aliasModal').classList.remove('hidden-panel');
+                        $('aliasYesBtn').onclick = () => {
+                            window.teamAliasMap[rawName] = kt;
+                            $('aliasModal').classList.add('hidden-panel');
+                            resolve(kt);
+                        };
+                        $('aliasNoBtn').onclick = () => {
+                            window.teamAliasMap[rawName] = clean;
+                            $('aliasModal').classList.add('hidden-panel');
+                            resolve(clean);
+                        };
+                    });
+                }
+            }
+            return clean;
+        }
+
+        console.log('Master 总控台完整版已加载，登录会话已安全加固。');
+    </script>
+</body>
+</html>

@@ -1,0 +1,78 @@
+# =========================
+# Node.js
+# =========================
+
+node_modules/
+
+npm-debug.log*
+
+yarn-error.log*
+
+pnpm-debug.log*
+
+# =========================
+# Environment
+# =========================
+
+.env
+
+.env.*
+
+!.env.example
+
+# =========================
+# Logs
+# =========================
+
+logs/
+
+*.log
+
+# =========================
+# OS
+# =========================
+
+.DS_Store
+
+Thumbs.db
+
+# =========================
+# IDE
+# =========================
+
+.vscode/settings.json
+
+.idea/
+
+# =========================
+# Build
+# =========================
+
+dist/
+
+coverage/
+
+# =========================
+# Temporary
+# =========================
+
+tmp/
+
+temp/
+
+# =========================
+# Archives and data files
+# =========================
+
+*.zip
+*.xls
+*.xlsx
+
+# TOP deployment test data
+Deploy-WechatCloud/0704文档/
+Deploy-WechatCloud/测试文档xls/
+
+# Legacy and Modern local archive snapshots
+Legacy/*-saved.zip
+Modern/*-saved.zip
+Modern/zz-*.zip

@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PICKLE球赛事管理系统 数字赛事全栈枢纽</title>
+    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ccircle cx='50' cy='50' r='45' fill='%23a3e635'/%3E%3Ccircle cx='50' cy='20' r='7' fill='%231e293b' opacity='0.4'/%3E%3Ccircle cx='30' cy='32' r='7' fill='%231e293b' opacity='0.4'/%3E%3Ccircle cx='70' cy='32' r='7' fill='%231e293b' opacity='0.4'/%3E%3Ccircle cx='18' cy='55' r='7' fill='%231e293b' opacity='0.4'/%3E%3Ccircle cx='82' cy='55' r='7' fill='%231e293b' opacity='0.4'/%3E%3Ccircle cx='35' cy='75' r='7' fill='%231e293b' opacity='0.4'/%3E%3Ccircle cx='65' cy='75' r='7' fill='%231e293b' opacity='0.4'/%3E%3Ccircle cx='50' cy='50' r='7' fill='%231e293b' opacity='0.4'/%3E%3Ccircle cx='50' cy='85' r='7' fill='%231e293b' opacity='0.4'/%3E%3C/svg%3E">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body { font-family: 'Inter', system-ui; background-color: #0f172a; color: #f1f5f9; min-height: 100vh; overflow-x: hidden; }
+        .portal-card { background: #1e293b; border-radius: 1.25rem; border: 1px solid rgba(255,255,255,0.05); box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.3); transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1); cursor: pointer; text-align: left; width: 100%; display: flex; flex-direction: column; height: 100%; text-decoration: none; }
+        .portal-card:hover { transform: translateY(-5px); border-color: rgba(16, 185, 129, 0.4); box-shadow: 0 20px 40px -10px rgba(16, 185, 129, 0.15); }
+        .gradient-text { background-clip: text; -webkit-background-clip: text; color: transparent; background-image: linear-gradient(to right, #34d399, #3b82f6); }
+        @keyframes marquee { 0% { transform: translateX(0); } 100% { transform: translateX(-100%); } }
+        .marquee-wrapper { overflow: hidden; white-space: nowrap; display: flex; flex: 1; }
+        .marquee-content { display: inline-block; animation: marquee 28s linear infinite; padding-left: 100%; }
+        .marquee-content:hover { animation-play-state: paused; }
+        .header-tag { font-size: 0.55rem; padding: 0.2rem 0.6rem; border-radius: 999px; background: rgba(51, 65, 85, 0.6); border: 1px solid rgba(71, 85, 105, 0.4); color: #94a3b8; transition: 0.2s; text-decoration: none; }
+        .header-tag:hover { background: rgba(16, 185, 129, 0.15); border-color: #34d399; color: #34d399; }
+    </style>
+</head>
+<body class="flex flex-col justify-between min-h-screen relative">
+
+    <!-- 顶部横幅：左侧跑马灯 + 右侧 Guide/Blog 小标签 -->
+    <div class="w-full bg-slate-900/90 border-b border-emerald-500/30 py-2 px-4 shadow-lg flex items-center justify-between" style="height: 44px;">
+        <div class="marquee-wrapper flex-1 min-w-0">
+            <div class="marquee-content text-emerald-400 font-black text-xs md:text-sm tracking-widest">
+                🚀 PICKLE球赛事管理系统 数字赛事协作总线 &nbsp;&nbsp;|&nbsp;&nbsp; 执裁全程无纸化 &nbsp;&nbsp;|&nbsp;&nbsp; 完美适配网球记 &nbsp;&nbsp;|&nbsp;&nbsp; 🔥 无限哥团队心血打造
+            </div>
+        </div>
+        <div class="flex items-center gap-2 shrink-0 ml-4">
+            <a href="guide.html" class="header-tag">📖 Guide</a>
+            <a href="blog.html" class="header-tag">📝 Blog</a>
+        </div>
+    </div>
+
+    <div class="flex-grow max-w-[1200px] mx-auto w-full px-4 py-8 flex flex-col justify-center">
+        
+        <div class="text-center mb-10">
+            <h1 class="text-3xl md:text-5xl font-black mb-3 tracking-tight gradient-text uppercase">PICKLE球赛事管理系统</h1>
+            <p class="text-slate-400 text-sm md:text-base font-medium">下一代轻量化数字赛事管理矩阵 · 生产级协作中台</p>
+        </div>
+
+        <!-- 卡片顺序：Master → Referee(联网) → Umpire → Checkin → Players → Lineup → Referee(离线) → ZZ → Dashboard(原Guide位) -->
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 items-stretch">
+            
+            <!-- 1. Master / Dashboard -->
+            <a href="master.html" class="p-5 portal-card border-amber-500/20">
+                <div class="flex justify-between items-center mb-3">
+                    <h3 class="text-base font-black text-white flex items-center gap-2"><span>👑</span> 裁判长总控台 <span class="text-[10px] text-amber-400 font-normal">Dashboard</span></h3>
+                    <span class="text-[9px] bg-amber-950 text-amber-400 px-2 py-0.5 rounded border border-amber-700/30">Master</span>
+                </div>
+                <p class="text-xs text-slate-400 leading-relaxed">创赛总控、网球记表格导入、盲排空间调度、子比赛一键解算、全量数据法务归档打包。</p>
+            </a>
+
+            <!-- 2. Referee 联网版 -->
+            <a href="referee.html" class="p-5 portal-card border-emerald-500/20">
+                <div class="flex justify-between items-center mb-3">
+                    <h3 class="text-base font-black text-white flex items-center gap-2"><span>👨‍⚖️</span> 裁判打分终端 <span class="text-[10px] text-emerald-400 font-normal">(联网版)</span></h3>
+                    <span class="text-[9px] bg-emerald-950 text-emerald-400 px-2 py-0.5 rounded border border-emerald-700/30">Referee</span>
+                </div>
+                <p class="text-xs text-slate-400 leading-relaxed">连接云端提取任务。全员免责检录强锁，支持Sideout发球得分制（自动换位/偶数区校验）与每球得分制。</p>
+            </a>
+
+            <!-- 3. Umpire -->
+            <a href="umpire.html" class="p-5 portal-card border-blue-500/20">
+                <div class="flex justify-between items-center mb-3">
+                    <h3 class="text-base font-black text-white flex items-center gap-2"><span>📂</span> 裁判大数据库</h3>
+                    <span class="text-[9px] bg-blue-950 text-blue-400 px-2 py-0.5 rounded border border-blue-700/30">Umpire</span>
+                </div>
+                <p class="text-xs text-slate-400 leading-relaxed">裁判现场自主报到。跨赛区维护裁判通讯录与资质级别，执裁场次全自动累加并签发电子证书。</p>
+            </a>
+
+            <!-- 4. Checkin -->
+            <a href="checkin.html" class="p-5 portal-card border-teal-500/20">
+                <div class="flex justify-between items-center mb-3">
+                    <h3 class="text-base font-black text-white flex items-center gap-2"><span>✍️</span> 免责签到台</h3>
+                    <span class="text-[9px] bg-slate-900 text-teal-400 px-2 py-0.5 rounded border border-teal-500/20">Checkin</span>
+                </div>
+                <p class="text-xs text-slate-400 leading-relaxed">选手扫码入场基站。强显白底画板手写签署法务免责声明，支持设备级缓存快速回溯。</p>
+            </a>
+
+            <!-- 5. Players -->
+            <a href="players.html" class="p-5 portal-card border-indigo-500/20">
+                <div class="flex justify-between items-center mb-3">
+                    <h3 class="text-base font-black text-white flex items-center gap-2"><span>👁️</span> 运动员法务雷达</h3>
+                    <span class="text-[9px] bg-indigo-950 text-indigo-400 px-2 py-0.5 rounded border border-indigo-700/30">Players</span>
+                </div>
+                <p class="text-xs text-slate-400 leading-relaxed">主控级防篡改监控墙。随时调阅选手的免责真迹、身份证尾号，支持突发状况下的现场名册增删。</p>
+            </a>
+
+            <!-- 6. Lineup -->
+            <a href="team_lineup.html" class="p-5 portal-card border-orange-500/20">
+                <div class="flex justify-between items-center mb-3">
+                    <h3 class="text-base font-black text-white flex items-center gap-2"><span>🏆</span> 领队排阵端</h3>
+                    <span class="text-[9px] bg-slate-900 text-orange-400 px-2 py-0.5 rounded border border-orange-500/20">Lineup</span>
+                </div>
+                <p class="text-xs text-slate-400 leading-relaxed">领队专属作战室。盲排提交上链，自动排查并标红警告未签到选手，彻底杜绝违规上场。</p>
+            </a>
+
+            <!-- 7. Referee 离线版 -->
+            <a href="referee.html?mode=local" class="p-5 portal-card border-cyan-500/20 bg-slate-800/50">
+                <div class="flex justify-between items-center mb-3">
+                    <h3 class="text-base font-black text-white flex items-center gap-2"><span>📱</span> 裁判打分终端 <span class="text-[10px] text-cyan-400 font-normal">(离线单机)</span></h3>
+                    <span class="text-[9px] bg-cyan-950 text-cyan-400 px-2 py-0.5 rounded border border-cyan-700/30">Local</span>
+                </div>
+                <p class="text-xs text-slate-400 leading-relaxed">无需联网，随开随用。提供最纯粹的 Pickleball 记分体验，支持发球局切换与比分逻辑推演。</p>
+            </a>
+
+            <!-- 8. ZZ -->
+            <a href="zz.html" class="p-5 portal-card border-rose-500/20 bg-slate-800/50">
+                <div class="flex justify-between items-center mb-3">
+                    <h3 class="text-base font-black text-white flex items-center gap-2"><span>⚡</span> ZZ 极速离线调度</h3>
+                    <span class="text-[9px] bg-rose-950 text-rose-400 px-2 py-0.5 rounded border border-rose-700/30">ZZ.html</span>
+                </div>
+                <p class="text-xs text-slate-400 leading-relaxed">抛弃繁重数据库的现场救火神器。输入名字直接预估场次并生成循环赛或固定对阵表，纯单机计算。</p>
+            </a>
+
+            <!-- 9. Dashboard 总览（原 Guide 位替换） -->
+            <a href="master.html" class="p-5 portal-card border-purple-500/20 bg-slate-800/50">
+                <div class="flex justify-between items-center mb-3">
+                    <h3 class="text-base font-black text-white flex items-center gap-2"><span>📊</span> Dashboard 总览</h3>
+                    <span class="text-[9px] bg-purple-950 text-purple-400 px-2 py-0.5 rounded border border-purple-700/30">Monitor</span>
+                </div>
+                <p class="text-xs text-slate-400 leading-relaxed">快速返回裁判长总控台，查看实时赛事数据、场地状态与调度面板，掌控全场动态。</p>
+            </a>
+
+        </div>
+    </div>
+
+    <footer class="w-full bg-slate-900 border-t border-slate-800 py-4 px-6 text-center text-xs text-slate-500 flex flex-col sm:flex-row justify-between items-center gap-2 relative z-50">
+        <div class="flex items-center gap-2 font-mono text-[11px]" id="deviceStatus">
+            <span class="w-2 h-2 bg-emerald-500 rounded-full animate-pulse"></span>
+            当前设备缓存嗅探: <span id="cachedCode" class="text-slate-400 italic">未检测到绑定赛事</span>
+        </div>
+        <div class="text-[11px]">
+            由 <span class="font-bold text-slate-400">无限哥团队</span> 倾力驱动 · System version v0.96
+        </div>
+    </footer>
+
+    <script>
+        window.onload = () => {
+            const masterCode = sessionStorage.getItem('pickle_master_code');
+            const checkinCode = localStorage.getItem('pickle_checkin_code');
+            const refereeCode = sessionStorage.getItem('pickle_ref_code');
+
+            let activeCode = masterCode || refereeCode || checkinCode || '';
+            if (activeCode) {
+                document.getElementById('cachedCode').innerHTML = `已自动记忆赛事码 【 <span class="text-emerald-400 font-bold font-mono tracking-widest uppercase">${activeCode}</span> 】`;
+            }
+        };
+    </script>
+</body>
+</html>

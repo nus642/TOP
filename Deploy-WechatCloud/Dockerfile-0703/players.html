@@ -1,0 +1,440 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pickle球 名单与法务雷达库</title>
+    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ccircle cx='50' cy='50' r='45' fill='%23a3e635'/%3E%3Ccircle cx='50' cy='20' r='7' fill='%231e293b' opacity='0.4'/%3E%3Ccircle cx='30' cy='32' r='7' fill='%231e293b' opacity='0.4'/%3E%3Ccircle cx='70' cy='32' r='7' fill='%231e293b' opacity='0.4'/%3E%3Ccircle cx='18' cy='55' r='7' fill='%231e293b' opacity='0.4'/%3E%3Ccircle cx='82' cy='55' r='7' fill='%231e293b' opacity='0.4'/%3E%3Ccircle cx='35' cy='75' r='7' fill='%231e293b' opacity='0.4'/%3E%3Ccircle cx='65' cy='75' r='7' fill='%231e293b' opacity='0.4'/%3E%3Ccircle cx='50' cy='50' r='7' fill='%231e293b' opacity='0.4'/%3E%3Ccircle cx='50' cy='85' r='7' fill='%231e293b' opacity='0.4'/%3E%3C/svg%3E">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body { background-color: #0f172a; color: white; font-family: 'Inter', sans-serif; }
+        .input-base { background: #1e293b; border: 1px solid #334155; padding: 0.75rem; border-radius: 0.5rem; color: white; width: 100%; outline: none; font-size: 0.875rem; }
+        .input-base:focus { border-color: #10b981; }
+        .card { background: #1e293b; border-radius: 1rem; border: 1px solid rgba(255,255,255,0.05); }
+        .sig-placeholder { color: #94a3b8; font-size: 0.8rem; padding: 0.5rem; background: #1e293b; border-radius: 0.5rem; text-align: center; }
+        .sig-error { color: #f87171; font-size: 0.8rem; padding: 0.5rem; background: #450a0a; border-radius: 0.5rem; text-align: center; border: 1px solid #7f1d1d; }
+        .sig-success { color: #34d399; font-size: 0.8rem; padding: 0.5rem; background: #064e3b; border-radius: 0.5rem; text-align: center; border: 1px solid #059669; }
+        .btn-danger { background: #dc2626; }
+        .btn-danger:hover { background: #b91c1c; }
+        .logout-btn { background: #dc2626; padding: 0.3rem 0.8rem; border-radius: 0.5rem; font-size: 0.75rem; font-weight: bold; cursor: pointer; border: none; color: white; transition: 0.2s; }
+        .logout-btn:hover { background: #b91c1c; }
+    </style>
+</head>
+<body class="p-4 md:p-8 max-w-5xl mx-auto">
+
+    <!-- 登录面板 -->
+    <div id="loginPanel" class="card text-center max-w-sm mx-auto mt-20 p-8 shadow-2xl">
+        <h2 class="text-2xl font-black mb-2 text-emerald-400">📋 法务雷达监控库</h2>
+        <p class="text-xs text-slate-400 mb-6">请输入赛事代码及裁判长授权密码登入</p>
+        <input type="text" id="eventCodeInput" class="input-base mb-4 text-center uppercase tracking-widest font-bold text-emerald-300" placeholder="赛事识别码 (如: PICKLE01)">
+        <input type="password" id="eventPwdInput" class="input-base mb-6 text-center font-bold text-amber-300" placeholder="裁判长授权密码">
+        <button onclick="doLogin()" class="w-full bg-emerald-600 hover:bg-emerald-500 py-3 rounded-lg font-bold shadow-lg transition-colors text-white">📡 连线并调阅数据</button>
+        <div class="text-[10px] text-slate-500 mt-4 text-center leading-relaxed">【授权声明】本页面仅限赛事裁判长及授权人员使用</div>
+    </div>
+
+    <!-- 主面板 -->
+    <div id="mainPanel" class="hidden">
+        <div class="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
+            <div>
+                <h1 class="text-2xl font-black text-emerald-400">👁️ 运动员与法务雷达监控库</h1>
+                <p class="text-slate-400 text-xs mt-1">当前连线赛事: <span id="dispCode" class="text-emerald-400 font-bold font-mono"></span></p>
+            </div>
+            <div class="flex gap-2 flex-wrap items-center">
+                <button onclick="document.getElementById('batchAddModal').classList.remove('hidden')" class="bg-indigo-600 hover:bg-indigo-500 px-4 py-2 rounded-lg font-bold text-sm shadow-lg transition-colors">➕ 批量添加</button>
+                <button onclick="forceAllCheckin()" class="bg-amber-600 hover:bg-amber-500 px-4 py-2 rounded-lg font-bold text-sm shadow-lg transition-colors">⚡ 一键全签到</button>
+                <button onclick="clearAllPlayers()" class="bg-red-600 hover:bg-red-500 px-4 py-2 rounded-lg font-bold text-sm shadow-lg transition-colors">🗑️ 一键全清</button>
+                <button onclick="saveData()" id="saveBtn" class="bg-emerald-600 hover:bg-emerald-500 px-4 py-2 rounded-lg font-bold text-sm shadow-lg transition-colors">💾 保存全盘覆写</button>
+                <button onclick="logout()" class="logout-btn">🚪 退出</button>
+            </div>
+        </div>
+
+        <div class="card overflow-x-auto shadow-2xl">
+            <table class="w-full text-left border-collapse min-w-[800px]">
+                <thead>
+                    <tr class="bg-slate-900 border-b border-slate-700 text-slate-300 text-xs uppercase tracking-wider">
+                        <th class="p-4 w-12 text-center">操作</th>
+                        <th class="p-4 w-28 text-amber-400 font-bold">编号 (ID)</th>
+                        <th class="p-4 w-32">姓名 (Name)</th>
+                        <th class="p-4 w-40">队伍 (Team)</th>
+						<th class="p-4 w-24 text-center text-amber-400">队伍编号</th>
+                        <th class="p-4 w-32">组别 (Group)</th>
+                        <th class="p-4 w-24 text-center text-emerald-400">免责签到</th>
+                        <th class="p-4 w-24 text-center text-blue-400">法务真迹</th>
+                    </tr>
+                </thead>
+                <tbody id="playerTableBody" class="text-sm divide-y divide-slate-800"></tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- 批量添加弹窗 -->
+    <div id="batchAddModal" class="hidden fixed inset-0 bg-black/80 z-[9999] flex items-center justify-center p-4">
+        <div class="bg-slate-800 p-6 rounded-xl w-full max-w-lg border border-indigo-500/50 shadow-2xl">
+            <h3 class="text-lg font-bold text-indigo-400 mb-4">➕ 批量编入新队伍/选手</h3>
+            <div class="grid grid-cols-2 gap-3 mb-3">
+                <input type="text" id="batchTeam" class="input-base border-slate-600 p-2" placeholder="队伍/单位名称 (如：中国电信)">
+                <input type="text" id="batchGroup" class="input-base border-slate-600 p-2" placeholder="组别 (如：公开组/混合池)">
+            </div>
+            <textarea id="batchNames" class="input-base border-slate-600 p-3 h-32 mb-4" placeholder="在此处粘贴选手姓名，多个姓名请用回车换行或空格隔开..."></textarea>
+            <div class="flex gap-3">
+                <button onclick="document.getElementById('batchAddModal').classList.add('hidden')" class="bg-slate-600 w-1/3 py-2 rounded font-bold">取消</button>
+                <button onclick="executeBatchAdd()" class="bg-indigo-600 w-2/3 py-2 rounded font-bold text-white">提取名字并排号入库</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 签名查看弹窗（优化版） -->
+    <div id="sigModal" class="hidden fixed inset-0 bg-black/90 z-50 flex items-center justify-center p-4" onclick="closeSigModal()">
+        <div class="bg-slate-800 p-6 rounded-xl max-w-sm w-full shadow-2xl border border-slate-600" onclick="event.stopPropagation()">
+            <div class="flex justify-between items-center mb-4">
+                <h3 class="font-bold text-emerald-400">📜 电子免责真迹调阅</h3>
+                <button onclick="closeSigModal()" class="text-slate-400 hover:text-white text-xl">&times;</button>
+            </div>
+            <div id="sigContentArea" class="bg-white p-2 rounded mb-4 min-h-[120px] flex items-center justify-center">
+                <div id="sigLoading" class="text-slate-500 text-sm">加载中...</div>
+                <img id="sigModalImg" src="" class="w-full h-auto object-contain border border-dashed border-slate-300 hidden">
+                <div id="sigPlaceholder" class="sig-placeholder hidden">暂无签名数据</div>
+                <div id="sigError" class="sig-error hidden"></div>
+            </div>
+            <div id="sigModalId" class="text-xs text-slate-400 font-mono leading-relaxed bg-slate-900 p-3 rounded"></div>
+            <div class="flex gap-2 mt-3">
+                <button onclick="refreshSignature()" id="refreshSigBtn" class="bg-indigo-600 hover:bg-indigo-500 px-3 py-1.5 rounded text-xs font-bold text-white transition-colors flex-1">🔄 重新加载</button>
+                <button onclick="closeSigModal()" class="bg-slate-600 hover:bg-slate-500 px-3 py-1.5 rounded text-xs font-bold text-white transition-colors flex-1">关闭</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let players = [];
+        let eventCode = '';
+        let eventPwd = '';
+        let currentSigPlayerName = '';
+
+        // ======================== 安全加固：登录与会话恢复 ========================
+        window.onload = () => {
+            const urlParams = new URLSearchParams(window.location.search);
+            // 优先从 sessionStorage 恢复
+            let code = sessionStorage.getItem('pickle_master_code');
+            let pwd = sessionStorage.getItem('pickle_master_pwd');
+            if (!code) {
+                code = urlParams.get('code');
+                if (code) {
+                    sessionStorage.setItem('pickle_master_code', code.toUpperCase());
+                }
+            }
+            if (!pwd) {
+                pwd = urlParams.get('pwd');
+                if (pwd) {
+                    sessionStorage.setItem('pickle_master_pwd', pwd);
+                }
+            }
+            // 如果 sessionStorage 有凭据，自动填入并登录
+            if (code && pwd) {
+                document.getElementById('eventCodeInput').value = code;
+                document.getElementById('eventPwdInput').value = pwd;
+                // 清除 URL 参数
+                if (window.history && window.history.replaceState) {
+                    const url = new URL(window.location);
+                    url.searchParams.delete('code');
+                    url.searchParams.delete('pwd');
+                    window.history.replaceState({}, document.title, url.toString());
+                }
+                // 自动登录
+                setTimeout(doLogin, 100);
+            } else {
+                // 仅从 URL 填充（无 sessionStorage）
+                const urlCode = urlParams.get('code');
+                const urlPwd = urlParams.get('pwd');
+                if (urlCode) document.getElementById('eventCodeInput').value = urlCode;
+                if (urlPwd) document.getElementById('eventPwdInput').value = urlPwd;
+                if (urlCode || urlPwd) {
+                    // 清除 URL 参数但保留输入框内容，避免历史泄露
+                    if (window.history && window.history.replaceState) {
+                        const url = new URL(window.location);
+                        url.searchParams.delete('code');
+                        url.searchParams.delete('pwd');
+                        window.history.replaceState({}, document.title, url.toString());
+                    }
+                }
+            }
+        };
+
+        window.doLogin = async () => {
+            const code = document.getElementById('eventCodeInput').value.trim().toUpperCase();
+            const pwd = document.getElementById('eventPwdInput').value.trim();
+            if (!code) return alert('请输入赛事代码！');
+            if (!pwd) return alert('请输入裁判长授权密码！');
+
+            try {
+                const res = await fetch(`/data.php?action=get_event_config&event_code=${code}`);
+                const data = await res.json();
+                if (data.status === 'error') {
+                    alert('❌ 赛事不存在，请检查代码');
+                    return;
+                }
+                if (data.data.referee_password !== pwd) {
+                    alert('❌ 密码错误，无权访问');
+                    return;
+                }
+            } catch (e) {
+                alert('网络通信失败，请重试');
+                return;
+            }
+
+            eventCode = code;
+            eventPwd = pwd;
+            sessionStorage.setItem('pickle_master_code', code);
+            sessionStorage.setItem('pickle_master_pwd', pwd);
+            document.getElementById('loginPanel').classList.add('hidden');
+            document.getElementById('mainPanel').classList.remove('hidden');
+            document.getElementById('dispCode').innerText = code;
+            // 清除 URL 参数
+            if (window.history && window.history.replaceState) {
+                const url = new URL(window.location);
+                url.searchParams.delete('code');
+                url.searchParams.delete('pwd');
+                window.history.replaceState({}, document.title, url.toString());
+            }
+            init();
+        };
+
+        // ========== 退出登录 ==========
+        window.logout = () => {
+            sessionStorage.removeItem('pickle_master_code');
+            sessionStorage.removeItem('pickle_master_pwd');
+            location.reload();
+        };
+
+        // ========== 原有所有功能（完整保留） ==========
+        async function init() {
+            try {
+                let res = await fetch(`/data.php?action=get_players&event_code=${eventCode}`);
+                let data = await res.json();
+                if (data.status === 'success') { players = data.data || []; renderTable(); }
+            } catch (e) { alert('通信失败'); }
+        }
+
+        function renderTable() {
+    let html = '';
+    players.forEach((p, i) => {
+        let checkBtn = p.checked_in
+            ? `<button onclick="toggleSign(${i})" class="bg-emerald-900/50 text-emerald-400 border border-emerald-500/50 px-3 py-1 rounded text-xs font-bold w-full hover:bg-red-900/50 hover:text-red-400 hover:border-red-500/50 transition-colors">已签到</button>`
+            : `<button onclick="toggleSign(${i})" class="bg-amber-900/50 text-amber-400 border border-amber-500/50 px-3 py-1 rounded text-xs font-bold w-full hover:bg-emerald-900/50 hover:text-emerald-400 hover:border-emerald-500/50 transition-colors">未签到</button>`;
+        let sigBtn = p.checked_in
+            ? `<button onclick="viewSignature('${p.name}')" class="text-blue-400 hover:text-blue-300 text-xs font-bold underline underline-offset-4 decoration-blue-900">调阅真迹</button>`
+            : `<span class="text-slate-600 text-xs">—</span>`;
+        let teamPrefix = p.id_code ? p.id_code.split('-')[0] : '—';
+        html += `
+        <tr class="hover:bg-slate-800/50 transition-colors group">
+            <td class="p-2 text-center"><button onclick="removePlayer(${i})" class="text-red-500 hover:text-red-400 font-black opacity-0 group-hover:opacity-100 transition-opacity p-2">✕</button></td>
+            <td class="p-2"><input type="text" value="${p.id_code||''}" onchange="updateField(${i}, 'id_code', this.value)" class="bg-transparent border-transparent hover:border-slate-600 focus:bg-slate-900 w-full p-1 rounded text-amber-400 font-mono font-bold outline-none"></td>
+            <td class="p-2"><input type="text" value="${p.name||''}" onchange="updateField(${i}, 'name', this.value)" class="bg-transparent border-transparent hover:border-slate-600 focus:bg-slate-900 w-full p-1 rounded font-bold outline-none"></td>
+            <td class="p-2"><input type="text" value="${p.team||''}" onchange="updateField(${i}, 'team', this.value)" class="bg-transparent border-transparent hover:border-slate-600 focus:bg-slate-900 w-full p-1 rounded outline-none"></td>
+            <td class="p-2 text-center font-mono text-amber-400">${teamPrefix}</td>
+            <td class="p-2"><input type="text" value="${p.group||''}" onchange="updateField(${i}, 'group', this.value)" class="bg-transparent border-transparent hover:border-slate-600 focus:bg-slate-900 w-full p-1 rounded outline-none"></td>
+            <td class="p-2">${checkBtn}</td>
+            <td class="p-2 text-center">${sigBtn}</td>
+        </tr>`;
+    });
+    document.getElementById('playerTableBody').innerHTML = html;
+}
+
+        window.updateField = (i, field, val) => { players[i][field] = val; };
+        window.removePlayer = (i) => { if (confirm(`确定从大库中移除选手 [${players[i].name}] 吗？`)) { players.splice(i, 1);
+                renderTable(); } };
+        window.toggleSign = (i) => { players[i].checked_in = !players[i].checked_in;
+            renderTable(); };
+
+        window.executeBatchAdd = () => {
+            const team = document.getElementById('batchTeam').value.trim();
+            const group = document.getElementById('batchGroup').value.trim() || '系统池';
+            const rawNames = document.getElementById('batchNames').value;
+
+            if (!rawNames) return alert('请输入选手姓名！');
+
+            let nameArray = rawNames.split(/[\s\n,，、]+/).map(s => s.trim()).filter(s => s);
+            if (nameArray.length === 0) return;
+
+            let currentMax = 0;
+            players.forEach(p => {
+                if (p.id_code && p.id_code.startsWith('P')) {
+                    let num = parseInt(p.id_code.substring(1));
+                    if (!isNaN(num) && num > currentMax) currentMax = num;
+                }
+            });
+
+            let added = 0;
+            nameArray.forEach(name => {
+                currentMax++;
+                players.unshift({
+                    id_code: 'P' + String(currentMax).padStart(3, '0'),
+                    name: name,
+                    team: team || name,
+                    group: group,
+                    checked_in: false
+                });
+                added++;
+            });
+
+            document.getElementById('batchAddModal').classList.add('hidden');
+            document.getElementById('batchTeam').value = '';
+            document.getElementById('batchNames').value = '';
+            renderTable();
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+            alert(`✅ 批量添加完成！已为您自动编排 ${added} 人的唯一系统编号。记得点击右上角 [保存全盘覆写]。`);
+        };
+
+        window.forceAllCheckin = () => {
+            if (confirm("🚨 法务警告：\n\n一键全员签到意味着您已通过线下纸质免责声明收集了所有人的签名。\n\n点确定后，系统内所有人将直接标记为【已签到】，且允许上场。\n是否继续？")) {
+                players.forEach(p => p.checked_in = true);
+                renderTable();
+            }
+        };
+
+        window.clearAllPlayers = async () => {
+            if (!eventCode) return alert('请先登录赛事');
+            if (!confirm('⚠️ 危险操作！\n\n您确定要清空当前赛事的【全部选手名单】吗？\n此操作不可恢复，所有选手数据将永久丢失！')) return;
+
+            const pwd = prompt('请输入裁判长授权密码以确认操作：');
+            if (pwd === null) return;
+            if (!pwd) return alert('密码不能为空');
+
+            try {
+                const res = await fetch('/data.php', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        action: 'clear_players',
+                        event_code: eventCode,
+                        password: pwd
+                    })
+                });
+                const data = await res.json();
+                if (data.status === 'success') {
+                    alert('✅ 选手名单已全部清空！');
+                    players = [];
+                    renderTable();
+                } else {
+                    alert('❌ 清空失败：' + (data.message || '未知错误'));
+                }
+            } catch (e) {
+                alert('网络请求失败，请重试');
+            }
+        };
+
+        // ========== 签名查看函数（已优化） ==========
+        function closeSigModal() {
+            document.getElementById('sigModal').classList.add('hidden');
+            currentSigPlayerName = '';
+            document.getElementById('sigLoading').classList.remove('hidden');
+            document.getElementById('sigModalImg').classList.add('hidden');
+            document.getElementById('sigPlaceholder').classList.add('hidden');
+            document.getElementById('sigError').classList.add('hidden');
+        }
+
+        window.viewSignature = async (name) => {
+            if (!name) return alert('选手姓名不能为空');
+            currentSigPlayerName = name;
+
+            const modal = document.getElementById('sigModal');
+            const loading = document.getElementById('sigLoading');
+            const img = document.getElementById('sigModalImg');
+            const placeholder = document.getElementById('sigPlaceholder');
+            const errorEl = document.getElementById('sigError');
+            const infoEl = document.getElementById('sigModalId');
+
+            loading.classList.remove('hidden');
+            img.classList.add('hidden');
+            placeholder.classList.add('hidden');
+            errorEl.classList.add('hidden');
+            infoEl.innerHTML = '加载中...';
+            modal.classList.remove('hidden');
+
+            try {
+                const url = `/data.php?action=check_waiver&event_code=${eventCode}&player_name=${encodeURIComponent(name)}&_t=${Date.now()}`;
+                const res = await fetch(url);
+                const data = await res.json();
+
+                loading.classList.add('hidden');
+
+                if (data.status === 'success' && data.data) {
+                    const w = data.data;
+                    if (w.signature && w.signature.startsWith('data:image')) {
+                        img.src = w.signature;
+                        img.classList.remove('hidden');
+                        infoEl.innerHTML = `
+                            <span class="text-emerald-400 font-bold">${name}</span><br>
+                            身份证尾号: <span class="text-amber-400 font-bold text-sm tracking-widest">${w.id_last4 || '****'}</span><br>
+                            存管时间: ${w.sign_time || '未知'}
+                        `;
+                        document.getElementById('sigContentArea').className = 'bg-white p-2 rounded mb-4 min-h-[120px] flex items-center justify-center border-2 border-emerald-500/50';
+                    } else {
+                        placeholder.classList.remove('hidden');
+                        placeholder.textContent = '⚠️ 该选手已签到，但签名数据不完整（图片缺失）';
+                        infoEl.innerHTML = `<span class="text-emerald-400 font-bold">${name}</span><br>状态: <span class="text-amber-400">已签到但签名图片异常</span>`;
+                        document.getElementById('sigContentArea').className = 'bg-white p-2 rounded mb-4 min-h-[120px] flex items-center justify-center border-2 border-amber-500/50';
+                    }
+                } else if (data.status === 'success' && !data.data) {
+                    const player = players.find(p => p.name === name);
+                    if (player && player.checked_in) {
+                        placeholder.classList.remove('hidden');
+                        placeholder.textContent = '⚠️ 该选手已签到，但签名数据尚未上传或已丢失。请联系裁判长重新签署。';
+                        infoEl.innerHTML = `<span class="text-emerald-400 font-bold">${name}</span><br>状态: <span class="text-red-400">已签到但签名缺失</span>`;
+                        document.getElementById('sigContentArea').className = 'bg-white p-2 rounded mb-4 min-h-[120px] flex items-center justify-center border-2 border-red-500/50';
+                    } else {
+                        placeholder.classList.remove('hidden');
+                        placeholder.textContent = '该选手尚未完成免责签到，无签名数据。';
+                        infoEl.innerHTML = `<span class="text-slate-400 font-bold">${name}</span><br>状态: <span class="text-amber-400">未签到</span>`;
+                        document.getElementById('sigContentArea').className = 'bg-white p-2 rounded mb-4 min-h-[120px] flex items-center justify-center border-2 border-slate-500/50';
+                    }
+                } else {
+                    errorEl.classList.remove('hidden');
+                    errorEl.textContent = `❌ 查询失败：${data.message || '未知错误'}`;
+                    infoEl.innerHTML = `<span class="text-slate-400 font-bold">${name}</span><br>状态: <span class="text-red-400">查询异常</span>`;
+                    document.getElementById('sigContentArea').className = 'bg-white p-2 rounded mb-4 min-h-[120px] flex items-center justify-center border-2 border-red-500/50';
+                }
+            } catch (e) {
+                loading.classList.add('hidden');
+                errorEl.classList.remove('hidden');
+                errorEl.textContent = `❌ 网络连接异常：${e.message || '请检查网络后重试'}`;
+                infoEl.innerHTML = `<span class="text-slate-400 font-bold">${name}</span><br>状态: <span class="text-red-400">网络错误</span>`;
+                document.getElementById('sigContentArea').className = 'bg-white p-2 rounded mb-4 min-h-[120px] flex items-center justify-center border-2 border-red-500/50';
+            }
+        };
+
+        window.refreshSignature = function() {
+            if (currentSigPlayerName) {
+                viewSignature(currentSigPlayerName);
+            } else {
+                alert('请先选择一位选手');
+            }
+        };
+
+        // ========== 保存数据 ==========
+        async function saveData() {
+            const btn = document.getElementById('saveBtn');
+            btn.innerText = '上传覆写中...';
+            btn.disabled = true;
+            try {
+                let res = await fetch('/data.php', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ action: 'set_players', event_code: eventCode, players: players })
+                });
+                let data = await res.json();
+                if (data.status === 'success') {
+                    btn.className = 'bg-emerald-700 px-4 py-2 rounded-lg font-bold text-sm shadow-inner transition-colors text-slate-300';
+                    btn.innerText = '✅ 云端已同步更新';
+                    setTimeout(() => {
+                        btn.className = 'bg-emerald-600 hover:bg-emerald-500 px-4 py-2 rounded-lg font-bold text-sm shadow-lg transition-colors';
+                        btn.innerText = '💾 保存全盘覆写';
+                        btn.disabled = false;
+                    }, 2000);
+                }
+            } catch (e) { alert('保存失败！');
+                btn.disabled = false;
+                btn.innerText = '💾 保存全盘覆写'; }
+        }
+    </script>
+</body>
+</html>

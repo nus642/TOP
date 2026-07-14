@@ -1,0 +1,5 @@
+// Competition Engine
+
+module.exports = {
+
+};

@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+    <title>Pickle球 文件库</title>
+   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ccircle cx='50' cy='50' r='45' fill='%23a3e635'/%3E%3Ccircle cx='50' cy='20' r='7' fill='%231e293b' opacity='0.4'/%3E%3Ccircle cx='30' cy='32' r='7' fill='%231e293b' opacity='0.4'/%3E%3Ccircle cx='70' cy='32' r='7' fill='%231e293b' opacity='0.4'/%3E%3Ccircle cx='18' cy='55' r='7' fill='%231e293b' opacity='0.4'/%3E%3Ccircle cx='82' cy='55' r='7' fill='%231e293b' opacity='0.4'/%3E%3Ccircle cx='35' cy='75' r='7' fill='%231e293b' opacity='0.4'/%3E%3Ccircle cx='65' cy='75' r='7' fill='%231e293b' opacity='0.4'/%3E%3Ccircle cx='50' cy='50' r='7' fill='%231e293b' opacity='0.4'/%3E%3Ccircle cx='50' cy='85' r='7' fill='%231e293b' opacity='0.4'/%3E%3C/svg%3E">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body { font-family: 'Inter', system-ui; background: #0f172a; color: #ecfdf5; min-height: 100vh; }
+        .glass-panel { background: rgba(30, 41, 59, 0.6); border: 1px solid rgba(20, 184, 166, 0.2); border-radius: 1rem; box-shadow: 0 10px 25px rgba(0,0,0,0.3); }
+        .input-base { width: 100%; background: #0f172a; border: 1px solid #334155; padding: 0.75rem; border-radius: 0.5rem; color: white; outline: none; transition: 0.2s; }
+        .input-base:focus { border-color: #14b8a6; }
+		/* 专属 Pickleball 镂空洞洞球 UI 图标引擎 */
+.pb-icon {
+    display: inline-block;
+    width: 1.2em; 
+    height: 1.2em;
+    vertical-align: text-bottom;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ccircle cx='50' cy='50' r='45' fill='%23a3e635'/%3E%3Ccircle cx='50' cy='20' r='7' fill='%231e293b' opacity='0.4'/%3E%3Ccircle cx='30' cy='32' r='7' fill='%231e293b' opacity='0.4'/%3E%3Ccircle cx='70' cy='32' r='7' fill='%231e293b' opacity='0.4'/%3E%3Ccircle cx='18' cy='55' r='7' fill='%231e293b' opacity='0.4'/%3E%3Ccircle cx='82' cy='55' r='7' fill='%231e293b' opacity='0.4'/%3E%3Ccircle cx='35' cy='75' r='7' fill='%231e293b' opacity='0.4'/%3E%3Ccircle cx='65' cy='75' r='7' fill='%231e293b' opacity='0.4'/%3E%3Ccircle cx='50' cy='50' r='7' fill='%231e293b' opacity='0.4'/%3E%3Ccircle cx='50' cy='85' r='7' fill='%231e293b' opacity='0.4'/%3E%3C/svg%3E");
+    background-size: contain;
+    background-repeat: no-repeat;
+}
+    </style>
+</head>
+<body class="p-4 md:p-8 flex flex-col items-center">
+
+    <div class="w-full max-w-3xl">
+        <div class="flex justify-between items-center mb-8 pb-4 border-b border-slate-700">
+            <div class="flex items-center gap-3">
+                <div class="w-12 h-12 bg-teal-600 rounded-xl flex items-center justify-center text-2xl shadow-lg border border-teal-400">📚</div>
+                <div>
+                    <h1 class="text-xl md:text-2xl font-black text-teal-300">Pickle球 文件库</h1>
+                    <p class="text-xs text-slate-400 font-mono tracking-widest mt-1">Official Document Center</p>
+                </div>
+            </div>
+            <div class="flex gap-3">
+                <button onclick="document.getElementById('uploaderPanel').classList.toggle('hidden')" class="bg-teal-900/50 hover:bg-teal-800 border border-teal-500/50 px-4 py-2 rounded-lg text-xs font-bold text-teal-300 transition-colors">收录文件</button>
+                <button onclick="location.href='index.html'" class="bg-slate-800 hover:bg-slate-700 px-4 py-2 rounded-lg text-xs font-bold transition-colors">返回首页</button>
+            </div>
+        </div>
+
+        <div id="uploaderPanel" class="glass-panel p-6 mb-8 hidden">
+            <h2 class="text-sm font-bold text-teal-400 mb-4 flex items-center gap-2"><span>🔗</span> 收录新文件外链</h2>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-3 mb-3">
+                <input type="text" id="docTitle" class="input-base text-sm" placeholder="文件名称 (如：2026裁判执裁手册.pdf)">
+                <input type="text" id="docLink" class="input-base text-sm" placeholder="外部下载链接 (如：百度网盘链接)">
+            </div>
+            <div class="flex gap-2">
+                <input type="password" id="docPwd" class="input-base w-1/3 text-center" placeholder="超管密码">
+                <button onclick="publishDoc()" id="publishBtn" class="bg-teal-600 hover:bg-teal-500 w-2/3 py-2 rounded-lg font-bold shadow-md transition-transform active:scale-95">📥 录入系统</button>
+            </div>
+        </div>
+
+        <div class="bg-slate-800/30 rounded-2xl border border-slate-700/50 overflow-hidden">
+            <div class="grid grid-cols-12 gap-4 p-4 bg-slate-800/80 border-b border-slate-700 text-xs font-black text-slate-400 uppercase tracking-wider">
+                <div class="col-span-8 md:col-span-6">文献名称</div>
+                <div class="col-span-4 md:col-span-3 text-center">收录日期</div>
+                <div class="hidden md:block col-span-3 text-right">操作</div>
+            </div>
+            <div id="docsStream" class="divide-y divide-slate-700/50">
+                <div class="text-center text-slate-500 py-10 animate-pulse">正在从资料库检索...</div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const API = '/data.php';
+        
+        async function loadDocs() {
+            try {
+                const res = await fetch(`${API}?action=get_sys_data&type=docs&_t=${Date.now()}`);
+                const data = await res.json();
+                if(data.status === 'success') {
+                    let html = '';
+                    if(data.data.length === 0) html = '<div class="text-center text-slate-500 py-10 italic">库中暂无卷宗</div>';
+                    
+                    data.data.forEach(doc => {
+                        html += `
+                            <div class="grid grid-cols-12 gap-4 p-4 items-center hover:bg-slate-700/30 transition-colors group">
+                                <div class="col-span-8 md:col-span-6 flex items-center gap-3">
+                                    <span class="text-teal-500 text-lg">📄</span>
+                                    <span class="font-bold text-slate-200 truncate">${doc.title}</span>
+                                </div>
+                                <div class="col-span-4 md:col-span-3 text-center text-xs font-mono text-slate-500">${doc.date.split(' ')[0]}</div>
+                                <div class="col-span-12 md:col-span-3 flex justify-end gap-2 mt-2 md:mt-0">
+                                    <a href="${doc.link}" target="_blank" class="bg-teal-900/40 hover:bg-teal-800 text-teal-400 px-3 py-1 rounded text-xs font-bold border border-teal-500/30">下载 / 查阅</a>
+                                    <button onclick="deleteDoc('${doc.id}')" class="text-xs bg-red-900/30 text-red-400 px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity">删除</button>
+                                </div>
+                            </div>
+                        `;
+                    });
+                    document.getElementById('docsStream').innerHTML = html;
+                }
+            } catch(e) { document.getElementById('docsStream').innerHTML = '网络请求失败'; }
+        }
+
+        async function publishDoc() {
+            const title = document.getElementById('docTitle').value.trim();
+            const link = document.getElementById('docLink').value.trim();
+            const pwd = document.getElementById('docPwd').value;
+            if(!title || !link || !pwd) return alert('请填入完整信息和超管密码');
+            
+            document.getElementById('publishBtn').innerText = '处理中...';
+            try {
+                const res = await fetch(API, {
+                    method: 'POST', headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({ action: 'save_sys_data', type: 'docs', pwd: pwd, item: { title, link } })
+                });
+                const data = await res.json();
+                if(data.status === 'success') {
+                    document.getElementById('docTitle').value = '';
+                    document.getElementById('docLink').value = '';
+                    document.getElementById('uploaderPanel').classList.add('hidden');
+                    loadDocs();
+                } else alert(data.message);
+            } catch(e) { alert('网络错误'); }
+            document.getElementById('publishBtn').innerText = '📥 录入系统';
+        }
+
+        async function deleteDoc(id) {
+            const pwd = prompt('请输入无限哥超管密码以确认移除：');
+            if(!pwd) return;
+            try {
+                const res = await fetch(API, {
+                    method: 'POST', headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({ action: 'save_sys_data', type: 'docs', pwd: pwd, delete_id: id })
+                });
+                const data = await res.json();
+                if(data.status === 'success') loadDocs();
+                else alert(data.message);
+            } catch(e) {}
+        }
+
+        window.onload = loadDocs;
+    </script>
+</body>
+</html>

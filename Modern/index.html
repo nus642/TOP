@@ -1,0 +1,1296 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Pickle球 · 极速调度</title>
+    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ccircle cx='50' cy='50' r='45' fill='%23a3e635'/%3E%3Ccircle cx='50' cy='20' r='7' fill='%231e293b' opacity='0.4'/%3E%3Ccircle cx='30' cy='32' r='7' fill='%231e293b' opacity='0.4'/%3E%3Ccircle cx='70' cy='32' r='7' fill='%231e293b' opacity='0.4'/%3E%3Ccircle cx='18' cy='55' r='7' fill='%231e293b' opacity='0.4'/%3E%3Ccircle cx='82' cy='55' r='7' fill='%231e293b' opacity='0.4'/%3E%3Ccircle cx='35' cy='75' r='7' fill='%231e293b' opacity='0.4'/%3E%3Ccircle cx='65' cy='75' r='7' fill='%231e293b' opacity='0.4'/%3E%3Ccircle cx='50' cy='50' r='7' fill='%231e293b' opacity='0.4'/%3E%3Ccircle cx='50' cy='85' r='7' fill='%231e293b' opacity='0.4'/%3E%3C/svg%3E">
+    <style>
+        /* ========== 完整样式 ========== */
+        * { box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, sans-serif; background: #f5f7fa; margin: 0; padding: 0; color: #1e293b; }
+        .container { max-width: 960px; margin: 0 auto; padding: 12px; }
+        .card { background: #fff; border-radius: 14px; padding: 16px; margin-bottom: 14px; box-shadow: 0 2px 8px rgba(0,0,0,0.06); }
+        .hidden { display: none !important; }
+        .flex-between { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px; }
+        .top-nav { display: flex; justify-content: space-between; align-items: center; background: #1e293b; color: #e2e8f0; padding: 8px 16px; border-radius: 12px; margin-bottom: 14px; }
+        .top-nav .brand { font-weight: 700; font-size: 18px; letter-spacing: 0.5px; }
+        .top-nav .brand small { font-size: 12px; font-weight: 400; color: #94a3b8; margin-left: 8px; }
+        .top-nav .right-group { display: flex; align-items: center; gap: 8px; }
+        .top-nav .view-toggle { display: flex; gap: 4px; background: #0f172a; padding: 4px; border-radius: 20px; }
+        .top-nav .view-toggle button { background: transparent; border: none; color: #94a3b8; padding: 4px 14px; border-radius: 16px; font-size: 13px; font-weight: 600; cursor: pointer; transition: 0.2s; }
+        .top-nav .view-toggle button.active { background: #334155; color: #fff; }
+        .top-nav .refresh-btn { background: #475569; border: none; color: #fff; width: 32px; height: 32px; border-radius: 50%; font-size: 18px; cursor: pointer; transition: 0.2s; display: flex; align-items: center; justify-content: center; }
+        .top-nav .refresh-btn:hover { background: #64748b; }
+        .admin-only { display: none; }
+        .admin-mode .admin-only { display: block; }
+        .admin-mode .player-only { display: none; }
+        .player-mode .admin-only { display: none; }
+        .player-mode .player-only { display: block; }
+        .mode-nav { display: flex; background: #e9eaed; border-radius: 30px; padding: 4px; margin-bottom: 14px; }
+        .mode-nav .mode-btn { flex: 1; text-align: center; padding: 10px; font-size: 14px; font-weight: 700; border: none; border-radius: 26px; background: transparent; color: #666; cursor: pointer; transition: 0.25s; }
+        .mode-nav .mode-btn.active { background: #fff; color: #07c160; box-shadow: 0 2px 8px rgba(0,0,0,0.08); }
+        .input-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin: 10px 0; }
+        .box-wrap { background: #f9f9f9; padding: 8px 10px; border-radius: 10px; border: 1px solid #eee; }
+        .box-wrap .box-label { font-size: 11px; color: #888; margin-bottom: 2px; font-weight: 600; }
+        .box-wrap .box-label .lv-tag { background: #ddd; border-radius: 12px; padding: 0 8px; font-size: 10px; color: #555; margin-left: 4px; }
+        textarea { width: 100%; border: none; background: transparent; font-size: 14px; resize: none; outline: none; height: 72px; display: block; padding: 4px 0; font-family: inherit; }
+        .config-bar { display: flex; justify-content: space-around; background: #1e293b; color: #e2e8f0; padding: 12px 10px; border-radius: 10px; font-size: 13px; margin: 10px 0; flex-wrap: wrap; gap: 6px; }
+        .config-bar input { width: 44px; border: none; border-radius: 6px; text-align: center; color: #07c160; font-weight: 700; background: #0f172a; padding: 4px 2px; font-size: 15px; }
+        .est-card { background: #eef5ff; border-left: 5px solid #07c160; margin: 8px 0 12px; padding: 12px 14px; border-radius: 12px; font-size: 14px; display: flex; flex-wrap: wrap; justify-content: space-between; align-items: baseline; gap: 6px 12px; }
+        .est-card .total { font-size: 22px; font-weight: 800; color: #0a5c2e; }
+        .est-card .time { background: #fff; padding: 4px 14px; border-radius: 40px; color: #1a6e3c; font-weight: 700; font-size: 14px; }
+        .est-note { font-size: 10px; color: #4a6a8b; width: 100%; margin-top: 2px; }
+        .match-card { border: 1px solid #e9e9e9; border-radius: 14px; padding: 14px 16px; margin-bottom: 12px; background: #f8fafc; border-left: 6px solid #d1d5db; transition: 0.25s; }
+        .match-card.status-idle { border-left-color: #94a3b8; background: #f8fafc; }
+        .match-card.status-playing { border-left-color: #07c160; background: #ecfdf5; box-shadow: 0 4px 12px rgba(7,193,96,0.12); }
+        .match-card.status-finished { border-left-color: #3b82f6; background: #eff6ff; }
+        .match-card.status-upcoming { border-left-color: #f59e0b; background: #fffbeb; box-shadow: 0 4px 12px rgba(245,158,11,0.15); }
+        .match-card.has-conflict { opacity: 0.7; background: #f1f5f9; }
+        .match-card .match-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; flex-wrap: wrap; gap: 6px; }
+        .match-card .court-tag { font-weight: 700; color: #07c160; font-size: 13px; background: #e6f7ed; padding: 2px 14px; border-radius: 30px; }
+        .match-card .match-body { display: flex; justify-content: space-between; align-items: center; gap: 6px; flex-wrap: wrap; }
+        .match-card .team { flex: 1; min-width: 70px; font-weight: 600; font-size: 14px; line-height: 1.5; }
+        .match-card .team .sub { font-weight: 400; color: #888; font-size: 11px; }
+        .match-card .vs { font-weight: 800; color: #bbb; padding: 0 6px; font-size: 14px; }
+        .score-input { width: 52px; height: 40px; border: 2px solid #e2e8f0; border-radius: 8px; text-align: center; font-size: 20px; font-weight: 700; background: #fff; transition: 0.15s; }
+        .score-input:focus { border-color: #07c160; outline: none; }
+        .score-input:disabled { background: #f1f5f9; color: #1e293b; cursor: default; }
+        .match-card .btn-sm { padding: 4px 10px; border-radius: 30px; font-size: 11px; font-weight: 700; border: none; cursor: pointer; transition: 0.15s; background: #07c160; color: #fff; }
+        .match-card .btn-sm:disabled { opacity: 0.4; cursor: not-allowed; }
+        .match-card .btn-sm.btn-upcoming { background: #f59e0b; color: #fff; }
+        .match-card .btn-sm.btn-playing { background: #07c160; color: #fff; }
+        .match-card .btn-sm.btn-finished { background: #3b82f6; color: #fff; }
+        .conflict-tag { display: block; font-size: 10px; color: #fa5151; font-weight: 700; margin-top: 6px; }
+        table { width: 100%; border-collapse: collapse; font-size: 13px; }
+        td, th { padding: 10px 4px; text-align: center; border-bottom: 1px solid #f1f5f9; }
+        th { font-weight: 600; color: #64748b; font-size: 11px; text-transform: uppercase; letter-spacing: 0.3px; }
+        .rank-badge { display: inline-block; width: 26px; height: 26px; line-height: 26px; border-radius: 50%; color: #fff; font-weight: 700; font-size: 12px; text-align: center; }
+        .rank-1 { background: #ffd700; }
+        .rank-2 { background: #c0c0c0; }
+        .rank-3 { background: #cd7f32; }
+        .status-busy { color: #fa5151; font-weight: 700; }
+        .status-busy::after { content: " ●"; font-size: 12px; color: #fa5151; }
+        .btn-main { background: #07c160; color: #fff; width: 100%; font-size: 16px; padding: 14px; border: none; border-radius: 12px; font-weight: 700; cursor: pointer; transition: 0.2s; margin-top: 4px; }
+        .btn-main:active { transform: scale(0.97); }
+        .btn-sub { background: #f1f5f9; color: #475569; font-size: 12px; border: 1px solid #d1d5db; padding: 8px 16px; border-radius: 8px; font-weight: 600; cursor: pointer; transition: 0.15s; }
+        .btn-sub:active { background: #e2e8f0; }
+        .btn-danger { background: #fa5151; color: #fff; }
+        .empty-state { text-align: center; padding: 40px 20px; color: #94a3b8; }
+        .empty-state .big-icon { font-size: 48px; margin-bottom: 12px; }
+        .empty-state h3 { color: #475569; margin: 6px 0; }
+        .empty-state p { font-size: 14px; max-width: 360px; margin: 8px auto 0; }
+        @media (max-width: 600px) {
+            .input-grid { grid-template-columns: 1fr; }
+            .match-card .team { font-size: 12px; min-width: 50px; }
+            .score-input { width: 44px; height: 34px; font-size: 17px; }
+            .top-nav { flex-wrap: wrap; gap: 6px; }
+            .top-nav .brand { font-size: 15px; }
+            .top-nav .view-toggle button { font-size: 11px; padding: 2px 10px; }
+        }
+    </style>
+</head>
+<body>
+
+<div class="container" id="app">
+
+    <!-- 顶部导航 -->
+    <div class="top-nav">
+        <div class="brand">🏸 Pickle球 <small>极速调度</small></div>
+        <div class="right-group">
+            <button class="refresh-btn" onclick="manualRefresh()" title="手动刷新数据">🔄</button>
+            <div class="view-toggle">
+                <button id="btnPlayerView" class="active" onclick="setViewMode('player')">👀 观赛</button>
+                <button id="btnAdminView" onclick="promptAdminLogin()">🔧 管理</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 视图：设置（管理后台） -->
+    <div id="view-setup" class="admin-only">
+        <div class="card">
+            <div style="display:flex; gap:8px; margin-bottom:10px;">
+                <input type="text" id="ev-name" style="flex:2; padding:8px 12px; border:1px solid #d1d5db; border-radius:8px; font-size:14px;" placeholder="赛事名称" value="赛事活动">
+                <input type="text" id="ev-date" style="flex:1; padding:8px 12px; border:1px solid #d1d5db; border-radius:8px; font-size:14px;">
+            </div>
+            <div class="mode-nav">
+                <button class="mode-btn active" id="m-rr" onclick="setMode('round-robin')">🔄 转转混搭</button>
+                <button class="mode-btn" id="m-fx" onclick="setMode('fixed-pair')">🤝 固定组对</button>
+            </div>
+            <div class="admin-panel" style="border-left:4px solid #07c160; background:#f8fafc; border-radius:12px; padding:12px 14px; margin-bottom:12px;">
+                <div style="font-size:11px; font-weight:600; color:#64748b; text-transform:uppercase; margin-bottom:6px;">📋 选手分级（仅主办人可见）</div>
+                <div class="input-grid">
+                    <div class="box-wrap"><div class="box-label">A 池 <span class="lv-tag">3.5+</span></div><textarea id="in-30p" placeholder="每行一个姓名"></textarea></div>
+                    <div class="box-wrap"><div class="box-label">B 池 <span class="lv-tag">3.0</span></div><textarea id="in-30" placeholder="每行一个姓名"></textarea></div>
+                    <div class="box-wrap"><div class="box-label">C 池 <span class="lv-tag">2.5-</span></div><textarea id="in-30m" placeholder="每行一个姓名"></textarea></div>
+                    <div class="box-wrap"><div class="box-label">D 池 <span class="lv-tag">待定</span></div><textarea id="in-unk" placeholder="每行一个姓名"></textarea></div>
+                </div>
+            </div>
+            <div class="card" style="padding:10px; background:#f8fafc; border:1px solid #e2e8f0; margin-bottom:10px;">
+                <label style="font-size:12px; font-weight:600; color:#475569;">🏟️ 球场编号（空格分隔）</label>
+                <input type="text" id="cfg-court-names" style="width:100%; padding:8px 12px; border:1px solid #d1d5db; border-radius:8px; margin-top:4px;" placeholder="如：3 4 5 6" oninput="autoSyncCourtNum()">
+            </div>
+            <div class="config-bar">
+                <span>场地数 <input type="number" id="cfg-c" value="3" readonly></span>
+                <span>每人/每对轮数 <input type="number" id="cfg-t" value="4"></span>
+            </div>
+            <div id="estimation-panel" class="est-card">
+                <div>📊 预计总场数 <span id="total-matches-est" class="total">0</span></div>
+                <div>⏱️ 预估耗时 <span id="total-time-est" class="time">--</span></div>
+                <div class="est-note" id="est-note-detail">⚡ 基于当前人数与轮数动态计算</div>
+            </div>
+            <button class="btn-main" id="btn-next" onclick="handleStart()">🚀 生成赛程</button>
+            <div style="display:flex; gap:8px; margin-top:8px;">
+                <button class="btn-sub" onclick="resetAllData()" style="flex:1; background:#fee2e2; border-color:#fca5a5; color:#b91c1c;">🗑️ 清空所有数据</button>
+                <button class="btn-sub" onclick="switchView('view-schedule')" style="flex:1;">📋 查看赛程总览</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 视图：配对（固定组对） -->
+    <div id="view-pairing" class="admin-only hidden">
+        <div class="card">
+            <h2 style="font-size:17px; margin:0 0 8px;">🤝 手动组对 · 点击两人配对</h2>
+            <div id="player-pool" style="background:#f8fafc; padding:12px; border-radius:12px; min-height:80px;"></div>
+            <div style="margin-top:16px;">
+                <h3 style="font-size:14px; color:#07c160; margin:0 0 6px;">已锁定搭档</h3>
+                <div id="pair-list"></div>
+            </div>
+            <button class="btn-main" onclick="startFixedGame()" style="margin-top:10px;">🚀 开始排阵</button>
+            <button class="btn-sub" style="width:100%; margin-top:8px;" onclick="switchView('view-setup')">⬅ 返回设置</button>
+        </div>
+    </div>
+
+    <!-- 视图：比赛进程 -->
+    <div id="view-running" class="hidden">
+        <div class="flex-between mb-2 admin-only">
+            <button class="btn-sub" onclick="switchView('view-setup')">⬅ 设置</button>
+            <button class="btn-sub" style="background:#ff9800; color:#fff; border-color:#ff9800;" onclick="copySchedule()">📋 复制赛程</button>
+            <button class="btn-sub" style="background:#1e293b; color:#fff; border-color:#1e293b;" onclick="showFinish()">🏆 结赛</button>
+        </div>
+
+        <div class="card" style="padding:8px 4px;">
+            <table>
+                <thead><tr><th>#</th><th>选手 / 组合</th><th>胜-负</th><th>净胜</th><th>进度</th></tr></thead>
+                <tbody id="rank-body"></tbody>
+            </table>
+        </div>
+
+        <div id="match-list"></div>
+
+        <div class="admin-only" style="margin-top:12px; text-align:center;">
+            <button class="btn-sub" onclick="switchView('view-setup')" style="background:#e2e8f0;">⬅ 返回管理</button>
+        </div>
+    </div>
+
+    <!-- 视图：赛程总览 -->
+    <div id="view-schedule" class="hidden">
+        <div class="card">
+            <div class="flex-between">
+                <h3 style="margin:0;">📋 全部赛程</h3>
+                <button class="btn-sub" onclick="switchView( state.rounds?.length ? 'view-running' : 'view-setup' )">⬅ 返回</button>
+            </div>
+            <div id="schedule-overview"></div>
+            <hr style="margin:20px 0;">
+            <h3>🏆 实时排名</h3>
+            <div id="schedule-rank"></div>
+        </div>
+    </div>
+
+    <!-- 视图：比赛结束 -->
+    <div id="view-finish" class="hidden">
+        <div class="card" style="text-align:center;">
+            <h2 id="fin-title-text" style="color:#07c160; margin:0 0 12px;">🏆 最终榜单</h2>
+            <div style="overflow-x:auto;">
+                <table id="final-table">
+                    <thead><tr><th>名次</th><th>选手 / 组合</th><th>战绩</th><th>净胜</th></tr></thead>
+                    <tbody id="final-body"></tbody>
+                </table>
+            </div>
+            <div style="display:flex; gap:8px; margin-top:16px; flex-wrap:wrap; justify-content:center;">
+                <button class="btn-sub admin-only" onclick="switchView('view-setup')">⬅ 返回设置</button>
+                <button class="btn-sub admin-only" style="background:#fee2e2; border-color:#fca5a5; color:#b91c1c;" onclick="confirmReset()">🔄 重置全部</button>
+                <button class="btn-sub" style="background:#e2e8f0;" onclick="copySchedule()">📋 复制赛果</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 空状态 -->
+    <div id="player-empty" class="hidden empty-state card">
+        <div class="big-icon">🏸</div>
+        <h3>比赛尚未开始</h3>
+        <p>请等待主办人完成赛程设置，比赛即将开始。</p>
+        <div style="margin-top:16px; font-size:13px; color:#94a3b8;">⏳ 赛事筹备中 ...</div>
+    </div>
+
+</div>
+
+<script>
+// ================================================================
+//  API 基础地址（自动适配当前主机）
+// ================================================================
+const API_BASE = `http://${window.location.hostname}:3000`;
+
+// ================================================================
+//  全局状态
+// ================================================================
+let state = {
+    mode: 'round-robin',
+    players: [],
+    pairs: [],
+    rounds: [],
+    meta: {},
+    config: { target: 4 },
+    courtNames: [],
+    selectedIdx: []
+};
+
+let viewMode = 'player';
+let matchIdMap = {};
+let refreshTimer = null;
+const REFRESH_INTERVAL = 5000;
+
+// ================================================================
+//  日志
+// ================================================================
+function log(msg, data) {
+    console.log('[Pickleball]', msg, data || '');
+}
+
+// ================================================================
+//  API 调用
+// ================================================================
+async function fetchSchedule() {
+    log('正在拉取赛程数据...');
+    try {
+        const res = await fetch(`${API_BASE}/api/schedule`);
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const data = await res.json();
+        log('数据拉取成功', data);
+
+        // 重建 players（重置胜场等统计，由前端重新计算）
+        state.players = data.players.map(p => ({
+            id: p.id,
+            name: p.name,
+            lv: p.level || 3,
+            wins: 0,
+            losses: 0,
+            net: 0,
+            curP: 0,
+            lastR: p.lastR || -2,
+            paired: p.paired || false,
+            partners: [],
+            opponents: []
+        }));
+
+        // 重建 rounds
+        state.rounds = [];
+        matchIdMap = {};
+        const roundsMap = {};
+        data.matches.forEach(m => {
+            if (!roundsMap[m.round_num]) roundsMap[m.round_num] = [];
+            const getPlayerName = (id) => {
+                const p = state.players.find(p => p.id === id);
+                return p ? p.name : '';
+            };
+            const matchObj = {
+                id: m.id,
+                p1: getPlayerName(m.player1_id) || m.team1_name?.split(' & ')[0] || '',
+                p2: getPlayerName(m.player2_id) || m.team1_name?.split(' & ')[1] || '',
+                p3: getPlayerName(m.player3_id) || m.team2_name?.split(' & ')[0] || '',
+                p4: getPlayerName(m.player4_id) || m.team2_name?.split(' & ')[1] || '',
+                team1: m.team1_name || null,
+                team2: m.team2_name || null,
+                court: m.court || '',
+                s1: m.score1,
+                s2: m.score2,
+                status: m.status || 'idle'
+            };
+            roundsMap[m.round_num].push(matchObj);
+            matchIdMap[`${m.round_num}-${roundsMap[m.round_num].length-1}`] = m.id;
+        });
+        state.rounds = Object.values(roundsMap);
+
+        // 固定组对
+        state.pairs = data.pairings.map(p => ({
+            name: (state.players.find(p2 => p2.id === p.player1_id)?.name || '') +
+                   ' & ' +
+                   (state.players.find(p2 => p2.id === p.player2_id)?.name || ''),
+            lv: 0
+        }));
+
+        // 更新 UI
+        renderRunning();
+        renderScheduleOverview();
+        return data;
+    } catch (err) {
+        log('拉取数据失败', err.message);
+        if (viewMode === 'player' && state.rounds.length === 0) {
+            document.getElementById('player-empty').classList.remove('hidden');
+            document.getElementById('view-running').classList.add('hidden');
+        }
+        throw err;
+    }
+}
+
+// ================================================================
+//  排名计算（核心）
+// ================================================================
+function calculateRanks(list) {
+    const sorted = [...list].sort((a, b) => (b.wins - a.wins) || (b.net - a.net));
+    for (let i=0; i<sorted.length; i++) {
+        if (i>0 && sorted[i].wins === sorted[i-1].wins && sorted[i].net === sorted[i-1].net) {
+            sorted[i].rank = sorted[i-1].rank;
+            sorted[i].isTie = true;
+        } else {
+            sorted[i].rank = i+1;
+            sorted[i].isTie = false;
+        }
+    }
+    return sorted;
+}
+
+function calcLiveRank() {
+    const isFX = state.mode === 'fixed-pair';
+    const list = isFX ? state.pairs : state.players;
+
+    // 重置统计
+    list.forEach(p => { p.wins=0; p.losses=0; p.net=0; p.curP=0; });
+
+    // 累计所有已完成的比赛
+    state.rounds.forEach(r => r.forEach(m => {
+        if (m.s1 !== null && m.s2 !== null) {
+            const wT = m.s1 > m.s2 ? 1 : (m.s2 > m.s1 ? 2 : 0);
+            const t1P = isFX ? [m.team1] : [m.p1, m.p2];
+            const t2P = isFX ? [m.team2] : [m.p3, m.p4];
+            t1P.forEach(n => {
+                let p = list.find(x => (isFX ? x.name === n : x.name === n));
+                if (p) { p.curP++; p.net += (m.s1 - m.s2); if (wT===1) p.wins++; else if (wT===2) p.losses++; }
+            });
+            t2P.forEach(n => {
+                let p = list.find(x => (isFX ? x.name === n : x.name === n));
+                if (p) { p.curP++; p.net += (m.s2 - m.s1); if (wT===2) p.wins++; else if (wT===1) p.losses++; }
+            });
+        }
+    }));
+
+    const sorted = calculateRanks(list);
+    const target = state.config.target || 4;
+    let busyMap = {};
+    state.rounds.forEach(r => r.forEach(m => {
+        if (m.status === 'playing') {
+            const ns = isFX ? [m.team1, m.team2] : [m.p1, m.p2, m.p3, m.p4];
+            ns.forEach(n => busyMap[n] = true);
+        }
+    }));
+
+    const tbody = document.getElementById('rank-body');
+    if (!tbody) return;
+    if (list.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="5">暂无球员数据</td></tr>';
+        return;
+    }
+    tbody.innerHTML = sorted.map(p => {
+        const rClass = p.rank===1 ? 'rank-1' : (p.rank===2 ? 'rank-2' : (p.rank===3 ? 'rank-3' : ''));
+        const isBusy = busyMap[p.name];
+        return `<tr>
+            <td><span class="${rClass} ${p.rank<=3?'rank-badge':''}">${p.rank}${p.isTie?'<sub style="font-weight:400;color:#999;">*</sub>':''}</span></td>
+            <td class="${isBusy?'status-busy':''}" style="text-align:left; padding-left:12px; font-weight:500;">${p.name}</td>
+            <td>${p.wins}-${p.losses}</td>
+            <td style="color:${p.net>0?'#07c160':(p.net<0?'#fa5151':'#94a3b8')}; font-weight:${p.net!==0?'700':'400'};">${p.net>0?'+':''}${p.net}</td>
+            <td style="font-size:11px; color:#94a3b8;">${p.curP}/${target}</td>
+        </tr>`;
+    }).join('');
+}
+
+// ================================================================
+//  渲染比赛进程（调用 calcLiveRank）
+// ================================================================
+function renderRunning() {
+    const isPlayer = viewMode === 'player';
+    const isFX = state.mode === 'fixed-pair';
+
+    calcLiveRank(); // 先更新排名
+
+    let busyMap = {};
+    state.rounds.forEach(r => r.forEach(m => {
+        if (m.status === 'playing') {
+            const ns = isFX ? [m.team1, m.team2] : [m.p1, m.p2, m.p3, m.p4];
+            ns.forEach(n => busyMap[n] = true);
+        }
+    }));
+
+    let h = '';
+    if (state.rounds.length === 0) {
+        h = '<div class="empty-state"><p>暂无比赛数据</p></div>';
+    } else {
+        state.rounds.forEach((r, ri) => {
+            h += `<h3 style="margin:18px 0 8px; font-size:15px; color:#1e293b;">📍 第 ${ri+1} 轮</h3>`;
+            r.forEach((m, mi) => {
+                const ns = isFX ? [m.team1, m.team2] : [m.p1, m.p2, m.p3, m.p4];
+                const conf = (m.status === 'idle' && ns.some(n => busyMap[n]));
+                const isFinished = m.status === 'finished';
+                const isPlaying = m.status === 'playing';
+                const isUpcoming = m.status === 'upcoming';
+                let statusClass = 'status-idle';
+                if (isPlaying) statusClass = 'status-playing';
+                else if (isFinished) statusClass = 'status-finished';
+                else if (isUpcoming) statusClass = 'status-upcoming';
+
+                const cls = statusClass + (conf ? ' has-conflict' : '');
+
+                const team1Label = isFX ? m.team1 : `${m.p1}<br><span class="sub">${m.p2}</span>`;
+                const team2Label = isFX ? m.team2 : `${m.p3}<br><span class="sub">${m.p4}</span>`;
+
+                let btns = '';
+                if (!isPlayer) {
+                    const startLabel = isPlaying ? '结束' : (isFinished ? '修改' : '开始');
+                    const startCls = isPlaying ? 'btn-playing' : (isFinished ? 'btn-finished' : 'btn-main');
+                    const startDisabled = conf && !isPlaying;
+                    btns += `<button class="btn-sm ${startCls}" onclick="toggleM(${ri},${mi})" ${startDisabled ? 'disabled':''}>${startLabel}</button>`;
+                    if (!isFinished && !isPlaying) {
+                        const upLabel = isUpcoming ? '取消' : '⏳ 即将';
+                        const upCls = isUpcoming ? 'btn-sub' : 'btn-upcoming';
+                        btns += `<button class="btn-sm ${upCls}" onclick="setUpcoming(${ri},${mi})">${upLabel}</button>`;
+                    }
+                }
+
+                h += `<div class="match-card ${cls}">
+                    <div class="match-header">
+                        <span class="court-tag">🏸 ${m.court}</span>
+                        <div style="display:flex; gap:4px; flex-wrap:wrap;">${btns}</div>
+                    </div>
+                    <div class="match-body">
+                        <div class="team">${team1Label}</div>
+                        <input class="score-input" value="${m.s1!==null?m.s1:''}" 
+                               onchange="${!isPlayer ? `updateScore(${ri},${mi},1,this.value)` : ''}" 
+                               ${isPlayer ? 'disabled' : ''}>
+                        <span class="vs">VS</span>
+                        <input class="score-input" value="${m.s2!==null?m.s2:''}" 
+                               onchange="${!isPlayer ? `updateScore(${ri},${mi},2,this.value)` : ''}" 
+                               ${isPlayer ? 'disabled' : ''}>
+                        <div class="team" style="text-align:right;">${team2Label}</div>
+                    </div>
+                    ${conf ? `<span class="conflict-tag">⚠️ 球员正在其他场地比赛</span>` : ''}
+                    ${isUpcoming ? `<span class="conflict-tag" style="color:#f59e0b;">⏳ 即将开始</span>` : ''}
+                </div>`;
+            });
+        });
+    }
+
+    document.getElementById('match-list').innerHTML = h;
+    calcLiveRank(); // 再次确保排名更新
+}
+
+// ================================================================
+//  赛程总览（含积分榜）
+// ================================================================
+function renderScheduleOverview() {
+    const container = document.getElementById('schedule-overview');
+    const rankContainer = document.getElementById('schedule-rank');
+    if (!state.rounds || state.rounds.length === 0) {
+        container.innerHTML = '<div class="empty-state"><p>暂无赛程数据</p></div>';
+        rankContainer.innerHTML = '';
+        return;
+    }
+    const isFX = state.mode === 'fixed-pair';
+    let html = '';
+    state.rounds.forEach((r, ri) => {
+        html += `<h4 style="margin:12px 0 6px;">📍 第 ${ri+1} 轮</h4>`;
+        r.forEach(m => {
+            const t1 = isFX ? m.team1 : `${m.p1} & ${m.p2}`;
+            const t2 = isFX ? m.team2 : `${m.p3} & ${m.p4}`;
+            const score = (m.s1 !== null && m.s2 !== null) ? `${m.s1} : ${m.s2}` : '待赛';
+            const statusLabel = m.status === 'playing' ? '🟢 进行中' : (m.status === 'finished' ? '✅ 已完成' : (m.status === 'upcoming' ? '⏳ 即将开始' : '⏳ 未开始'));
+            html += `<div style="display:flex; justify-content:space-between; border-bottom:1px solid #f1f5f9; padding:6px 0; font-size:14px;">
+                <span style="font-weight:500;">${m.court}</span>
+                <span>${t1}  vs  ${t2}</span>
+                <span>${score}</span>
+                <span style="font-size:12px; color:#64748b;">${statusLabel}</span>
+            </div>`;
+        });
+    });
+    container.innerHTML = html;
+
+    // 积分榜 - 重新计算并渲染
+    const list = isFX ? state.pairs : state.players;
+    const rankList = list.map(p => ({ ...p, wins:0, losses:0, net:0 }));
+    state.rounds.forEach(r => r.forEach(m => {
+        if (m.s1 !== null && m.s2 !== null) {
+            const wT = m.s1 > m.s2 ? 1 : (m.s2 > m.s1 ? 2 : 0);
+            const t1P = isFX ? [m.team1] : [m.p1, m.p2];
+            const t2P = isFX ? [m.team2] : [m.p3, m.p4];
+            t1P.forEach(n => {
+                let p = rankList.find(x => (isFX ? x.name === n : x.name === n));
+                if (p) { p.net += (m.s1 - m.s2); if (wT===1) p.wins++; else if (wT===2) p.losses++; }
+            });
+            t2P.forEach(n => {
+                let p = rankList.find(x => (isFX ? x.name === n : x.name === n));
+                if (p) { p.net += (m.s2 - m.s1); if (wT===2) p.wins++; else if (wT===1) p.losses++; }
+            });
+        }
+    }));
+    const sorted = calculateRanks(rankList);
+    rankContainer.innerHTML = `<table>
+        <thead><tr><th>#</th><th>选手/组合</th><th>胜-负</th><th>净胜</th></tr></thead>
+        <tbody>
+            ${sorted.map(p => `<tr><td>${p.rank}${p.isTie?'*':''}</td><td>${p.name}</td><td>${p.wins}-${p.losses}</td><td>${p.net>0?'+':''}${p.net}</td></tr>`).join('')}
+        </tbody>
+    </table>`;
+}
+
+// ================================================================
+//  结赛 & 最终榜单
+// ================================================================
+async function showFinish() {
+    log('执行结赛');
+    // 先拉取最新数据
+    await fetchSchedule();
+    // 重新计算排名
+    calcLiveRank();
+    // 切换到结束视图
+    switchView('view-finish');
+    const isFX = state.mode === 'fixed-pair';
+    const list = isFX ? state.pairs : state.players;
+    const sorted = calculateRanks(list);
+    document.getElementById('fin-title-text').innerText = (state.meta.name || '赛事') + ' · 最终榜单';
+
+    const tbody = document.getElementById('final-body');
+    if (!tbody) return;
+    if (list.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="4">暂无球员数据</td></tr>';
+        return;
+    }
+    tbody.innerHTML = sorted.map((p, i) => {
+        let trophy = '';
+        if (i===0 && !p.isTie) trophy = '🏆 ';
+        else if (i===1 && !p.isTie) trophy = '🥈 ';
+        else if (i===2 && !p.isTie) trophy = '🥉 ';
+        return `<tr>
+            <td style="font-weight:600;">${p.rank}${p.isTie?' (并列)':''}</td>
+            <td style="font-weight:600; text-align:left; padding-left:12px;">${trophy}${p.name}</td>
+            <td>${p.wins}胜 ${p.losses}负</td>
+            <td style="color:${p.net>0?'#07c160':(p.net<0?'#fa5151':'#94a3b8')};">${p.net>0?'+':''}${p.net}</td>
+        </tr>`;
+    }).join('');
+
+    if (viewMode === 'player') {
+        document.getElementById('player-empty').classList.add('hidden');
+        document.getElementById('view-running').classList.add('hidden');
+        document.getElementById('view-finish').classList.remove('hidden');
+        stopAutoRefresh();
+    }
+}
+
+// ================================================================
+//  其余函数（保持不变，完整实现）
+// ================================================================
+
+// 以下函数为系统必需，全部保留
+async function saveSchedule(rounds, mode, target, courtNames, tournamentName) {
+    const payload = { players: state.players, rounds, mode, target, courtNames, tournamentName };
+    const res = await fetch(`${API_BASE}/api/save`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+    });
+    if (!res.ok) throw new Error('保存赛程失败');
+    return res.json();
+}
+
+async function updateMatch(matchId, score1, score2, status) {
+    const res = await fetch(`${API_BASE}/api/match/${matchId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ score1, score2, status })
+    });
+    if (!res.ok) throw new Error('更新比赛失败');
+    return res.json();
+}
+
+async function resetAllData() {
+    const res = await fetch(`${API_BASE}/api/reset`, { method: 'DELETE' });
+    if (!res.ok) throw new Error('重置失败');
+    return res.json();
+}
+
+async function manualRefresh() {
+    log('手动刷新点击');
+    try {
+        await fetchSchedule();
+        const visibleViews = document.querySelectorAll('[id^="view-"]:not(.hidden)');
+        visibleViews.forEach(el => {
+            if (el.id === 'view-running') renderRunning();
+            if (el.id === 'view-schedule') renderScheduleOverview();
+            if (el.id === 'view-finish') showFinish();
+        });
+        alert('数据已刷新');
+    } catch (err) {
+        alert('刷新失败：' + err.message);
+    }
+}
+
+function startAutoRefresh() {
+    stopAutoRefresh();
+    refreshTimer = setInterval(() => {
+        if (viewMode === 'player' && state.rounds && state.rounds.length > 0) {
+            fetchSchedule().catch(err => log('自动刷新失败', err.message));
+        }
+    }, REFRESH_INTERVAL);
+}
+
+function stopAutoRefresh() {
+    if (refreshTimer) {
+        clearInterval(refreshTimer);
+        refreshTimer = null;
+    }
+}
+
+function setViewMode(mode) {
+    log('切换视图模式', mode);
+    viewMode = mode;
+    const root = document.getElementById('app');
+    const pBtn = document.getElementById('btnPlayerView');
+    const aBtn = document.getElementById('btnAdminView');
+
+    if (mode === 'player') {
+        root.classList.remove('admin-mode');
+        root.classList.add('player-mode');
+        pBtn.classList.add('active');
+        aBtn.classList.remove('active');
+        document.getElementById('view-setup').classList.add('hidden');
+        document.getElementById('view-pairing').classList.add('hidden');
+        const hasData = state.rounds && state.rounds.length > 0;
+        const isFinished = document.getElementById('view-finish') && !document.getElementById('view-finish').classList.contains('hidden');
+        if (hasData) {
+            document.getElementById('view-running').classList.remove('hidden');
+            document.getElementById('view-finish').classList.add('hidden');
+            document.getElementById('player-empty').classList.add('hidden');
+            renderRunning();
+            startAutoRefresh();
+        } else if (isFinished) {
+            document.getElementById('view-running').classList.add('hidden');
+            document.getElementById('view-finish').classList.remove('hidden');
+            document.getElementById('player-empty').classList.add('hidden');
+            stopAutoRefresh();
+        } else {
+            document.getElementById('view-running').classList.add('hidden');
+            document.getElementById('view-finish').classList.add('hidden');
+            document.getElementById('player-empty').classList.remove('hidden');
+            stopAutoRefresh();
+        }
+        document.getElementById('view-schedule').classList.add('hidden');
+    } else {
+        root.classList.remove('player-mode');
+        root.classList.add('admin-mode');
+        aBtn.classList.add('active');
+        pBtn.classList.remove('active');
+        document.getElementById('player-empty').classList.add('hidden');
+        const vSetup = document.getElementById('view-setup');
+        const vPair = document.getElementById('view-pairing');
+        const vRun = document.getElementById('view-running');
+        const vFin = document.getElementById('view-finish');
+        if (state.rounds && state.rounds.length > 0) {
+            vSetup.classList.add('hidden');
+            vPair.classList.add('hidden');
+            vRun.classList.remove('hidden');
+            vFin.classList.add('hidden');
+            renderRunning();
+            stopAutoRefresh();
+        } else if (state.pairs && state.pairs.length > 0) {
+            vSetup.classList.add('hidden');
+            vPair.classList.remove('hidden');
+            vRun.classList.add('hidden');
+            vFin.classList.add('hidden');
+            showPairing();
+            stopAutoRefresh();
+        } else {
+            vSetup.classList.remove('hidden');
+            vPair.classList.add('hidden');
+            vRun.classList.add('hidden');
+            vFin.classList.add('hidden');
+            stopAutoRefresh();
+        }
+        document.getElementById('view-schedule').classList.add('hidden');
+    }
+    if (mode === 'admin' && state.rounds && state.rounds.length > 0) {
+        renderRunning();
+    }
+}
+
+function switchView(id) {
+    log('切换视图', id);
+    if (viewMode === 'player' && (id === 'view-setup' || id === 'view-pairing')) {
+        alert('请先进入管理后台（点击右上角“管理”）');
+        return;
+    }
+    document.querySelectorAll('[id^="view-"]').forEach(v => v.classList.add('hidden'));
+    document.getElementById(id).classList.remove('hidden');
+    if (id === 'view-running') {
+        renderRunning();
+        if (viewMode === 'player') startAutoRefresh();
+    }
+    if (id === 'view-finish') showFinish();
+    if (id === 'view-schedule') renderScheduleOverview();
+}
+
+function promptAdminLogin() {
+    const pwd = prompt('请输入管理员密码：');
+    if (pwd === 'admin123') {
+        setViewMode('admin');
+        alert('已进入管理后台');
+    } else if (pwd !== null) {
+        alert('密码错误');
+    }
+}
+
+function setMode(m) {
+    state.mode = m;
+    document.getElementById('m-rr').classList.toggle('active', m === 'round-robin');
+    document.getElementById('m-fx').classList.toggle('active', m === 'fixed-pair');
+    document.getElementById('btn-next').innerText = (m === 'round-robin') ? '🚀 生成混搭赛程' : '🚀 下一步：手动组对';
+    updateEstimation();
+}
+
+function getCurrentPlayerListFromInput() {
+    let all = [];
+    ['in-30p','in-30','in-30m','in-unk'].forEach(id => {
+        const text = document.getElementById(id).value;
+        if (text.trim()) {
+            text.split(/[\s\n,，]+/).filter(n => n.trim()).forEach(n => all.push(n.trim()));
+        }
+    });
+    return all;
+}
+
+function updateEstimation() {
+    const isRR = state.mode === 'round-robin';
+    const target = parseInt(document.getElementById('cfg-t').value) || 0;
+    const courts = parseInt(document.getElementById('cfg-c').value) || 1;
+    const players = getCurrentPlayerListFromInput();
+    const total = players.length;
+
+    let est = 0, msg = '';
+    if (total < 4) { est = 0; msg = '⚠️ 至少4名球员'; }
+    else if (target <= 0) { est = 0; msg = '📌 轮数需 >0'; }
+    else if (isRR) {
+        const pMatch = total * target;
+        est = Math.ceil(pMatch / 4);
+        msg = `🔁 混搭 ${total}人×${target}轮 → ${est}场`;
+    } else {
+        const maxPairs = Math.floor(total / 2);
+        if (maxPairs < 2) { est = 0; msg = '🤝 至少2对'; }
+        else {
+            est = Math.ceil((maxPairs * target) / 2);
+            msg = `🤝 固定组对 最多${maxPairs}对×${target}轮 → ${est}场`;
+        }
+    }
+
+    document.getElementById('total-matches-est').innerText = est || '0';
+    const mins = est > 0 ? Math.ceil((est * 12) / courts) : 0;
+    let timeStr = mins < 60 ? `${mins} 分钟` : `${Math.floor(mins/60)}小时${mins%60?mins%60+'分钟':''}`;
+    document.getElementById('total-time-est').innerHTML = mins > 0 ? `⏱️ ${timeStr} (${courts}片场)` : '--';
+    document.getElementById('est-note-detail').innerHTML = msg || '⚙️ 参数不足';
+}
+
+function autoSyncCourtNum() {
+    const names = document.getElementById('cfg-court-names').value.split(/[\s,，]+/).filter(n => n.trim());
+    const cInput = document.getElementById('cfg-c');
+    if (names.length > 0) cInput.value = names.length;
+    else if (cInput.value === '') cInput.value = 1;
+    updateEstimation();
+}
+
+function formatName(name) {
+    return name.charAt(0).toUpperCase() + name.slice(1).toLowerCase();
+}
+
+function generateRR_optimized(players, target, courtNames) {
+    let pData = players.map(p => ({ ...p }));
+    let rds = [];
+    let safety = 0;
+    const cNum = courtNames.length;
+
+    if (pData.length === 4) {
+        const names = pData.map(p => p.name);
+        const pairings = [
+            [[0,1],[2,3]],
+            [[0,2],[1,3]],
+            [[0,3],[1,2]]
+        ];
+        let roundIdx = 0;
+        for (let r = 0; r < target; r++) {
+            const pairing = pairings[roundIdx % pairings.length];
+            const team1 = pairing[0].map(i => names[i]);
+            const team2 = pairing[1].map(i => names[i]);
+            team1.forEach(name => {
+                let p = pData.find(x => x.name === name);
+                p.curP++;
+                p.lastR = rds.length;
+                team1.forEach(q => {
+                    if (q !== name && !p.partners.includes(q)) p.partners.push(q);
+                });
+                team2.forEach(q => {
+                    if (!p.opponents.includes(q)) p.opponents.push(q);
+                });
+            });
+            team2.forEach(name => {
+                let p = pData.find(x => x.name === name);
+                p.curP++;
+                p.lastR = rds.length;
+                team2.forEach(q => {
+                    if (q !== name && !p.partners.includes(q)) p.partners.push(q);
+                });
+                team1.forEach(q => {
+                    if (!p.opponents.includes(q)) p.opponents.push(q);
+                });
+            });
+            const court = courtNames[r % courtNames.length] || (r+1);
+            rds.push([{
+                p1: team1[0], p2: team1[1],
+                p3: team2[0], p4: team2[1],
+                s1: null, s2: null,
+                status: 'idle',
+                court: court
+            }]);
+            roundIdx++;
+        }
+        return rds;
+    }
+
+    function penalty(a, b) {
+        let score = 0;
+        if (a.partners.includes(b.name) || b.partners.includes(a.name)) score += 100;
+        if (a.opponents.includes(b.name) || b.opponents.includes(a.name)) score += 50;
+        score += Math.abs(a.lv - b.lv) * 2;
+        return score;
+    }
+
+    while (pData.some(p => p.curP < target) && safety < 1000) {
+        safety++;
+        let roundMatches = [];
+        let roundBusy = new Set();
+
+        for (let c = 0; c < cNum; c++) {
+            let available = pData.filter(p => p.curP < target && !roundBusy.has(p.name));
+            if (available.length < 4) break;
+            available.sort((a,b) => a.curP - b.curP || a.lastR - b.lastR);
+
+            let bestPick = null;
+            let bestPenalty = Infinity;
+
+            for (let i = 0; i < Math.min(available.length, 10); i++) {
+                let a1 = available[i];
+                let rest = available.filter(p => p !== a1);
+                for (let j = 0; j < rest.length; j++) {
+                    let a2 = rest[j];
+                    let rest2 = rest.filter(p => p !== a2);
+                    for (let k = 0; k < rest2.length; k++) {
+                        let a3 = rest2[k];
+                        let rest3 = rest2.filter(p => p !== a3);
+                        if (rest3.length === 0) continue;
+                        let a4 = rest3[0];
+                        let p1 = penalty(a1, a2) + penalty(a1, a3) + penalty(a1, a4) +
+                                 penalty(a2, a3) + penalty(a2, a4) + penalty(a3, a4);
+                        if (p1 < bestPenalty) {
+                            bestPenalty = p1;
+                            bestPick = [a1, a2, a3, a4];
+                        }
+                    }
+                }
+            }
+
+            if (!bestPick || bestPick.length < 4) break;
+
+            const players = bestPick;
+            let bestTeam1 = null, bestTeam2 = null;
+            let bestDiff = Infinity;
+            const pairings = [
+                [[0,1],[2,3]],
+                [[0,2],[1,3]],
+                [[0,3],[1,2]]
+            ];
+            for (let p of pairings) {
+                const team1 = p[0].map(i => players[i]);
+                const team2 = p[1].map(i => players[i]);
+                const sum1 = team1.reduce((s, p) => s + p.lv, 0);
+                const sum2 = team2.reduce((s, p) => s + p.lv, 0);
+                const diff = Math.abs(sum1 - sum2);
+                if (diff < bestDiff) {
+                    bestDiff = diff;
+                    bestTeam1 = team1;
+                    bestTeam2 = team2;
+                }
+            }
+            if (!bestTeam1 || !bestTeam2) {
+                bestTeam1 = [players[0], players[1]];
+                bestTeam2 = [players[2], players[3]];
+            }
+
+            bestPick.forEach(p => roundBusy.add(p.name));
+
+            const team1 = bestTeam1;
+            const team2 = bestTeam2;
+            team1.forEach(p => {
+                let pObj = pData.find(x => x.name === p.name);
+                pObj.curP++;
+                pObj.lastR = rds.length;
+                team1.forEach(q => {
+                    if (q.name !== p.name && !pObj.partners.includes(q.name)) pObj.partners.push(q.name);
+                });
+                team2.forEach(q => {
+                    if (!pObj.opponents.includes(q.name)) pObj.opponents.push(q.name);
+                });
+            });
+            team2.forEach(p => {
+                let pObj = pData.find(x => x.name === p.name);
+                pObj.curP++;
+                pObj.lastR = rds.length;
+                team2.forEach(q => {
+                    if (q.name !== p.name && !pObj.partners.includes(q.name)) pObj.partners.push(q.name);
+                });
+                team1.forEach(q => {
+                    if (!pObj.opponents.includes(q.name)) pObj.opponents.push(q.name);
+                });
+            });
+
+            roundMatches.push({
+                p1: team1[0].name,
+                p2: team1[1].name,
+                p3: team2[0].name,
+                p4: team2[1].name,
+                s1: null, s2: null,
+                status: 'idle',
+                court: courtNames[c] || (c+1)
+            });
+        }
+        if (roundMatches.length) rds.push(roundMatches);
+    }
+    return rds;
+}
+
+
+function handleStart() {
+    const lvs = { 'in-30p':4, 'in-30':3, 'in-30m':2, 'in-unk':3 };
+    state.players = [];
+    state.selectedIdx = [];
+    state.pairs = [];
+    ['in-30p','in-30','in-30m','in-unk'].forEach(id => {
+        const text = document.getElementById(id).value;
+        if (text.trim()) {
+            text.split(/[\s\n,，]+/).filter(n => n.trim()).forEach(n => {
+                const name = formatName(n.trim());
+                state.players.push({
+                    name: name,
+                    lv: lvs[id] || 3,
+                    wins: 0, losses: 0, net: 0,
+                    curP: 0,
+                    partners: [],
+                    opponents: [],
+                    lastR: -2,
+                    paired: false
+                });
+            });
+        }
+    });
+
+    if (state.players.length < 4) return alert('⚠️ 至少需要4名球员');
+
+    state.config.target = parseInt(document.getElementById('cfg-t').value) || 4;
+    const cInput = document.getElementById('cfg-court-names').value.split(/[\s,，]+/).filter(n => n.trim());
+    const cNum = parseInt(document.getElementById('cfg-c').value) || 1;
+    state.courtNames = [];
+    for (let i=0; i<cNum; i++) state.courtNames.push(cInput[i] || (i+1));
+    state.meta.name = document.getElementById('ev-name').value || '赛事活动';
+
+    let rounds = [];
+    if (state.mode === 'round-robin') {
+        rounds = generateRR_optimized(state.players, state.config.target, state.courtNames);
+    } else {
+        showPairing();
+        if (viewMode !== 'admin') setViewMode('admin');
+        switchView('view-pairing');
+        return;
+    }
+
+    saveSchedule(rounds, state.mode, state.config.target, state.courtNames, state.meta.name)
+        .then(async () => {
+            alert('赛程已生成并保存');
+            await fetchSchedule();
+            switchView('view-running');
+            if (viewMode === 'player') {
+                document.getElementById('player-empty').classList.add('hidden');
+                document.getElementById('view-running').classList.remove('hidden');
+                startAutoRefresh();
+            }
+        })
+        .catch(err => alert('保存失败：' + err.message));
+}
+
+
+function showPairing() {
+    const pool = document.getElementById('player-pool');
+    pool.innerHTML = '';
+    state.players.forEach((p, i) => {
+        const d = document.createElement('div');
+        d.className = 'player-chip' + (p.paired ? ' paired' : '') + (state.selectedIdx.includes(i) ? ' selected' : '');
+        d.innerText = p.name;
+        d.onclick = () => {
+            if (p.paired || viewMode === 'player') return;
+            if (state.selectedIdx.includes(i)) {
+                state.selectedIdx = state.selectedIdx.filter(x => x !== i);
+            } else {
+                state.selectedIdx.push(i);
+                if (state.selectedIdx.length === 2) {
+                    const a = state.selectedIdx[0], b = state.selectedIdx[1];
+                    state.players[a].paired = true;
+                    state.players[b].paired = true;
+                    state.pairs.push({
+                        name: state.players[a].name + ' & ' + state.players[b].name,
+                        lv: state.players[a].lv + state.players[b].lv,
+                        wins: 0, losses: 0, net: 0, curP: 0, lastR: -2, opponents: []
+                    });
+                    state.selectedIdx = [];
+                }
+            }
+            showPairing();
+        };
+        pool.appendChild(d);
+    });
+    const list = document.getElementById('pair-list');
+    list.innerHTML = state.pairs.map((p, i) => `
+        <div class="pair-item">
+            <span><b>${i+1}.</b> 🤝 ${p.name} <span class="text-muted">(合力 ${p.lv})</span></span>
+            <span class="del" onclick="removePair(${i})">撤销</span>
+        </div>
+    `).join('');
+}
+
+
+function removePair(i) {
+    const names = state.pairs[i].name.split(' & ');
+    names.forEach(n => {
+        let p = state.players.find(x => x.name === n);
+        if (p) p.paired = false;
+    });
+    state.pairs.splice(i, 1);
+    showPairing();
+}
+
+function startFixedGame() {
+    if (state.pairs.length < 2) return alert('至少需要2对组合');
+    let pData = state.pairs.map(p => ({ ...p }));
+    let rds = [];
+    let safety = 0;
+    const target = state.config.target;
+    const courtNames = state.courtNames;
+    while (pData.some(p => p.curP < target) && safety < 500) {
+        safety++;
+        let roundMatches = [], roundBusy = new Set();
+        for (let c = 0; c < courtNames.length; c++) {
+            let need = pData.filter(p => p.curP < target && !roundBusy.has(p.name))
+                .sort((a, b) => a.curP - b.curP || a.lastR - b.lastR);
+            if (need.length === 0) break;
+            let t1 = need[0];
+            roundBusy.add(t1.name);
+            let candidates = pData.filter(p => !roundBusy.has(p.name))
+                .sort((a, b) => {
+                    let aNeed = a.curP < target ? 0 : 1;
+                    let bOp = t1.opponents.includes(a.name) ? 1 : 0;
+                    return (aNeed - (b.curP < target ? 0 : 1)) ||
+                        (bOp - (t1.opponents.includes(b.name) ? 1 : 0)) ||
+                        Math.abs(t1.lv - a.lv) - Math.abs(t1.lv - b.lv) ||
+                        a.lastR - b.lastR;
+                });
+            if (candidates.length > 0) {
+                let t2 = candidates[0];
+                roundBusy.add(t2.name);
+                t1.curP++; t1.lastR = rds.length; t1.opponents.push(t2.name);
+                t2.curP++; t2.lastR = rds.length; t2.opponents.push(t1.name);
+                const n1 = t1.name.split(' & '), n2 = t2.name.split(' & ');
+                roundMatches.push({
+                    p1: n1[0], p2: n1[1], p3: n2[0], p4: n2[1],
+                    team1: t1.name, team2: t2.name,
+                    s1: null, s2: null, status: 'idle',
+                    court: courtNames[c] || (c+1)
+                });
+            }
+        }
+        if (roundMatches.length) rds.push(roundMatches);
+    }
+    saveSchedule(rds, 'fixed-pair', target, courtNames, state.meta.name)
+        .then(async () => {
+            alert('赛程已生成并保存');
+            await fetchSchedule();
+            switchView('view-running');
+            if (viewMode === 'player') {
+                document.getElementById('player-empty').classList.add('hidden');
+                document.getElementById('view-running').classList.remove('hidden');
+                startAutoRefresh();
+            }
+        })
+        .catch(err => alert('保存失败：' + err.message));
+}
+
+
+async function updateScore(ri, mi, side, val) {
+    if (viewMode === 'player') return;
+    const m = state.rounds[ri][mi];
+    const v = val === '' ? null : parseInt(val);
+    if (side === 1) m.s1 = v;
+    else m.s2 = v;
+    if (m.s1 !== null && m.s2 !== null) {
+        m.status = 'finished';
+        if (m.status === 'upcoming') m.status = 'finished';
+    }
+    const key = `${ri+1}-${mi}`;
+    const matchId = matchIdMap[key];
+    if (!matchId) {
+        alert('无法获取比赛ID，请刷新页面重试');
+        return;
+    }
+    try {
+        await updateMatch(matchId, m.s1, m.s2, m.status);
+        await fetchSchedule();
+        renderRunning();
+    } catch (err) {
+        alert('更新比分失败：' + err.message);
+    }
+}
+
+async function toggleM(ri, mi) {
+    if (viewMode === 'player') return;
+    const m = state.rounds[ri][mi];
+    if (m.status === 'finished') {
+        m.status = 'idle';
+        m.s1 = null;
+        m.s2 = null;
+    } else if (m.status === 'playing') {
+        m.status = 'idle';
+    } else {
+        m.status = 'playing';
+        if (m.status === 'upcoming') m.status = 'playing';
+    }
+    const key = `${ri+1}-${mi}`;
+    const matchId = matchIdMap[key];
+    if (!matchId) {
+        alert('无法获取比赛ID，请刷新页面重试');
+        return;
+    }
+    try {
+        await updateMatch(matchId, m.s1, m.s2, m.status);
+        await fetchSchedule();
+        renderRunning();
+    } catch (err) {
+        alert('更新状态失败：' + err.message);
+    }
+}
+
+async function setUpcoming(ri, mi) {
+    if (viewMode === 'player') return;
+    const m = state.rounds[ri][mi];
+    if (m.status === 'finished' || m.status === 'playing') return;
+    if (m.status === 'upcoming') {
+        m.status = 'idle';
+    } else {
+        m.status = 'upcoming';
+    }
+    const key = `${ri+1}-${mi}`;
+    const matchId = matchIdMap[key];
+    if (!matchId) {
+        alert('无法获取比赛ID，请刷新页面重试');
+        return;
+    }
+    try {
+        await updateMatch(matchId, m.s1, m.s2, m.status);
+        await fetchSchedule();
+        renderRunning();
+    } catch (err) {
+        alert('更新状态失败：' + err.message);
+    }
+}
+
+function copySchedule() {
+    let t = `【${state.meta.name || '赛事赛程'}】\n`;
+    const isFX = state.mode === 'fixed-pair';
+    state.rounds.forEach((r, i) => {
+        t += `\n第 ${i+1} 轮:\n`;
+        r.forEach(m => {
+            const t1 = isFX ? m.team1 : `${m.p1} & ${m.p2}`;
+            const t2 = isFX ? m.team2 : `${m.p3} & ${m.p4}`;
+            const sc = (m.s1 !== null && m.s2 !== null) ? `  ${m.s1} : ${m.s2}` : '  待赛';
+            t += `  ${m.court}  ${t1}  vs  ${t2}  ${sc}\n`;
+        });
+    });
+    const el = document.createElement('textarea');
+    el.value = t;
+    document.body.appendChild(el);
+    el.select();
+    document.execCommand('copy');
+    document.body.removeChild(el);
+    alert('✅ 赛程已复制到剪贴板');
+}
+
+function confirmReset() {
+    if (confirm('⚠️ 确定要清空所有数据吗？此操作不可恢复！')) {
+        resetAllData().then(async () => {
+            alert('数据已清空');
+            await fetchSchedule();
+            setViewMode('player');
+            document.getElementById('player-empty').classList.remove('hidden');
+            document.getElementById('view-running').classList.add('hidden');
+            document.getElementById('view-finish').classList.add('hidden');
+            document.getElementById('view-setup').classList.add('hidden');
+            document.getElementById('view-pairing').classList.add('hidden');
+            stopAutoRefresh();
+        }).catch(err => alert('清空失败：' + err.message));
+    }
+}
+
+// ================================================================
+//  初始化
+// ================================================================
+window.onload = function() {
+    document.getElementById('ev-date').value = new Date().toISOString().split('T')[0];
+    const ids = ['in-30p','in-30','in-30m','in-unk','cfg-t','cfg-court-names'];
+    ids.forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.addEventListener('input', () => { if (id === 'cfg-court-names') autoSyncCourtNum(); updateEstimation(); });
+    });
+    document.getElementById('cfg-c').addEventListener('change', updateEstimation);
+
+    fetchSchedule().then(() => {
+        setViewMode('player');
+    }).catch(err => {
+        console.error('加载赛程失败:', err);
+        setViewMode('player');
+    });
+    updateEstimation();
+};
+
+// 暴露全局
+window.setViewMode = setViewMode;
+window.switchView = switchView;
+window.setMode = setMode;
+window.handleStart = handleStart;
+window.showPairing = showPairing;
+window.removePair = removePair;
+window.startFixedGame = startFixedGame;
+window.renderRunning = renderRunning;
+window.updateScore = updateScore;
+window.toggleM = toggleM;
+window.setUpcoming = setUpcoming;
+window.showFinish = showFinish;
+window.copySchedule = copySchedule;
+window.confirmReset = confirmReset;
+window.resetAllData = resetAllData;
+window.autoSyncCourtNum = autoSyncCourtNum;
+window.updateEstimation = updateEstimation;
+window.promptAdminLogin = promptAdminLogin;
+window.renderScheduleOverview = renderScheduleOverview;
+window.manualRefresh = manualRefresh;
+
+console.log('✅ 页面加载完成，排名和最终榜单功能已修复');
+</script>
+</body>
+</html>
