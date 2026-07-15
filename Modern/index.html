@@ -610,7 +610,7 @@ async function updateMatch(matchId, score1, score2, status) {
 }
 
 async function resetAllData() {
-    const res = await fetch(`${API_BASE}/api/reset`, { method: 'DELETE' });
+    const res = await fetch(`${API_BASE}/api/competition/reset`, { method: 'DELETE' });
     if (!res.ok) throw new Error('重置失败');
     return res.json();
 }
