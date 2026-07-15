@@ -451,16 +451,69 @@ main
 
 ---
 
-## 我最后再补充一点（这是文档之外的建议）
 
-今天回家，你只需要花 **15~20 分钟**，就能把家里的开发环境搭好。
 
-明天开始，你就可以实现真正的工作方式：
+TOP Daily Startup
+1. 检查 MySQL 容器
+docker ps
 
-* 办公室：`git push`
-* 回家：`git pull`
-* 继续开发
+应该看到：
 
-这是我们今天最大的成果之一。
+docker-desktop-mysql-1
 
-🍻 恭喜，TOP 从今天开始正式进入了**双开发环境时代**。
+如果没有：
+
+docker start docker-desktop-mysql-1
+2. 拉取最新代码
+cd D:\Projects\TOP
+
+git pull
+
+git status
+
+预期工作区干净。
+
+3. 启动后端
+
+进入：
+
+cd D:\Projects\TOP\Modern
+
+启动：
+
+npm run dev
+
+保持这个窗口不要关闭。
+
+正常应看到：
+
+DB: localhost 3306 nhpa
+Server running on http://0.0.0.0:3000
+4. 新开 PowerShell 做端口检查
+Test-NetConnection localhost -Port 3000
+
+预期：
+
+TcpTestSucceeded : True
+5. API Smoke Test
+
+今天先调用只读接口，不改数据库：
+
+Invoke-RestMethod `
+-Method GET `
+-Uri http://localhost:3000/api/competition/schedule
+
+只要能正常返回：
+
+tournament
+players
+matches
+
+就说明：
+
+Docker
+→ MySQL
+→ Node
+→ API
+
+整条链路正常。
