@@ -600,7 +600,7 @@ async function saveSchedule(rounds, mode, target, courtNames, tournamentName) {
 }
 
 async function updateMatch(matchId, score1, score2, status) {
-    const res = await fetch(`${API_BASE}/api/match/${matchId}`, {
+    const res = await fetch(`${API_BASE}/api/competition/match/${matchId}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ score1, score2, status })
