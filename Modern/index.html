@@ -589,7 +589,15 @@ async function showFinish() {
 
 // 以下函数为系统必需，全部保留
 async function saveSchedule(rounds, mode, target, courtNames, tournamentName) {
-    const payload = { players: state.players, rounds, mode, target, courtNames, tournamentName };
+    const payload = {
+        players: state.players,
+        rounds,
+        mode,
+        target,
+        courtNames,
+        tournamentName,
+        pairs: mode === 'fixed-pair' ? state.pairs : []
+    };
     const res = await fetch(`${API_BASE}/api/save`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
