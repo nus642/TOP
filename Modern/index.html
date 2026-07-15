@@ -263,9 +263,10 @@ function log(msg, data) {
 async function fetchSchedule() {
     log('正在拉取赛程数据...');
     try {
-        const res = await fetch(`${API_BASE}/api/schedule`);
+        const res = await fetch(`${API_BASE}/api/competition/schedule`);
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         const data = await res.json();
+        state.mode = data.mode || 'round-robin';
         log('数据拉取成功', data);
 
         // 重建 players（重置胜场等统计，由前端重新计算）
