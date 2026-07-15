@@ -598,7 +598,7 @@ async function saveSchedule(rounds, mode, target, courtNames, tournamentName) {
         tournamentName,
         pairs: mode === 'fixed-pair' ? state.pairs : []
     };
-    const res = await fetch(`${API_BASE}/api/save`, {
+    const res = await fetch(`${API_BASE}/api/competition/save`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload)
