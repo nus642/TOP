@@ -151,10 +151,17 @@ async function getSchedule(tournamentId){
             tournamentId
         );
 
+    const pairings =
+        await pairingRepository.getPairingsByTournament(
+            tournamentId
+        );
+
     return {
         tournament,
         players,
-        matches
+        matches,
+        pairings,
+        mode: pairings.length > 0 ? "fixed-pair" : "round-robin"
     };
 
 }    

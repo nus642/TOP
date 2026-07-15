@@ -38,7 +38,24 @@ async function createPairing(pairing){
 
 }
 
+async function getPairingsByTournament(tournamentId){
+
+    const [rows] = await db.query(
+        `
+        SELECT *
+        FROM pairings
+        WHERE tournament_id = ?
+        ORDER BY id
+        `,
+        [tournamentId]
+    );
+
+    return rows;
+
+}
+
 module.exports = {
         deletePairingsByTournament,
-        createPairing
+        createPairing,
+        getPairingsByTournament
 };
