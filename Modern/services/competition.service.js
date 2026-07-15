@@ -50,6 +50,33 @@ async function saveSchedule(data){
             tournamentId
         );
 
+    // 保存固定组对
+    if(data.mode === "fixed-pair" && data.pairs){
+
+        await pairingRepository.deletePairingsByTournament(
+            tournamentId
+        );
+
+        for(const pair of data.pairs){
+
+            const names = pair.name.split(" & ");
+
+            const player1Id = playerMap[names[0]];
+            const player2Id = playerMap[names[1]];
+
+            if(player1Id && player2Id){
+
+                await pairingRepository.createPairing({
+                    tournament_id:tournamentId,
+                    player1_id:player1Id,
+                    player2_id:player2Id
+                });
+
+            }
+        }
+    } 
+        
+
     // 删除旧比赛
     await matchRepository.deleteMatchesByTournament(
         tournamentId
@@ -85,13 +112,13 @@ async function saveSchedule(data){
 
     player4_id: playerMap[m.p4],
 
-    team1_name: null,
+    team1_name: data.mode === "fixed-pair" ? m.team1 : null,
 
-    team2_name: null,
+    team2_name: data.mode === "fixed-pair" ? m.team2 : null,
 
-    score1: m.s1 || 0,
-
-    score2: m.s2 || 0,
+    score1: m.s1 ?? null,
+    
+    score2: m.s2 ?? null,
 
     status: m.status || "idle"
 });
@@ -253,6 +280,8 @@ async function generateCompetition(data){
         playerMap[player.name] = createdPlayer.id;
 
     }
+
+
 
     if(data.mode === "fixed-pair" && data.pairs){
 
