@@ -19,9 +19,9 @@ async function getPlayersByTournament(tournamentId) {
 
 
 // Create player (future implementation)
-async function createPlayer(player){
+async function createPlayer(player, connection = db){
 
-    const [result] = await db.query(
+    const [result] = await connection.query(
         `
         INSERT INTO players
         (
@@ -58,9 +58,12 @@ async function updatePlayerRuntimeStats(
 }
 
 
-async function resetPlayerRuntimeStatsByTournament(tournamentId){
+async function resetPlayerRuntimeStatsByTournament(
+    tournamentId,
+    connection = db
+){
 
-const [result] = await db.query(
+const [result] = await connection.query(
     `
     UPDATE players
     SET wins = 0, losses = 0, net = 0, curP = 0
@@ -75,9 +78,12 @@ const [result] = await db.query(
 
 }
 
-async function deletePlayersByTournament(tournamentId){
+async function deletePlayersByTournament(
+    tournamentId,
+    connection = db
+){
 
-const [result] = await db.query(
+const [result] = await connection.query(
     `
     DELETE FROM players
     WHERE tournament_id = ?
@@ -91,9 +97,11 @@ return result;
 
 }
 
-async function deletePlayerPartnersByTournament(tournamentId){
+async function deletePlayerPartnersByTournament(
+    tournamentId, 
+    connection = db){
 
-    const [result] = await db.query(
+    const [result] = await connection.query(
         `
         DELETE FROM player_partners
         WHERE tournament_id = ?
@@ -108,9 +116,10 @@ async function deletePlayerPartnersByTournament(tournamentId){
 }
 
 
-async function deletePlayerOpponentsByTournament(tournamentId){
-
-    const [result] = await db.query(
+async function deletePlayerOpponentsByTournament( 
+    tournamentId,
+    connection = db){
+    const [result] = await connection.query(
         `
         DELETE FROM player_opponents
         WHERE tournament_id = ?
@@ -124,9 +133,11 @@ async function deletePlayerOpponentsByTournament(tournamentId){
 
 }
 
-async function getPlayerMap(tournamentId){
+async function getPlayerMap(
+    tournamentId,
+    connection = db){
 
-    const [rows] = await db.query(
+    const [rows] = await connection.query(
         `
         SELECT id, name
         FROM players

@@ -12,9 +12,6 @@ const dbConfig = {
 
 const pool = mysql.createPool(dbConfig);
 
-
-module.exports = pool;
-
 console.log(
     `[DB] ${dbConfig.host}:${dbConfig.port}/${dbConfig.database}`
 );
@@ -32,4 +29,30 @@ async function initDB() {
     }
 }
 
+async function withTransaction(work) {
+    const connection = await pool.getConnection();
+
+    try {
+        await connection.beginTransaction();
+
+        const result = await work(connection);
+
+        await connection.commit();
+
+        return result;
+
+    } catch (err) {
+        await connection.rollback();
+        throw err;
+
+    } finally {
+        connection.release();
+    }
+}
+
+
+module.exports = pool;
+
 module.exports.initDB = initDB;
+
+module.exports.withTransaction = withTransaction;
