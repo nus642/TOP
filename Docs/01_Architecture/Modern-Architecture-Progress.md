@@ -231,6 +231,42 @@ Verification
 - Integration Test
 - Behavioral Compatibility Verified
 
+## 033 Node v1 Migration
+
+Status: Completed ✅
+
+Scope:
+
+Migrate Node v1 competition capabilities into Modern Architecture.
+
+Completed APIs:
+
+- GET /api/schedule
+- POST /api/generate
+- POST /api/save
+- PUT /api/match/:id
+- DELETE /api/reset
+
+Architecture:
+
+API
+↓
+Service
+↓
+Repository
+↓
+Database
+
+Verification:
+
+- Update Match verified
+- Reset verified
+- Generate verified
+
+Completion Date:
+
+2026-07-16
+
 ---
 
 ## 6.Current Architecture Snapshot
