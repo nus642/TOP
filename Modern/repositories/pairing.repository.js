@@ -1,7 +1,10 @@
 const db = require("../database/db");
 
-async function deletePairingsByTournament(tournamentId){
-    const [result] = await db.query(
+async function deletePairingsByTournament(
+    tournamentId,
+    connection = db
+){
+    const [result] = await connection.query(
         `
         DELETE FROM pairings
         WHERE tournament_id = ?
@@ -12,9 +15,12 @@ async function deletePairingsByTournament(tournamentId){
     return result;
 }
 
-async function createPairing(pairing){
+async function createPairing(
+    pairing,
+    connection = db
+){
 
-    const [result] = await db.query(
+    const [result] = await connection.query(
         `
         INSERT INTO pairings
         (
