@@ -318,12 +318,50 @@ Transaction:
 
 connection = transaction connection
 
----
-# Next Steps
+
 
 ### 035.2.4 Tournament Repository
 
-Prepare tournament updates for transaction support.
+Status:
+
+COMPLETED ✅
+
+File:
+
+Modern/repositories/tournament.repository.js
+
+
+Updated methods:
+
+- updateTournamentName()
+
+
+Pattern:
+
+Before:
+
+repository
+|
+db.query()
+
+
+After:
+
+repository
+|
+connection.query()
+
+
+Default:
+
+connection = db
+
+Transaction:
+
+connection = transaction connection
+
+---
+# Next Steps
 
 
 ### 035.3 Service Transaction Boundary
