@@ -16,9 +16,13 @@ async function getTournamentById(tournamentId){
 
 }
 
-async function updateTournamentName(id, name){
+async function updateTournamentName(
+    id, 
+    name,
+    connection = db
+){
 
-    const [result] = await db.query(
+    const [result] = await connection.query(
         `
         UPDATE tournaments
         SET name = ?
