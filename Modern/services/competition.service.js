@@ -2,7 +2,7 @@ const matchRepository = require("../repositories/match.repository");
 const playerRepository = require("../repositories/player.repository");
 const pairingRepository = require("../repositories/pairing.repository");
 const tournamentRepository = require("../repositories/tournament.repository");
-
+const db = require("../database/db");
 
 async function saveSchedule(data){
 
@@ -144,21 +144,26 @@ async function updateMatch(matchId,score1,score2,status){
 
 const tournamentId = 1;
 
+return db.withTransaction(async (connection) => {
+
 await matchRepository.updateMatchScore(
     matchId,
     score1,
     score2,
-    status
+    status,
+    connection
 );
 
 await playerRepository.resetPlayerRuntimeStatsByTournament(
-    tournamentId
+    tournamentId,
+    connection
 );
 
 return {
     success: true
 };
 
+});
 }
 
 async function getSchedule(tournamentId){
