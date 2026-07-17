@@ -243,9 +243,13 @@ Existing calls continue working.
 
 ---
 
-# Next Steps
+
 
 ## 035.2.2 Match Repository Transaction Support
+
+Status:
+
+COMPLETED ✅
 
 Target:
 
@@ -272,14 +276,50 @@ Target methods:
 - updateMatchScore()
 
 
----
-
-## Following Steps
-
 ### 035.2.3 Pairing Repository
+Status:
+
+COMPLETED ✅
 
 Prepare pairing operations for transaction support.
 
+File:
+
+Modern/repositories/pairing.repository.js
+
+
+Updated methods:
+
+- createPairing()
+- deletePairingsByTournament()
+
+
+Pattern:
+
+Before:
+
+repository
+|
+db.query()
+
+
+After:
+
+repository
+|
+connection.query()
+
+
+Default:
+
+connection = db
+
+Transaction:
+
+connection = transaction connection
+
+---
+# Next Steps
 
 ### 035.2.4 Tournament Repository
 
