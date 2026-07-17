@@ -361,7 +361,7 @@ Transaction:
 connection = transaction connection
 
 ---
-# Next Steps
+
 
 
 ### 035.3 Service Transaction Boundary
@@ -382,8 +382,39 @@ Target workflows:
 - generateCompetition()
 - saveSchedule()
 
+## 035.3.1 updateMatch Transaction Boundary
+
+Status:
+
+COMPLETED ✅
+
+
+File:
+
+Modern/services/competition.service.js
+
+
+Workflow:
+
+updateMatch()
+
+Uses:
+
+db.withTransaction()
+
+
+Repositories involved:
+
+- matchRepository.updateMatchScore()
+- playerRepository.resetPlayerRuntimeStatsByTournament()
+
+
+# Next Steps
+
+## 035.3.2
 
 ---
+
 
 # Architecture Principles
 
