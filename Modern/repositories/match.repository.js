@@ -17,9 +17,9 @@ async function getMatchesByTournament(tournamentId){
 }
 
 
-async function createMatch(match){
+async function createMatch(match, connection = db){
 
-    const [result] = await db.query(
+    const [result] = await connection.query(
         `
         INSERT INTO matches
         (
@@ -63,7 +63,10 @@ async function createMatch(match){
 
 }
 
-async function deleteMatchesByTournament(tournamentId){
+async function deleteMatchesByTournament(
+    tournamentId,
+    connection = db
+){
 
     console.log(
         "Deleting matches for tournament:",
@@ -71,7 +74,7 @@ async function deleteMatchesByTournament(tournamentId){
     );
 
 
-    const [result] = await db.query(
+    const [result] = await connection.query(
         `
         DELETE FROM matches
         WHERE tournament_id = ?
@@ -96,9 +99,10 @@ async function updateMatchScore(
     matchId,
     score1,
     score2,
-    status
+    status,
+    connection = db
 ) {
-    const [result] = await db.query(
+    const [result] = await connection.query(
         `
         UPDATE matches
         SET score1 = ?, score2 = ?, status = ?
