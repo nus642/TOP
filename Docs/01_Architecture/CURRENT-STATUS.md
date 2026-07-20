@@ -418,11 +418,17 @@ Status:
 
 COMPLETED ✅
 
-# Next Step
-
 ## 035.3.3
 
+Status:
+
+COMPLETED ✅
+
 Generate Competition
+
+# Next Step
+
+## 035.3.4 saveSchedule()
 
 ---
 
@@ -493,7 +499,7 @@ main
 Latest completed: 2026-7-20
 
 
-035.3.2 建立 Service Transaction Boundary
+035.3.3 Generate Competition
 
 
 Working tree:

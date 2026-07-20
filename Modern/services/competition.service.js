@@ -245,31 +245,40 @@ async function generateCompetition(data){
 
     const tournamentId = 1;
 
+     return db.withTransaction (async (connection) => {
+
+
     await matchRepository.deleteMatchesByTournament(
-        tournamentId
+        tournamentId,
+        connection
     );
 
     await pairingRepository.deletePairingsByTournament(
-        tournamentId
+        tournamentId,
+        connection  
     );
 
     await playerRepository.deletePlayersByTournament(
-        tournamentId
+        tournamentId,
+        connection
     );
 
     await playerRepository.deletePlayerPartnersByTournament(
-        tournamentId
+        tournamentId,
+        connection
     );
 
     await playerRepository.deletePlayerOpponentsByTournament(
-        tournamentId
+        tournamentId,
+        connection
     );
 
     if(data.tournamentName){
 
         await tournamentRepository.updateTournamentName(
             tournamentId,
-            data.tournamentName
+            data.tournamentName,
+            connection  
         );
 
     }
@@ -289,7 +298,9 @@ async function generateCompetition(data){
 
                 paired:player.paired || false
 
-            });
+            },
+            connection
+        );
 
         playerMap[player.name] = createdPlayer.id;
 
@@ -319,8 +330,9 @@ async function generateCompetition(data){
                     player1_id:player1Id,
 
                     player2_id:player2Id
-
-                });
+                },
+                connection
+            );
 
             }
 
@@ -333,6 +345,7 @@ async function generateCompetition(data){
         message:"球员已保存，请调用 /api/save 保存赛程"
     };
 
+    });
 }
 
 module.exports = {
