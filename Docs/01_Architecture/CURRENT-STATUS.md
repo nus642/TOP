@@ -409,9 +409,20 @@ Repositories involved:
 - playerRepository.resetPlayerRuntimeStatsByTournament()
 
 
-# Next Steps
 
 ## 035.3.2
+
+建立 Service Transaction Boundary
+
+Status:
+
+COMPLETED ✅
+
+# Next Step
+
+## 035.3.3
+
+Generate Competition
 
 ---
 
@@ -479,18 +490,10 @@ main
 
 
 
-Latest completed:
+Latest completed: 2026-7-20
 
 
-034.1 Modern Architecture Stabilization
-
-
-
-Latest transaction work:
-
-
-Add transaction support foundation for player repository
-
+035.3.2 建立 Service Transaction Boundary
 
 
 Working tree:

@@ -202,34 +202,43 @@ async function resetCompetition(){
 
     const tournamentId = 1;
 
+    return db.withTransaction(async (connection) => {
+
     await matchRepository.deleteMatchesByTournament(
-        tournamentId
+        tournamentId,
+        connection
     );
 
     await pairingRepository.deletePairingsByTournament(
-        tournamentId
+        tournamentId,
+        connection
     );
 
     await playerRepository.deletePlayersByTournament(
-        tournamentId
+        tournamentId,
+        connection
     );
 
     await playerRepository.deletePlayerPartnersByTournament(
-        tournamentId
+        tournamentId,
+        connection
     );
 
     await playerRepository.deletePlayerOpponentsByTournament(
-        tournamentId
+        tournamentId,
+        connection
     );
 
     await tournamentRepository.updateTournamentName(
         tournamentId,
-        "赛事活动"
+        "赛事活动",
+        connection
     );
 
     return {
         success: true
     };
+        });
 }
 
 async function generateCompetition(data){
