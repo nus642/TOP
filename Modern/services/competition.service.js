@@ -6,21 +6,25 @@ const db = require("../database/db");
 
 async function saveSchedule(data){
 
-    const tournamentId = 1;
+        const tournamentId = 1;
+
+       return db.withTransaction(async (connection)=>{
 
     // 更新赛事名称
     if(data.tournamentName){
 
         await tournamentRepository.updateTournamentName(
             tournamentId,
-            data.tournamentName
+            data.tournamentName,
+            connection
         );
 
     }
 
     // 删除旧球员
     await playerRepository.deletePlayersByTournament(
-        tournamentId
+        tournamentId,
+        connection
     );
 
     // 保存新球员
@@ -38,23 +42,27 @@ async function saveSchedule(data){
 
                 paired: p.paired
 
-            });
+             },
+             connection
+        );
 
-        }
+         }
 
-    }
+        }    
 
     // 建立 Player Map
     const playerMap =
         await playerRepository.getPlayerMap(
-            tournamentId
+            tournamentId,
+            connection
         );
 
     // 保存固定组对
     if(data.mode === "fixed-pair" && data.pairs){
 
         await pairingRepository.deletePairingsByTournament(
-            tournamentId
+            tournamentId,
+            connection
         );
 
         for(const pair of data.pairs){
@@ -70,7 +78,9 @@ async function saveSchedule(data){
                     tournament_id:tournamentId,
                     player1_id:player1Id,
                     player2_id:player2Id
-                });
+                 },
+                connection
+            );
 
             }
         }
@@ -79,9 +89,9 @@ async function saveSchedule(data){
 
     // 删除旧比赛
     await matchRepository.deleteMatchesByTournament(
-        tournamentId
+        tournamentId,
+        connection
         );
-
         for(let r = 0; r < data.rounds.length; r++){
 
     const roundMatches = data.rounds[r];
@@ -121,8 +131,9 @@ async function saveSchedule(data){
     score2: m.s2 ?? null,
 
     status: m.status || "idle"
-});
-
+},
+connection
+);
     }
 
 }
@@ -137,6 +148,7 @@ async function saveSchedule(data){
 
     };
 
+});
 
 }
 
