@@ -511,6 +511,8 @@ Latest completed: 2026-07-21
 
 Milestone 035 Retrospective COMPLETED
 
+Milestone 036 AI Task Delivery Workflow COMPLETED
+
 
 Working tree:
 
