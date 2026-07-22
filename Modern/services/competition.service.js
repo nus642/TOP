@@ -21,8 +21,28 @@ async function saveSchedule(data){
 
     }
 
-    // 删除旧球员
+    // 删除旧数据（顺序与 resetCompetition/generateCompetition 一致）
+    await matchRepository.deleteMatchesByTournament(
+        tournamentId,
+        connection
+    );
+
+    await pairingRepository.deletePairingsByTournament(
+        tournamentId,
+        connection
+    );
+
     await playerRepository.deletePlayersByTournament(
+        tournamentId,
+        connection
+    );
+
+    await playerRepository.deletePlayerPartnersByTournament(
+        tournamentId,
+        connection
+    );
+
+    await playerRepository.deletePlayerOpponentsByTournament(
         tournamentId,
         connection
     );
@@ -60,11 +80,6 @@ async function saveSchedule(data){
     // 保存固定组对
     if(data.mode === "fixed-pair" && data.pairs){
 
-        await pairingRepository.deletePairingsByTournament(
-            tournamentId,
-            connection
-        );
-
         for(const pair of data.pairs){
 
             const names = pair.name.split(" & ");
@@ -85,16 +100,11 @@ async function saveSchedule(data){
             }
         }
     } 
-        
 
-    // 删除旧比赛
-    await matchRepository.deleteMatchesByTournament(
-        tournamentId,
-        connection
-        );
+    // 保存比赛
         for(let r = 0; r < data.rounds.length; r++){
 
-    const roundMatches = data.rounds[r];
+        const roundMatches = data.rounds[r];
 
 
     console.log(
