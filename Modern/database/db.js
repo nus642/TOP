@@ -30,23 +30,40 @@ async function initDB() {
 }
 
 async function withTransaction(work) {
-    const connection = await pool.getConnection();
 
-    try {
-        await connection.beginTransaction();
+    const maxAttempts = 3;
 
-        const result = await work(connection);
+    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
 
-        await connection.commit();
+        const connection = await pool.getConnection();
 
-        return result;
+        try {
+            await connection.beginTransaction();
 
-    } catch (err) {
-        await connection.rollback();
-        throw err;
+            const result = await work(connection);
 
-    } finally {
-        connection.release();
+            await connection.commit();
+
+            return result;
+
+        } catch (err) {
+            await connection.rollback();
+
+            if (err.errno === 1213 && attempt < maxAttempts) {
+                console.warn(
+                    `[DB] Deadlock detected, retry ${attempt}/${maxAttempts - 1}`
+                );
+                await new Promise(resolve =>
+                    setTimeout(resolve, 50 * attempt)
+                );
+                continue;
+            }
+
+            throw err;
+
+        } finally {
+            connection.release();
+        }
     }
 }
 
