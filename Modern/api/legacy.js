@@ -1,5 +1,6 @@
 const express = require("express");
 const pool = require("../database/db");
+const competitionService = require("../services/competition.service");
 
 const router = express.Router();
 
@@ -32,54 +33,11 @@ router.get('/schedule', async (req, res) => {
 });
 
 // 生成赛程（接收前端提交的球员列表和配置）
+// 036.2: 委托至 Service Layer，获得事务保护
 router.post('/generate', async (req, res) => {
     try {
-        const { players, mode, target, courtNames, tournamentName } = req.body;
-        const tournamentId = 1;
-        // 清空旧数据（只删除当前赛事的球员和比赛）
-        await pool.query('DELETE FROM matches WHERE tournament_id = ?', [tournamentId]);
-        await pool.query('DELETE FROM pairings WHERE tournament_id = ?', [tournamentId]);
-        await pool.query('DELETE FROM players WHERE tournament_id = ?', [tournamentId]);
-        await pool.query('DELETE FROM player_partners WHERE tournament_id = ?', [tournamentId]);
-        await pool.query('DELETE FROM player_opponents WHERE tournament_id = ?', [tournamentId]);
-        // 更新赛事名称
-        if (tournamentName) {
-            await pool.query('UPDATE tournaments SET name = ? WHERE id = ?', [tournamentName, tournamentId]);
-        }
-
-        // 插入球员
-        const playerMap = {}; // name -> id
-        for (let p of players) {
-            const [result] = await pool.query(
-                'INSERT INTO players (tournament_id, name, level, paired) VALUES (?, ?, ?, ?)',
-                [tournamentId, p.name, p.lv || 3, p.paired || false]
-            );
-            playerMap[p.name] = result.insertId;
-        }
-
-        // 如果是固定组对模式，需要处理 pairings（前端应传入 pairs 数组）
-        if (mode === 'fixed-pair' && req.body.pairs) {
-            for (let pair of req.body.pairs) {
-                const names = pair.name.split(' & ');
-                const p1 = playerMap[names[0]];
-                const p2 = playerMap[names[1]];
-                if (p1 && p2) {
-                    await pool.query('INSERT INTO pairings (tournament_id, player1_id, player2_id) VALUES (?, ?, ?)',
-                        [tournamentId, p1, p2]);
-                }
-            }
-        }
-
-        // 调用排阵算法生成比赛（这里需要将算法逻辑移植到后端）
-        // 为了简化，我们将前端生成逻辑迁移到后端，这里直接调用同一个 generateRR 函数（需将算法代码复制过来）
-        // 但由于算法较长，我们暂时返回空，让前端直接保存（但这样数据不会持久化）
-        // 更好的做法：把排阵算法用 JS 实现并放在后端，或者直接调用前端传递的赛程数据。
-        // 我们采用第二种：前端生成好赛程后，通过 API 保存赛程。
-        // 因此，我们增加一个保存赛程的接口。
-        // 重新设计：前端生成赛程后，调用 POST /api/save 保存。
-
-        // 为了快速实现，我们提供一个保存接口
-        res.json({ success: true, message: '球员已保存，请调用 /api/save 保存赛程' });
+        const result = await competitionService.generateCompetition(req.body);
+        res.json(result);
     } catch (err) {
         console.error(err);
         res.status(500).json({ error: '生成失败' });
