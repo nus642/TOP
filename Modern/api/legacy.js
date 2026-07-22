@@ -84,16 +84,11 @@ router.put('/match/:id', async (req, res) => {
 });
 
 // 重置所有数据
+// 036.2.4: 委托至 Service Layer，获得事务保护
 router.delete('/reset', async (req, res) => {
     try {
-        const tournamentId = 1;
-        await pool.query('DELETE FROM matches WHERE tournament_id = ?', [tournamentId]);
-        await pool.query('DELETE FROM pairings WHERE tournament_id = ?', [tournamentId]);
-        await pool.query('DELETE FROM players WHERE tournament_id = ?', [tournamentId]);
-        await pool.query('DELETE FROM player_partners WHERE tournament_id = ?', [tournamentId]);
-        await pool.query('DELETE FROM player_opponents WHERE tournament_id = ?', [tournamentId]);
-        await pool.query('UPDATE tournaments SET name = ? WHERE id = ?', ['赛事活动', tournamentId]);
-        res.json({ success: true });
+        const result = await competitionService.resetCompetition();
+        res.json(result);
     } catch (err) {
         console.error(err);
         res.status(500).json({ error: '重置失败' });
