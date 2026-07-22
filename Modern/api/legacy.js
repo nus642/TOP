@@ -57,26 +57,16 @@ router.post('/save', async (req, res) => {
 });
 
 // 更新比赛（比分、状态）
+// 036.2.5: 委托至 Service Layer，获得事务保护
 router.put('/match/:id', async (req, res) => {
     try {
-        const matchId = req.params.id;
-        const { score1, score2, status } = req.body;
-        await pool.query(
-            'UPDATE matches SET score1 = ?, score2 = ?, status = ? WHERE id = ?',
-            [score1, score2, status, matchId]
+        const result = await competitionService.updateMatch(
+            req.params.id,
+            req.body.score1,
+            req.body.score2,
+            req.body.status
         );
-        // 更新球员统计数据（净胜、胜场等）这里为了保持数据一致性，我们每次更新比赛后重新计算所有球员的统计
-        // 简单做法：删除原有球员统计，重新计算
-        const tournamentId = 1;
-        // 重置球员统计
-        await pool.query('UPDATE players SET wins = 0, losses = 0, net = 0, curP = 0 WHERE tournament_id = ?', [tournamentId]);
-        // 计算所有比赛（只计算已完成的）
-        const [matches] = await pool.query('SELECT * FROM matches WHERE tournament_id = ? AND status = "finished"', [tournamentId]);
-        for (let m of matches) {
-            // 这里需要根据模式（固定组对或混搭）更新球员数据，但我们只简单更新净胜，不考虑胜负（可由前端计算）
-            // 更完整的做法：后端维护完整统计，但为简化，我们让前端在加载时重新计算，后端只存储原始比分
-        }
-        res.json({ success: true });
+        res.json(result);
     } catch (err) {
         console.error(err);
         res.status(500).json({ error: '更新失败' });
