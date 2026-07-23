@@ -4,6 +4,116 @@ const pairingRepository = require("../repositories/pairing.repository");
 const tournamentRepository = require("../repositories/tournament.repository");
 const db = require("../database/db");
 
+function makeValidationError(message){
+
+    const error = new Error(message);
+    error.code = "VALIDATION_ERROR";
+
+    return error;
+
+}
+
+function makeNotFoundError(message){
+
+    const error = new Error(message);
+    error.code = "NOT_FOUND";
+
+    return error;
+
+}
+
+function parseCompetitionId(id){
+
+    const competitionId = Number(id);
+
+    if (!Number.isInteger(competitionId) || competitionId <= 0) {
+        throw makeValidationError("Valid competition id is required");
+    }
+
+    return competitionId;
+
+}
+
+async function createCompetition(data){
+
+    if (!data || !data.name) {
+        throw makeValidationError("Competition name is required");
+    }
+
+    if (!data.sport) {
+        throw makeValidationError("Competition sport is required");
+    }
+
+    return db.withTransaction(async (connection) => {
+
+        const competition = await tournamentRepository.createTournament({
+            name: data.name,
+            sport: data.sport,
+            status: data.status || "draft"
+        }, connection);
+
+        return {
+            competition
+        };
+
+    });
+
+}
+
+async function updateCompetition(id, data){
+
+    const competitionId = parseCompetitionId(id);
+    const updates = {};
+
+    for (const field of ["name", "sport", "status"]) {
+        if (data && Object.prototype.hasOwnProperty.call(data, field) && data[field] !== undefined && data[field] !== null) {
+            updates[field] = data[field];
+        }
+    }
+
+    return db.withTransaction(async (connection) => {
+
+        const competition = await tournamentRepository.updateTournament(
+            competitionId,
+            updates,
+            connection
+        );
+
+        if (!competition) {
+            throw makeNotFoundError("Competition not found");
+        }
+
+        return {
+            competition
+        };
+
+    });
+
+}
+
+async function deleteCompetition(id){
+
+    const competitionId = parseCompetitionId(id);
+
+    return db.withTransaction(async (connection) => {
+
+        const deleted = await tournamentRepository.deleteTournament(
+            competitionId,
+            connection
+        );
+
+        if (!deleted) {
+            throw makeNotFoundError("Competition not found");
+        }
+
+        return {
+            success: true
+        };
+
+    });
+
+}
+
 async function saveSchedule(data){
 
         const tournamentId = 1;
@@ -394,6 +504,9 @@ async function generateCompetition(data){
 
 module.exports = {
 
+    createCompetition,
+    updateCompetition,
+    deleteCompetition,
     saveSchedule,
     getCompetition,
     getSchedule,
