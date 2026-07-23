@@ -1,10 +1,10 @@
 # TOP Engineering Playbook
 
-Version: 1.3
+Version: 1.4
 
 Status: Active
 
-Last Update: 2026-07-13
+Last Update: 2026-07-23
 
 Author:
 Paul Wu + ChatGPT
@@ -16,6 +16,7 @@ Paul Wu + ChatGPT
 
 | Version | Date | Changes |
 |---------|------|---------|
+| 1.4 | 2026-07-23 | Added Rule-020 through Rule-024 for transaction ownership, repository source priority, explicit action, analysis-first implementation, and AI task protocol |
 | 1.3 | 2026-07-13 | Added rule-15,-18 |
 | 1.2 | 2026-07-08 | Added reference to Documentation Governance framework |
 | 1.1 | 2026-07-08 | Added AI collaboration rules |
@@ -539,6 +540,87 @@ Tasks	Task	Task-012
 Design Decisions	DD	DD-001
 Modules	Module	Module-001
 
+
+## Rule-020 Service Owns Transaction Boundaries
+
+Services own transaction boundaries.
+
+Application services decide when a business operation begins, commits, or rolls back as one unit.
+
+Repositories should not independently open, commit, or roll back transactions for business workflows unless explicitly designed for an isolated infrastructure operation.
+
+This keeps business consistency rules visible at the service layer and prevents hidden repository-side transaction behavior.
+
+## Rule-021 Repository Source Priority
+
+When repository information conflicts, use the repository itself as the highest-priority source of truth.
+
+Priority order:
+
+1. GitHub committed and pushed state (remote repository).
+2. Accepted project documentation in the repository.
+3. Local unpushed commits.
+4. Local working-tree changes.
+5. Current task instructions.
+6. Conversation history or AI memory.
+
+Do not override repository facts with memory, assumptions, or outdated conversation history.
+
+## Rule-022 Explicit Action
+
+Engineering work should end with explicit, traceable action.
+
+For every task completion or handoff, report:
+
+- **Status**: current state of the task (complete, blocked, in-progress).
+- **Action**: what was changed or performed.
+- **Owner**: who performed the action or who owns the next step.
+- **Expected Output**: what result was produced or what remains to be delivered.
+
+Avoid ambiguous completion states such as implying implementation was done when only analysis was completed, or implying approval was granted when only a recommendation was provided.
+
+## Rule-023 Analysis Before Implementation
+
+Analyze before implementing.
+
+The engineering lifecycle for any change follows this sequence:
+
+1. Identify the requested outcome.
+2. Locate the authoritative source files.
+3. Determine the affected scope.
+4. Review existing rules or constraints.
+5. Define validation steps.
+6. Implement the change.
+7. Verify the result.
+
+Implementation should follow the analysis instead of replacing it.
+
+Commit and push operations require that the task explicitly authorizes them. If the task scope does not include commit or push, the engineer must not perform these actions.
+
+## Rule-024 AI Task Protocol
+
+AI-assisted work must follow a task protocol aligned with the Engineering Playbook.
+
+Every AI task assignment must specify:
+
+- **Task ID**: unique identifier for traceability.
+- **Role**: which AI role performs the work.
+- **Objective**: the requested outcome.
+- **Scope**: files and areas affected.
+- **Constraints**: rules, boundaries, or exclusions.
+- **Expected Output**: deliverables and verification criteria.
+
+Minimum protocol:
+
+1. Read the relevant repository files before editing.
+2. Respect scoped files and constraints.
+3. Apply repository source priority as defined by Rule-021.
+4. Perform analysis before implementation as defined by Rule-023.
+5. Report explicit actions and verification results as defined by Rule-022.
+
+Commit and push operations require explicit task authorization. If the task does not authorize commit or push, the AI must not perform these actions.
+
+AI collaboration documents may reference this protocol but should not duplicate the full rule text.
 
 ---
 

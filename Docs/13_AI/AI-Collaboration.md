@@ -1,10 +1,10 @@
 # TOP AI Collaboration Guide
 
-Version: 1.0
+Version: 1.3
 
 Status: Active
 
-Last Update: 2026-07-08
+Last Update: 2026-07-23
 
 Author:
 Paul Wu + ChatGPT
@@ -117,6 +117,40 @@ Coding Assistant 不负责：
 - 数据库设计
 - API设计
 - 产品决策
+
+---
+
+## Codex Cloud Roles
+
+Codex Cloud may act in repository-scoped implementation and verification roles when a task is explicitly assigned.
+
+Typical responsibilities:
+
+- Read the current repository files before editing.
+- Implement scoped documentation or code changes.
+- Run task-appropriate verification.
+- Report changed files, checks, and open risks.
+
+Codex Cloud must follow Engineering Playbook Rule-021 Repository Source Priority, Rule-023 Analysis Before Implementation, and Rule-024 AI Task Protocol.
+
+Codex Cloud does not replace the Chief Architect for long-term architecture authority or the Product Owner for business decisions.
+
+---
+
+## Local Integration Engineer
+
+Current:
+
+Qoder CN
+
+Responsibilities:
+
+- Local environment integration.
+- Local build and runtime verification.
+- Repository-aware implementation support.
+- Detecting conflicts between generated changes and the local working tree.
+
+Qoder CN should use the repository as the source of truth according to Engineering Playbook Rule-021 and should apply Rule-023 before implementation work.
 
 ---
 
@@ -349,6 +383,8 @@ User Manuals
 
 All AI-generated proposals, rules and design decisions must follow Rule-014 Documentation Governance defined in the Engineering Playbook before becoming official project documentation.
 
+AI implementation work should reference the Engineering Playbook instead of duplicating full rule text. In particular, AI work must align with Rule-021 Repository Source Priority, Rule-023 Analysis Before Implementation, and Rule-024 AI Task Protocol.
+
 ---
 
 # Knowledge Preservation
@@ -401,16 +437,9 @@ Tournament Operations Platform (TOP)
 
 # Revision History
 
-1.0
-
-Initial Version
-
-1.1
-
-Add AI Rule-001
-
-1.2
-
-Add AI Rule-002
-
-Add AI Rule-003
+| Version | Date | Changes |
+|---------|------|---------|
+| 1.3 | 2026-07-23 | Added Codex Cloud roles, Qoder CN Local Integration Engineer role, and references to Engineering Playbook Rules 021, 023 and 024 |
+| 1.2 | 2026-07-08 | Add AI Rule-002 and AI Rule-003 |
+| 1.1 | 2026-07-08 | Add AI Rule-001 |
+| 1.0 | 2026-07-08 | Initial Version |
