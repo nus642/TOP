@@ -2,6 +2,7 @@ const express = require("express");
 const router = express.Router();
 
 const competitionService = require("../services/competition.service");
+const checkinService = require("../services/checkin.service");
 
 const DEFAULT_TOURNAMENT_ID = 1;
 
@@ -54,6 +55,48 @@ router.post("/:id/players", async (req, res) => {
         );
 
         res.status(201).json(result);
+    } catch (err) {
+        sendWriteError(res, err);
+    }
+});
+
+
+router.post("/:id/players/:playerId/waiver", async (req, res) => {
+    try {
+        const result = await checkinService.acceptWaiver(
+            req.params.id,
+            req.params.playerId,
+            req.body
+        );
+
+        res.status(201).json(result);
+    } catch (err) {
+        sendWriteError(res, err);
+    }
+});
+
+router.post("/:id/players/:playerId/check-in", async (req, res) => {
+    try {
+        const result = await checkinService.checkInPlayer(
+            req.params.id,
+            req.params.playerId,
+            req.body
+        );
+
+        res.json(result);
+    } catch (err) {
+        sendWriteError(res, err);
+    }
+});
+
+router.get("/:id/players/:playerId/check-in", async (req, res) => {
+    try {
+        const result = await checkinService.getCheckInStatus(
+            req.params.id,
+            req.params.playerId
+        );
+
+        res.json(result);
     } catch (err) {
         sendWriteError(res, err);
     }
