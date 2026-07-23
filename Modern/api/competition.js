@@ -17,6 +17,48 @@ function getTournamentId(req) {
     return Number(req.query.tournamentId) || DEFAULT_TOURNAMENT_ID;
 }
 
+function sendWriteError(res, err) {
+    if (err.code === "VALIDATION_ERROR") {
+        res.status(400).json({
+            error: err.message
+        });
+        return;
+    }
+
+    if (err.code === "NOT_FOUND") {
+        res.status(404).json({
+            error: err.message
+        });
+        return;
+    }
+
+    sendServerError(res, "保存赛事失败", err);
+}
+
+router.post("/", async (req, res) => {
+    try {
+        const result = await competitionService.createCompetition(req.body);
+
+        res.status(201).json(result);
+    } catch (err) {
+        sendWriteError(res, err);
+    }
+});
+
+router.put("/:id", async (req, res) => {
+    try {
+        const result = await competitionService.updateCompetition(
+            req.params.id,
+            req.body
+        );
+
+        res.json(result);
+    } catch (err) {
+        sendWriteError(res, err);
+    }
+});
+
+
 router.get("/", async (req, res) => {
     try {
         const result = await competitionService.getCompetition(
@@ -109,6 +151,16 @@ router.delete("/reset", async (req, res) => {
         res.json(result);
     } catch (err) {
         sendServerError(res, "重置失败", err);
+    }
+});
+
+router.delete("/:id", async (req, res) => {
+    try {
+        await competitionService.deleteCompetition(req.params.id);
+
+        res.status(204).send();
+    } catch (err) {
+        sendWriteError(res, err);
     }
 });
 
