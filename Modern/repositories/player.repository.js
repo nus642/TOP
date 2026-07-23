@@ -162,11 +162,89 @@ async function getPlayerMap(
 
 }
 
+async function getPlayerByIdForTournament(
+    tournamentId,
+    playerId,
+    connection = db
+){
+
+    const [rows] = await connection.query(
+        `
+        SELECT *
+        FROM players
+        WHERE tournament_id = ? AND id = ?
+        `,
+        [
+            tournamentId,
+            playerId
+        ]
+    );
+
+    return rows[0] || null;
+
+}
+
+async function deletePlayerByTournament(
+    tournamentId,
+    playerId,
+    connection = db
+){
+
+    const [result] = await connection.query(
+        `
+        DELETE FROM players
+        WHERE tournament_id = ? AND id = ?
+        `,
+        [
+            tournamentId,
+            playerId
+        ]
+    );
+
+    return result.affectedRows > 0;
+
+}
+
+async function deletePlayerRelations(
+    tournamentId,
+    playerId,
+    connection = db
+){
+
+    await connection.query(
+        `
+        DELETE FROM player_partners
+        WHERE tournament_id = ? AND (player_id = ? OR partner_id = ?)
+        `,
+        [
+            tournamentId,
+            playerId,
+            playerId
+        ]
+    );
+
+    await connection.query(
+        `
+        DELETE FROM player_opponents
+        WHERE tournament_id = ? AND (player_id = ? OR opponent_id = ?)
+        `,
+        [
+            tournamentId,
+            playerId,
+            playerId
+        ]
+    );
+
+}
+
 
 module.exports = {
 
     getPlayersByTournament,
+    getPlayerByIdForTournament,
     createPlayer,
+    deletePlayerByTournament,
+    deletePlayerRelations,
     updatePlayerRuntimeStats,
     resetPlayerRuntimeStatsByTournament,
     deletePlayersByTournament,

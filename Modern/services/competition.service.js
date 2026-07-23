@@ -22,6 +22,35 @@ function makeNotFoundError(message){
 
 }
 
+
+function parsePlayerId(id){
+
+    const playerId = Number(id);
+
+    if (!Number.isInteger(playerId) || playerId <= 0) {
+        throw makeValidationError("Valid player id is required");
+    }
+
+    return playerId;
+
+}
+
+function normalizePlayerRegistration(data){
+
+    if (!data || !data.name || typeof data.name !== "string" || data.name.trim() === "") {
+        throw makeValidationError("Player name is required");
+    }
+
+    return {
+        name: data.name.trim(),
+        level: Number.isInteger(Number(data.level ?? data.lv))
+            ? Number(data.level ?? data.lv)
+            : 3,
+        paired: Boolean(data.paired)
+    };
+
+}
+
 function parseCompetitionId(id){
 
     const competitionId = Number(id);
@@ -105,6 +134,89 @@ async function deleteCompetition(id){
         if (!deleted) {
             throw makeNotFoundError("Competition not found");
         }
+
+        return {
+            success: true
+        };
+
+    });
+
+}
+
+async function registerPlayer(competitionIdValue, data){
+
+    const competitionId = parseCompetitionId(competitionIdValue);
+    const player = normalizePlayerRegistration(data);
+
+    return db.withTransaction(async (connection) => {
+
+        const competition = await tournamentRepository.getTournamentByIdWithConnection(
+            competitionId,
+            connection
+        );
+
+        if (!competition) {
+            throw makeNotFoundError("Competition not found");
+        }
+
+        const createdPlayer = await playerRepository.createPlayer({
+            tournament_id: competitionId,
+            name: player.name,
+            level: player.level,
+            paired: player.paired
+        }, connection);
+
+        return {
+            player: createdPlayer
+        };
+
+    });
+
+}
+
+async function withdrawPlayer(competitionIdValue, playerIdValue){
+
+    const competitionId = parseCompetitionId(competitionIdValue);
+    const playerId = parsePlayerId(playerIdValue);
+
+    return db.withTransaction(async (connection) => {
+
+        const competition = await tournamentRepository.getTournamentByIdWithConnection(
+            competitionId,
+            connection
+        );
+
+        if (!competition) {
+            throw makeNotFoundError("Competition not found");
+        }
+
+        const player = await playerRepository.getPlayerByIdForTournament(
+            competitionId,
+            playerId,
+            connection
+        );
+
+        if (!player) {
+            throw makeNotFoundError("Player not found");
+        }
+
+        await pairingRepository.deletePairingsByPlayer(
+            competitionId,
+            playerId,
+            connection
+        );
+
+        await playerRepository.deletePlayerRelations(
+            competitionId,
+            playerId,
+            connection
+        );
+
+        await playerRepository.deletePlayerByTournament(
+            competitionId,
+            playerId,
+            connection
+        );
 
         return {
             success: true
@@ -506,6 +618,8 @@ module.exports = {
 
     createCompetition,
     updateCompetition,
+    registerPlayer,
+    withdrawPlayer,
     deleteCompetition,
     saveSchedule,
     getCompetition,
