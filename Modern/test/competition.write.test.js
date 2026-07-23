@@ -5,6 +5,7 @@ process.env.MYSQL_HOST = process.env.MYSQL_HOST || "localhost";
 
 const db = require("../database/db");
 const tournamentRepository = require("../repositories/tournament.repository");
+const pairingRepository = require("../repositories/pairing.repository");
 const competitionService = require("../services/competition.service");
 
 const original = {
@@ -153,4 +154,113 @@ test("DELETE service returns not found for an unknown id", async () => {
         () => competitionService.deleteCompetition(999),
         { code: "NOT_FOUND" }
     );
+});
+
+const playerRepository = require("../repositories/player.repository");
+
+test("registerPlayer creates a player for an existing competition", async () => {
+    const saved = {
+        getTournamentByIdWithConnection: tournamentRepository.getTournamentByIdWithConnection,
+        createPlayer: playerRepository.createPlayer
+    };
+
+    tournamentRepository.getTournamentByIdWithConnection = async (id) => ({
+        id,
+        name: "Registration Open"
+    });
+    playerRepository.createPlayer = async (data) => ({
+        id: 44,
+        ...data
+    });
+
+    const result = await competitionService.registerPlayer(41, {
+        name: " Ada ",
+        level: 4,
+        paired: true
+    });
+
+    assert.deepEqual(result, {
+        player: {
+            id: 44,
+            tournament_id: 41,
+            name: "Ada",
+            level: 4,
+            paired: true
+        }
+    });
+
+    tournamentRepository.getTournamentByIdWithConnection = saved.getTournamentByIdWithConnection;
+    playerRepository.createPlayer = saved.createPlayer;
+});
+
+test("registerPlayer rejects an unknown competition", async () => {
+    const saved = tournamentRepository.getTournamentByIdWithConnection;
+    tournamentRepository.getTournamentByIdWithConnection = async () => null;
+
+    await assert.rejects(
+        () => competitionService.registerPlayer(404, { name: "Ada" }),
+        { code: "NOT_FOUND" }
+    );
+
+    tournamentRepository.getTournamentByIdWithConnection = saved;
+});
+
+test("withdrawPlayer removes a player from an existing competition", async () => {
+    const saved = {
+        getTournamentByIdWithConnection: tournamentRepository.getTournamentByIdWithConnection,
+        getPlayerByIdForTournament: playerRepository.getPlayerByIdForTournament,
+        deletePlayerRelations: playerRepository.deletePlayerRelations,
+        deletePlayerByTournament: playerRepository.deletePlayerByTournament
+    };
+    const savedPairing = pairingRepository.deletePairingsByPlayer;
+    const calls = [];
+
+    tournamentRepository.getTournamentByIdWithConnection = async (id) => ({ id });
+    playerRepository.getPlayerByIdForTournament = async (competitionId, playerId) => ({
+        id: playerId,
+        tournament_id: competitionId
+    });
+    pairingRepository.deletePairingsByPlayer = async (competitionId, playerId) => {
+        calls.push(["pairings", competitionId, playerId]);
+    };
+    playerRepository.deletePlayerRelations = async (competitionId, playerId) => {
+        calls.push(["relations", competitionId, playerId]);
+    };
+    playerRepository.deletePlayerByTournament = async (competitionId, playerId) => {
+        calls.push(["player", competitionId, playerId]);
+        return true;
+    };
+
+    const result = await competitionService.withdrawPlayer(51, 52);
+
+    assert.deepEqual(result, { success: true });
+    assert.deepEqual(calls, [
+        ["pairings", 51, 52],
+        ["relations", 51, 52],
+        ["player", 51, 52]
+    ]);
+
+    tournamentRepository.getTournamentByIdWithConnection = saved.getTournamentByIdWithConnection;
+    pairingRepository.deletePairingsByPlayer = savedPairing;
+    playerRepository.getPlayerByIdForTournament = saved.getPlayerByIdForTournament;
+    playerRepository.deletePlayerRelations = saved.deletePlayerRelations;
+    playerRepository.deletePlayerByTournament = saved.deletePlayerByTournament;
+});
+
+test("withdrawPlayer rejects an unknown player", async () => {
+    const saved = {
+        getTournamentByIdWithConnection: tournamentRepository.getTournamentByIdWithConnection,
+        getPlayerByIdForTournament: playerRepository.getPlayerByIdForTournament
+    };
+
+    tournamentRepository.getTournamentByIdWithConnection = async (id) => ({ id });
+    playerRepository.getPlayerByIdForTournament = async () => null;
+
+    await assert.rejects(
+        () => competitionService.withdrawPlayer(61, 62),
+        { code: "NOT_FOUND" }
+    );
+
+    tournamentRepository.getTournamentByIdWithConnection = saved.getTournamentByIdWithConnection;
+    playerRepository.getPlayerByIdForTournament = saved.getPlayerByIdForTournament;
 });

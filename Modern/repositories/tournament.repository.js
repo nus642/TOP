@@ -143,6 +143,7 @@ module.exports = {
     createTournament,
     updateTournament,
     deleteTournament,
+    getTournamentByIdWithConnection,
     updateTournamentName
 
 };

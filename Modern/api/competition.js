@@ -45,6 +45,33 @@ router.post("/", async (req, res) => {
     }
 });
 
+
+router.post("/:id/players", async (req, res) => {
+    try {
+        const result = await competitionService.registerPlayer(
+            req.params.id,
+            req.body
+        );
+
+        res.status(201).json(result);
+    } catch (err) {
+        sendWriteError(res, err);
+    }
+});
+
+router.delete("/:id/players/:playerId", async (req, res) => {
+    try {
+        await competitionService.withdrawPlayer(
+            req.params.id,
+            req.params.playerId
+        );
+
+        res.status(204).send();
+    } catch (err) {
+        sendWriteError(res, err);
+    }
+});
+
 router.put("/:id", async (req, res) => {
     try {
         const result = await competitionService.updateCompetition(

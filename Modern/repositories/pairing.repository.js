@@ -15,6 +15,28 @@ async function deletePairingsByTournament(
     return result;
 }
 
+async function deletePairingsByPlayer(
+    tournamentId,
+    playerId,
+    connection = db
+){
+
+    const [result] = await connection.query(
+        `
+        DELETE FROM pairings
+        WHERE tournament_id = ? AND (player1_id = ? OR player2_id = ?)
+        `,
+        [
+            tournamentId,
+            playerId,
+            playerId
+        ]
+    );
+
+    return result;
+
+}
+
 async function createPairing(
     pairing,
     connection = db
@@ -62,6 +84,7 @@ async function getPairingsByTournament(tournamentId){
 
 module.exports = {
         deletePairingsByTournament,
+        deletePairingsByPlayer,
         createPairing,
         getPairingsByTournament
 };
