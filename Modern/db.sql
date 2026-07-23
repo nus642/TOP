@@ -57,3 +57,27 @@ CREATE TABLE IF NOT EXISTS player_opponents (
     tournament_id INT NOT NULL,
     PRIMARY KEY (player_id, opponent_id, tournament_id)
 ) DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE IF NOT EXISTS player_check_ins (
+    id INT PRIMARY KEY AUTO_INCREMENT,
+    tournament_id INT NOT NULL,
+    player_id INT NOT NULL,
+    checked_in BOOLEAN NOT NULL DEFAULT FALSE,
+    checked_in_at TIMESTAMP NULL DEFAULT NULL,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    UNIQUE KEY uq_player_check_in (tournament_id, player_id),
+    FOREIGN KEY (tournament_id) REFERENCES tournaments(id) ON DELETE CASCADE,
+    FOREIGN KEY (player_id) REFERENCES players(id) ON DELETE CASCADE
+) DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE IF NOT EXISTS waivers (
+    id INT PRIMARY KEY AUTO_INCREMENT,
+    tournament_id INT NOT NULL,
+    player_id INT NOT NULL,
+    waiver_version VARCHAR(50) NOT NULL,
+    accepted_by VARCHAR(100) NOT NULL,
+    accepted_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (tournament_id) REFERENCES tournaments(id) ON DELETE CASCADE,
+    FOREIGN KEY (player_id) REFERENCES players(id) ON DELETE CASCADE,
+    INDEX idx_waivers_player (tournament_id, player_id, accepted_at)
+) DEFAULT CHARSET=utf8mb4;
