@@ -188,27 +188,19 @@ return {
 });
 }
 
-async function getSchedule(tournamentId){
+async function getCompetition(tournamentId){
 
-    const tournament =
-        await tournamentRepository.getTournamentById(
-            tournamentId
-        );
-
-    const players =
-        await playerRepository.getPlayersByTournament(
-            tournamentId
-        );
-
-    const matches =
-        await matchRepository.getMatchesByTournament(
-            tournamentId
-        );
-
-    const pairings =
-        await pairingRepository.getPairingsByTournament(
-            tournamentId
-        );
+    const [
+        tournament,
+        players,
+        matches,
+        pairings
+    ] = await Promise.all([
+        tournamentRepository.getTournamentById(tournamentId),
+        playerRepository.getPlayersByTournament(tournamentId),
+        matchRepository.getMatchesByTournament(tournamentId),
+        pairingRepository.getPairingsByTournament(tournamentId)
+    ]);
 
     return {
         tournament,
@@ -218,7 +210,37 @@ async function getSchedule(tournamentId){
         mode: pairings.length > 0 ? "fixed-pair" : "round-robin"
     };
 
-}    
+}
+
+async function getSchedule(tournamentId){
+
+    return getCompetition(tournamentId);
+
+}
+
+async function getPlayers(tournamentId){
+
+    return {
+        players: await playerRepository.getPlayersByTournament(tournamentId)
+    };
+
+}
+
+async function getMatches(tournamentId){
+
+    return {
+        matches: await matchRepository.getMatchesByTournament(tournamentId)
+    };
+
+}
+
+async function getPairings(tournamentId){
+
+    return {
+        pairings: await pairingRepository.getPairingsByTournament(tournamentId)
+    };
+
+}
 
 async function resetCompetition(){
 
@@ -373,7 +395,11 @@ async function generateCompetition(data){
 module.exports = {
 
     saveSchedule,
+    getCompetition,
     getSchedule,
+    getPlayers,
+    getMatches,
+    getPairings,
     updateMatch,
     resetCompetition,
     generateCompetition
