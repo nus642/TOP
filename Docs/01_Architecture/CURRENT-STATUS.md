@@ -1,6 +1,6 @@
 # TOP Modern — Current Status
 
-Last Updated: 2026-07-17
+Last Updated: 2026-07-23
 
 ## Project
 
@@ -513,6 +513,8 @@ Milestone 035 Retrospective COMPLETED
 
 Milestone 036 AI Task Delivery Workflow COMPLETED
 
+Sprint-005 Waiver & Check-in Foundation COMPLETED ✅
+
 
 Working tree:
 
@@ -534,3 +536,33 @@ Future priorities:
 3. Competition lifecycle
 4. Event foundation
 5. Referee / analytics / AI capability
+
+---
+
+# Sprint-005 — Waiver & Check-in Foundation
+
+Status:
+
+COMPLETE ✅
+
+Branch:
+
+codex/implement-sprint-005-waiver-check-in
+
+Commit:
+
+91f34bf — Implement waiver and check-in foundation
+
+Completed:
+
+- Waiver acceptance API and service
+- Player check-in API and service
+- Check-in status query API
+- player_check_ins table (unique constraint per tournament/player)
+- waivers table (versioned, indexed)
+- 7 unit tests for check-in service
+- All 22 tests passing
+
+Migration Inventory:
+
+Player / Legal Check-in — Completed (Sprint 005)
