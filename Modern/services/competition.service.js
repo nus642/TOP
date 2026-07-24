@@ -138,6 +138,22 @@ function parseCompetitionId(id){
 
 }
 
+
+async function requireCompetition(competitionId, connection){
+
+    const competition = await tournamentRepository.getTournamentByIdWithConnection(
+        competitionId,
+        connection
+    );
+
+    if (!competition) {
+        throw makeNotFoundError("Competition not found");
+    }
+
+    return competition;
+
+}
+
 async function createCompetition(data){
 
     if (!data || !data.name) {
@@ -347,6 +363,8 @@ async function saveSchedule(competitionIdValue, data){
         const tournamentId = parseCompetitionId(competitionIdValue);
 
        return db.withTransaction(async (connection)=>{
+
+    await requireCompetition(tournamentId, connection);
 
     // 更新赛事名称
     if(data.tournamentName){
@@ -591,6 +609,8 @@ async function resetCompetition(competitionIdValue){
 
     return db.withTransaction(async (connection) => {
 
+    await requireCompetition(tournamentId, connection);
+
     await matchRepository.deleteMatchesByTournament(
         tournamentId,
         connection
@@ -634,6 +654,7 @@ async function generateCompetition(competitionIdValue, data){
 
      return db.withTransaction (async (connection) => {
 
+    await requireCompetition(tournamentId, connection);
 
     await matchRepository.deleteMatchesByTournament(
         tournamentId,
