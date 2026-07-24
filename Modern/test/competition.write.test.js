@@ -286,7 +286,7 @@ test("withdrawPlayer rejects an unknown player", async () => {
     playerRepository.getPlayerByIdForTournament = saved.getPlayerByIdForTournament;
 });
 
-test("saveSchedule runs all lifecycle writes inside one transaction", async () => {
+test("saveSchedule propagates the existing lifecycle transaction connection", async () => {
     const connection = { marker: "transaction" };
     const calls = [];
 
@@ -363,7 +363,7 @@ test("saveSchedule runs all lifecycle writes inside one transaction", async () =
     assert.ok(calls.every((call) => call.at(-1) === connection));
 });
 
-test("resetCompetition runs cleanup inside one transaction", async () => {
+test("resetCompetition propagates the existing lifecycle transaction connection", async () => {
     const connection = { marker: "transaction" };
     const calls = [];
 
@@ -404,7 +404,7 @@ test("resetCompetition runs cleanup inside one transaction", async () => {
     assert.ok(calls.every((call) => call.at(-1) === connection));
 });
 
-test("generateCompetition runs replacement writes inside one transaction", async () => {
+test("generateCompetition propagates the existing lifecycle transaction connection", async () => {
     const connection = { marker: "transaction" };
     const calls = [];
 
