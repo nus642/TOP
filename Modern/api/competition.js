@@ -3,6 +3,7 @@ const router = express.Router();
 
 const competitionService = require("../services/competition.service");
 const checkinService = require("../services/checkin.service");
+const teamService = require("../services/team.service");
 
 const DEFAULT_TOURNAMENT_ID = 1;
 
@@ -106,6 +107,92 @@ router.delete("/:id/players/:playerId", async (req, res) => {
     try {
         await competitionService.withdrawPlayer(
             req.params.id,
+            req.params.playerId
+        );
+
+        res.status(204).send();
+    } catch (err) {
+        sendWriteError(res, err);
+    }
+});
+
+
+router.get("/:id/teams", async (req, res) => {
+    try {
+        const result = await teamService.getTeams(req.params.id);
+
+        res.json(result);
+    } catch (err) {
+        sendWriteError(res, err);
+    }
+});
+
+router.post("/:id/teams", async (req, res) => {
+    try {
+        const result = await teamService.createTeam(req.params.id, req.body);
+
+        res.status(201).json(result);
+    } catch (err) {
+        sendWriteError(res, err);
+    }
+});
+
+router.put("/:id/teams/:teamId", async (req, res) => {
+    try {
+        const result = await teamService.updateTeam(
+            req.params.id,
+            req.params.teamId,
+            req.body
+        );
+
+        res.json(result);
+    } catch (err) {
+        sendWriteError(res, err);
+    }
+});
+
+router.delete("/:id/teams/:teamId", async (req, res) => {
+    try {
+        await teamService.deleteTeam(req.params.id, req.params.teamId);
+
+        res.status(204).send();
+    } catch (err) {
+        sendWriteError(res, err);
+    }
+});
+
+router.get("/:id/teams/:teamId/members", async (req, res) => {
+    try {
+        const result = await teamService.getTeamMembers(
+            req.params.id,
+            req.params.teamId
+        );
+
+        res.json(result);
+    } catch (err) {
+        sendWriteError(res, err);
+    }
+});
+
+router.post("/:id/teams/:teamId/members", async (req, res) => {
+    try {
+        const result = await teamService.addTeamMember(
+            req.params.id,
+            req.params.teamId,
+            req.body
+        );
+
+        res.status(201).json(result);
+    } catch (err) {
+        sendWriteError(res, err);
+    }
+});
+
+router.delete("/:id/teams/:teamId/members/:playerId", async (req, res) => {
+    try {
+        await teamService.removeTeamMember(
+            req.params.id,
+            req.params.teamId,
             req.params.playerId
         );
 
