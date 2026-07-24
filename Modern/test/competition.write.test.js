@@ -55,6 +55,61 @@ test.afterEach(() => {
 });
 
 
+function stubScheduleLifecycleWrites(calls) {
+    tournamentRepository.updateTournamentName = async (id, name, activeConnection) => {
+        calls.push(["updateTournamentName", id, name, activeConnection]);
+    };
+    matchRepository.deleteMatchesByTournament = async (id, activeConnection) => {
+        calls.push(["deleteMatches", id, activeConnection]);
+    };
+    pairingRepository.deletePairingsByTournament = async (id, activeConnection) => {
+        calls.push(["deletePairings", id, activeConnection]);
+    };
+    playerRepository.deletePlayersByTournament = async (id, activeConnection) => {
+        calls.push(["deletePlayers", id, activeConnection]);
+    };
+    playerRepository.deletePlayerPartnersByTournament = async (id, activeConnection) => {
+        calls.push(["deletePartners", id, activeConnection]);
+    };
+    playerRepository.deletePlayerOpponentsByTournament = async (id, activeConnection) => {
+        calls.push(["deleteOpponents", id, activeConnection]);
+    };
+    playerRepository.createPlayer = async (player, activeConnection) => {
+        calls.push(["createPlayer", player.tournament_id, player.name, activeConnection]);
+        return { id: player.name === "Ada" ? 7 : 8, ...player };
+    };
+    playerRepository.getPlayerMap = async (id, activeConnection) => {
+        calls.push(["getPlayerMap", id, activeConnection]);
+        return { Ada: 7, Lin: 8 };
+    };
+    pairingRepository.createPairing = async (pairing, activeConnection) => {
+        calls.push(["createPairing", pairing.tournament_id, pairing.player1_id, pairing.player2_id, activeConnection]);
+    };
+    matchRepository.createMatch = async (match, activeConnection) => {
+        calls.push(["createMatch", match.tournament_id, match.player1_id, match.player2_id, activeConnection]);
+    };
+}
+
+const lifecyclePayload = {
+    tournamentName: "Summer Open",
+    mode: "fixed-pair",
+    players: [
+        { name: "Ada", lv: 4, paired: true },
+        { name: "Lin", lv: 3, paired: true }
+    ],
+    pairs: [{ name: "Ada & Lin" }],
+    rounds: [[{
+        court: "Court 1",
+        p1: "Ada",
+        p2: "Lin",
+        p3: "Ada",
+        p4: "Lin",
+        team1: "Ada & Lin",
+        team2: "Ada & Lin"
+    }]]
+};
+
+
 test("updateMatch scopes score updates to the supplied competition", async () => {
     const connection = { marker: "transaction" };
     const calls = [];
@@ -459,11 +514,66 @@ test("withdrawPlayer rejects an unknown player", async () => {
     playerRepository.getPlayerByIdForTournament = saved.getPlayerByIdForTournament;
 });
 
+
+for (const [methodName, invoke] of [
+    ["saveSchedule", (id) => competitionService.saveSchedule(id, lifecyclePayload)],
+    ["resetCompetition", (id) => competitionService.resetCompetition(id)],
+    ["generateCompetition", (id) => competitionService.generateCompetition(id, lifecyclePayload)]
+]) {
+    test(`${methodName} rejects invalid competition ids before lifecycle writes`, async () => {
+        const calls = [];
+        let transactionStarted = false;
+
+        db.withTransaction = async (work) => {
+            transactionStarted = true;
+            return work({});
+        };
+        stubScheduleLifecycleWrites(calls);
+
+        await assert.rejects(
+            () => invoke(undefined),
+            { code: "VALIDATION_ERROR" }
+        );
+        await assert.rejects(
+            () => invoke("abc"),
+            { code: "VALIDATION_ERROR" }
+        );
+
+        assert.equal(transactionStarted, false);
+        assert.deepEqual(calls, []);
+    });
+
+    test(`${methodName} rejects unknown competitions before lifecycle writes`, async () => {
+        const connection = { marker: "transaction" };
+        const calls = [];
+
+        db.withTransaction = async (work) => work(connection);
+        tournamentRepository.getTournamentByIdWithConnection = async (id, activeConnection) => {
+            assert.equal(id, 999);
+            assert.equal(activeConnection, connection);
+            return null;
+        };
+        stubScheduleLifecycleWrites(calls);
+
+        await assert.rejects(
+            () => invoke(999),
+            { code: "NOT_FOUND" }
+        );
+
+        assert.deepEqual(calls, []);
+    });
+}
+
 test("saveSchedule propagates the existing lifecycle transaction connection", async () => {
     const connection = { marker: "transaction" };
     const calls = [];
 
     db.withTransaction = async (work) => work(connection);
+    tournamentRepository.getTournamentByIdWithConnection = async (id, activeConnection) => {
+        assert.equal(id, 7);
+        assert.equal(activeConnection, connection);
+        return { id };
+    };
     tournamentRepository.updateTournamentName = async (id, name, activeConnection) => {
         calls.push(["updateTournamentName", id, name, activeConnection]);
     };
@@ -550,6 +660,11 @@ test("resetCompetition propagates the existing lifecycle transaction connection"
     const calls = [];
 
     db.withTransaction = async (work) => work(connection);
+    tournamentRepository.getTournamentByIdWithConnection = async (id, activeConnection) => {
+        assert.equal(id, 7);
+        assert.equal(activeConnection, connection);
+        return { id };
+    };
     matchRepository.deleteMatchesByTournament = async (id, activeConnection) => {
         calls.push(["deleteMatches", id, activeConnection]);
     };
@@ -594,6 +709,11 @@ test("generateCompetition propagates the existing lifecycle transaction connecti
     const calls = [];
 
     db.withTransaction = async (work) => work(connection);
+    tournamentRepository.getTournamentByIdWithConnection = async (id, activeConnection) => {
+        assert.equal(id, 7);
+        assert.equal(activeConnection, connection);
+        return { id };
+    };
     matchRepository.deleteMatchesByTournament = async (id, activeConnection) => {
         calls.push(["deleteMatches", id, activeConnection]);
     };
