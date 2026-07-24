@@ -2,23 +2,6 @@
 
 ## READY
 
-### TASK-DOC-003
-Title:
-Player Guide
-
-Type:
-DOC
-
-Priority:
-Medium
-
-Dependency:
-None
-
-Output:
-PR
-
-
 ## BLOCKED
 
 ### TASK-TOP-007C-2
@@ -58,3 +41,6 @@ Referee Manual
 
 TASK-DOC-002
 Organizer Manual
+
+TASK-DOC-003
+Player Guide
