@@ -1,10 +1,10 @@
 # TOP Engineering Playbook
 
-Version: 1.4
+Version: 1.5
 
 Status: Active
 
-Last Update: 2026-07-23
+Last Update: 2026-07-24
 
 Author:
 Paul Wu + ChatGPT
@@ -16,6 +16,7 @@ Paul Wu + ChatGPT
 
 | Version | Date | Changes |
 |---------|------|---------|
+| 1.5 | 2026-07-24 | Harmonized Rule-021 source priority with TES governance and GitHub canonical source-of-truth wording |
 | 1.4 | 2026-07-23 | Added Rule-020 through Rule-024 for transaction ownership, repository source priority, explicit action, analysis-first implementation, and AI task protocol |
 | 1.3 | 2026-07-13 | Added rule-15,-18 |
 | 1.2 | 2026-07-08 | Added reference to Documentation Governance framework |

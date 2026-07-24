@@ -118,7 +118,8 @@ Priority order:
 1. GitHub repository committed and pushed state.
 2. Local repository commits.
 3. Local working-directory changes.
-4. Conversation history or AI memory.
+4. Current task instructions.
+5. Conversation history or AI memory.
 
 Codex sandbox commits and patch artifacts are temporary execution artifacts only. They are not project history unless the developer reviews, commits, and pushes the changes to GitHub.
 

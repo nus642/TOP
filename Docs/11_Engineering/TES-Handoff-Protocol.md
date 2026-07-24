@@ -358,4 +358,4 @@ The communication protocol should remain stable even if AI tools change.
 
 Conversation is temporary.
 
-Artifacts are permanent.
+Artifacts are durable only when committed, pushed, or attached to the GitHub Pull Request; GitHub committed and pushed state remains canonical.
