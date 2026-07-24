@@ -342,9 +342,9 @@ async function withdrawPlayer(competitionIdValue, playerIdValue){
 
 }
 
-async function saveSchedule(data){
+async function saveSchedule(competitionIdValue, data){
 
-        const tournamentId = 1;
+        const tournamentId = parseCompetitionId(competitionIdValue);
 
        return db.withTransaction(async (connection)=>{
 
@@ -580,9 +580,9 @@ async function getPairings(tournamentId){
 
 }
 
-async function resetCompetition(){
+async function resetCompetition(competitionIdValue){
 
-    const tournamentId = 1;
+    const tournamentId = parseCompetitionId(competitionIdValue);
 
     return db.withTransaction(async (connection) => {
 
@@ -623,9 +623,9 @@ async function resetCompetition(){
         });
 }
 
-async function generateCompetition(data){
+async function generateCompetition(competitionIdValue, data){
 
-    const tournamentId = 1;
+    const tournamentId = parseCompetitionId(competitionIdValue);
 
      return db.withTransaction (async (connection) => {
 

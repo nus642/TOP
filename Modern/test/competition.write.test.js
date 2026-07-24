@@ -440,7 +440,7 @@ test("saveSchedule propagates the existing lifecycle transaction connection", as
         calls.push(["deleteOpponents", id, activeConnection]);
     };
     playerRepository.createPlayer = async (player, activeConnection) => {
-        calls.push(["createPlayer", player.name, activeConnection]);
+        calls.push(["createPlayer", player.tournament_id, player.name, activeConnection]);
         return { id: player.name === "Ada" ? 7 : 8, ...player };
     };
     playerRepository.getPlayerMap = async (id, activeConnection) => {
@@ -448,13 +448,15 @@ test("saveSchedule propagates the existing lifecycle transaction connection", as
         return { Ada: 7, Lin: 8 };
     };
     pairingRepository.createPairing = async (pairing, activeConnection) => {
-        calls.push(["createPairing", pairing.player1_id, pairing.player2_id, activeConnection]);
+        calls.push(["createPairing", pairing.tournament_id, pairing.player1_id, pairing.player2_id, activeConnection]);
     };
     matchRepository.createMatch = async (match, activeConnection) => {
-        calls.push(["createMatch", match.player1_id, match.player2_id, activeConnection]);
+        calls.push(["createMatch", match.tournament_id, match.player1_id, match.player2_id, activeConnection]);
     };
 
-    const result = await competitionService.saveSchedule({
+    const competitionId = 7;
+
+    const result = await competitionService.saveSchedule(competitionId, {
         tournamentName: "Summer Open",
         mode: "fixed-pair",
         players: [
@@ -491,6 +493,13 @@ test("saveSchedule propagates the existing lifecycle transaction connection", as
         ]
     );
     assert.ok(calls.every((call) => call.at(-1) === connection));
+    assert.ok(calls.every((call) => {
+        if (["updateTournamentName", "deleteMatches", "deletePairings", "deletePlayers", "deletePartners", "deleteOpponents", "getPlayerMap"].includes(call[0])) {
+            return call[1] === competitionId;
+        }
+
+        return call[1] === competitionId;
+    }));
 });
 
 test("resetCompetition propagates the existing lifecycle transaction connection", async () => {
@@ -517,7 +526,9 @@ test("resetCompetition propagates the existing lifecycle transaction connection"
         calls.push(["updateTournamentName", id, name, activeConnection]);
     };
 
-    const result = await competitionService.resetCompetition();
+    const competitionId = 7;
+
+    const result = await competitionService.resetCompetition(competitionId);
 
     assert.deepEqual(result, { success: true });
     assert.deepEqual(
@@ -532,6 +543,7 @@ test("resetCompetition propagates the existing lifecycle transaction connection"
         ]
     );
     assert.ok(calls.every((call) => call.at(-1) === connection));
+    assert.ok(calls.every((call) => call[1] === competitionId));
 });
 
 test("generateCompetition propagates the existing lifecycle transaction connection", async () => {
@@ -559,14 +571,16 @@ test("generateCompetition propagates the existing lifecycle transaction connecti
     };
     playerRepository.createPlayer = async (player, activeConnection) => {
         const id = player.name === "Ada" ? 7 : 8;
-        calls.push(["createPlayer", player.name, activeConnection]);
+        calls.push(["createPlayer", player.tournament_id, player.name, activeConnection]);
         return { id, ...player };
     };
     pairingRepository.createPairing = async (pairing, activeConnection) => {
-        calls.push(["createPairing", pairing.player1_id, pairing.player2_id, activeConnection]);
+        calls.push(["createPairing", pairing.tournament_id, pairing.player1_id, pairing.player2_id, activeConnection]);
     };
 
-    const result = await competitionService.generateCompetition({
+    const competitionId = 7;
+
+    const result = await competitionService.generateCompetition(competitionId, {
         tournamentName: "Summer Open",
         mode: "fixed-pair",
         players: [
@@ -592,4 +606,5 @@ test("generateCompetition propagates the existing lifecycle transaction connecti
         ]
     );
     assert.ok(calls.every((call) => call.at(-1) === connection));
+    assert.ok(calls.every((call) => call[1] === competitionId));
 });
