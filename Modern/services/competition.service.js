@@ -4,6 +4,81 @@ const pairingRepository = require("../repositories/pairing.repository");
 const tournamentRepository = require("../repositories/tournament.repository");
 const db = require("../database/db");
 
+const COMPETITION_STATUSES = Object.freeze({
+    DRAFT: "draft",
+    REGISTRATION_OPEN: "registration_open",
+    REGISTRATION_CLOSED: "registration_closed",
+    CHECK_IN_OPEN: "check_in_open",
+    READY: "ready",
+    IN_PROGRESS: "in_progress",
+    COMPLETED: "completed",
+    CANCELLED: "cancelled"
+});
+
+const ALLOWED_TRANSITIONS = Object.freeze({
+    [COMPETITION_STATUSES.DRAFT]: [
+        COMPETITION_STATUSES.REGISTRATION_OPEN,
+        COMPETITION_STATUSES.CANCELLED
+    ],
+    [COMPETITION_STATUSES.REGISTRATION_OPEN]: [
+        COMPETITION_STATUSES.REGISTRATION_CLOSED,
+        COMPETITION_STATUSES.CANCELLED
+    ],
+    [COMPETITION_STATUSES.REGISTRATION_CLOSED]: [
+        COMPETITION_STATUSES.CHECK_IN_OPEN,
+        COMPETITION_STATUSES.READY,
+        COMPETITION_STATUSES.CANCELLED
+    ],
+    [COMPETITION_STATUSES.CHECK_IN_OPEN]: [
+        COMPETITION_STATUSES.READY,
+        COMPETITION_STATUSES.CANCELLED
+    ],
+    [COMPETITION_STATUSES.READY]: [
+        COMPETITION_STATUSES.IN_PROGRESS,
+        COMPETITION_STATUSES.CANCELLED
+    ],
+    [COMPETITION_STATUSES.IN_PROGRESS]: [
+        COMPETITION_STATUSES.COMPLETED,
+        COMPETITION_STATUSES.CANCELLED
+    ],
+    [COMPETITION_STATUSES.COMPLETED]: [],
+    [COMPETITION_STATUSES.CANCELLED]: []
+});
+
+function isKnownCompetitionStatus(status) {
+    return Object.prototype.hasOwnProperty.call(ALLOWED_TRANSITIONS, status);
+}
+
+function normalizeCompetitionStatus(status) {
+    if (typeof status !== "string" || status.trim() === "") {
+        throw makeValidationError("Competition status is required");
+    }
+
+    const normalizedStatus = status.trim();
+
+    if (!isKnownCompetitionStatus(normalizedStatus)) {
+        throw makeValidationError(`Unknown competition status: ${normalizedStatus}`);
+    }
+
+    return normalizedStatus;
+}
+
+function validateCompetitionTransition(currentStatus, nextStatus) {
+    const normalizedCurrentStatus = normalizeCompetitionStatus(
+        currentStatus || COMPETITION_STATUSES.DRAFT
+    );
+    const normalizedNextStatus = normalizeCompetitionStatus(nextStatus);
+    const allowedStatuses = ALLOWED_TRANSITIONS[normalizedCurrentStatus];
+
+    if (!allowedStatuses.includes(normalizedNextStatus)) {
+        throw makeValidationError(
+            `Cannot transition competition from ${normalizedCurrentStatus} to ${normalizedNextStatus}`
+        );
+    }
+
+    return normalizedNextStatus;
+}
+
 function makeValidationError(message){
 
     const error = new Error(message);
@@ -78,8 +153,47 @@ async function createCompetition(data){
         const competition = await tournamentRepository.createTournament({
             name: data.name,
             sport: data.sport,
-            status: data.status || "draft"
+            status: data.status
+                ? normalizeCompetitionStatus(data.status)
+                : COMPETITION_STATUSES.DRAFT
         }, connection);
+
+        return {
+            competition
+        };
+
+    });
+
+}
+
+async function transitionCompetition(id, nextStatusValue){
+
+    const competitionId = parseCompetitionId(id);
+    const nextStatus = normalizeCompetitionStatus(nextStatusValue);
+
+    return db.withTransaction(async (connection) => {
+
+        const existingCompetition = await tournamentRepository.getTournamentByIdWithConnection(
+            competitionId,
+            connection
+        );
+
+        if (!existingCompetition) {
+            throw makeNotFoundError("Competition not found");
+        }
+
+        validateCompetitionTransition(
+            existingCompetition.status,
+            nextStatus
+        );
+
+        const competition = await tournamentRepository.updateTournament(
+            competitionId,
+            {
+                status: nextStatus
+            },
+            connection
+        );
 
         return {
             competition
@@ -96,7 +210,9 @@ async function updateCompetition(id, data){
 
     for (const field of ["name", "sport", "status"]) {
         if (data && Object.prototype.hasOwnProperty.call(data, field) && data[field] !== undefined && data[field] !== null) {
-            updates[field] = data[field];
+            updates[field] = field === "status"
+                ? normalizeCompetitionStatus(data[field])
+                : data[field];
         }
     }
 
@@ -618,6 +734,7 @@ module.exports = {
 
     createCompetition,
     updateCompetition,
+    transitionCompetition,
     registerPlayer,
     withdrawPlayer,
     deleteCompetition,
@@ -629,6 +746,7 @@ module.exports = {
     getPairings,
     updateMatch,
     resetCompetition,
-    generateCompetition
+    generateCompetition,
+    COMPETITION_STATUSES,
+    ALLOWED_TRANSITIONS
 };
-

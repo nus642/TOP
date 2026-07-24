@@ -15,6 +15,7 @@ const original = {
     createTournament: tournamentRepository.createTournament,
     updateTournament: tournamentRepository.updateTournament,
     deleteTournament: tournamentRepository.deleteTournament,
+    getTournamentByIdWithConnection: tournamentRepository.getTournamentByIdWithConnection,
     updateTournamentName: tournamentRepository.updateTournamentName,
     deletePairingsByTournament: pairingRepository.deletePairingsByTournament,
     createPairing: pairingRepository.createPairing,
@@ -36,6 +37,7 @@ test.afterEach(() => {
     tournamentRepository.createTournament = original.createTournament;
     tournamentRepository.updateTournament = original.updateTournament;
     tournamentRepository.deleteTournament = original.deleteTournament;
+    tournamentRepository.getTournamentByIdWithConnection = original.getTournamentByIdWithConnection;
     tournamentRepository.updateTournamentName = original.updateTournamentName;
     pairingRepository.deletePairingsByTournament = original.deletePairingsByTournament;
     pairingRepository.createPairing = original.createPairing;
@@ -57,7 +59,7 @@ test("POST service creates a competition", async () => {
     const result = await competitionService.createCompetition({
         name: "Guangzhou Open",
         sport: "pickleball",
-        status: "published"
+        status: "registration_open"
     });
 
     assert.deepEqual(result, {
@@ -65,7 +67,7 @@ test("POST service creates a competition", async () => {
             id: 12,
             name: "Guangzhou Open",
             sport: "pickleball",
-            status: "published"
+            status: "registration_open"
         }
     });
 });
@@ -109,7 +111,7 @@ test("PUT service updates allowed fields", async () => {
     const result = await competitionService.updateCompetition(21, {
         name: "Updated Open",
         sport: "pickleball",
-        status: "active",
+        status: "ready",
         ignored: "value"
     });
 
@@ -118,14 +120,14 @@ test("PUT service updates allowed fields", async () => {
             id: 21,
             name: "Updated Open",
             sport: "pickleball",
-            status: "active"
+            status: "ready"
         }
     });
 });
 
 test("PUT service preserves unspecified fields", async () => {
     tournamentRepository.updateTournament = async (id, data) => {
-        assert.deepEqual(data, { status: "active" });
+        assert.deepEqual(data, { status: "ready" });
 
         return {
             id,
@@ -136,7 +138,7 @@ test("PUT service preserves unspecified fields", async () => {
     };
 
     const result = await competitionService.updateCompetition(22, {
-        status: "active",
+        status: "ready",
         name: undefined,
         sport: null
     });
@@ -145,8 +147,136 @@ test("PUT service preserves unspecified fields", async () => {
         id: 22,
         name: "Existing Open",
         sport: "pickleball",
-        status: "active"
+        status: "ready"
     });
+});
+
+test("transitionCompetition advances from draft to registration_open", async () => {
+    tournamentRepository.getTournamentByIdWithConnection = async (id) => ({
+        id,
+        name: "Lifecycle Open",
+        status: "draft"
+    });
+    tournamentRepository.updateTournament = async (id, data) => ({
+        id,
+        name: "Lifecycle Open",
+        status: data.status
+    });
+
+    const result = await competitionService.transitionCompetition(
+        71,
+        "registration_open"
+    );
+
+    assert.deepEqual(result, {
+        competition: {
+            id: 71,
+            name: "Lifecycle Open",
+            status: "registration_open"
+        }
+    });
+});
+
+test("transitionCompetition advances from registration_closed to check_in_open", async () => {
+    tournamentRepository.getTournamentByIdWithConnection = async (id) => ({
+        id,
+        status: "registration_closed"
+    });
+    tournamentRepository.updateTournament = async (id, data) => ({
+        id,
+        status: data.status
+    });
+
+    const result = await competitionService.transitionCompetition(
+        72,
+        "check_in_open"
+    );
+
+    assert.equal(result.competition.status, "check_in_open");
+});
+
+test("transitionCompetition advances from ready to in_progress", async () => {
+    tournamentRepository.getTournamentByIdWithConnection = async (id) => ({
+        id,
+        status: "ready"
+    });
+    tournamentRepository.updateTournament = async (id, data) => ({
+        id,
+        status: data.status
+    });
+
+    const result = await competitionService.transitionCompetition(
+        73,
+        "in_progress"
+    );
+
+    assert.equal(result.competition.status, "in_progress");
+});
+
+test("transitionCompetition advances from in_progress to completed", async () => {
+    tournamentRepository.getTournamentByIdWithConnection = async (id) => ({
+        id,
+        status: "in_progress"
+    });
+    tournamentRepository.updateTournament = async (id, data) => ({
+        id,
+        status: data.status
+    });
+
+    const result = await competitionService.transitionCompetition(
+        74,
+        "completed"
+    );
+
+    assert.equal(result.competition.status, "completed");
+});
+
+test("transitionCompetition rejects completed to draft", async () => {
+    tournamentRepository.getTournamentByIdWithConnection = async (id) => ({
+        id,
+        status: "completed"
+    });
+
+    await assert.rejects(
+        () => competitionService.transitionCompetition(75, "draft"),
+        { code: "VALIDATION_ERROR" }
+    );
+});
+
+test("transitionCompetition rejects cancelled to registration_open", async () => {
+    tournamentRepository.getTournamentByIdWithConnection = async (id) => ({
+        id,
+        status: "cancelled"
+    });
+
+    await assert.rejects(
+        () => competitionService.transitionCompetition(76, "registration_open"),
+        { code: "VALIDATION_ERROR" }
+    );
+});
+
+test("transitionCompetition rejects unknown status", async () => {
+    tournamentRepository.getTournamentByIdWithConnection = async (id) => ({
+        id,
+        status: "draft"
+    });
+
+    await assert.rejects(
+        () => competitionService.transitionCompetition(77, "unknown"),
+        { code: "VALIDATION_ERROR" }
+    );
+});
+
+test("transitionCompetition rejects invalid transition", async () => {
+    tournamentRepository.getTournamentByIdWithConnection = async (id) => ({
+        id,
+        status: "draft"
+    });
+
+    await assert.rejects(
+        () => competitionService.transitionCompetition(78, "in_progress"),
+        { code: "VALIDATION_ERROR" }
+    );
 });
 
 test("PUT service returns not found for an unknown id", async () => {

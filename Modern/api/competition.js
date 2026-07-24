@@ -215,6 +215,19 @@ router.put("/:id", async (req, res) => {
     }
 });
 
+router.post("/:id/transition", async (req, res) => {
+    try {
+        const result = await competitionService.transitionCompetition(
+            req.params.id,
+            req.body.status
+        );
+
+        res.json(result);
+    } catch (err) {
+        sendWriteError(res, err);
+    }
+});
+
 
 router.get("/", async (req, res) => {
     try {
