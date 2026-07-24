@@ -1,10 +1,10 @@
 # TOP Engineering Playbook
 
-Version: 1.4
+Version: 1.5
 
 Status: Active
 
-Last Update: 2026-07-23
+Last Update: 2026-07-24
 
 Author:
 Paul Wu + ChatGPT
@@ -16,6 +16,7 @@ Paul Wu + ChatGPT
 
 | Version | Date | Changes |
 |---------|------|---------|
+| 1.5 | 2026-07-24 | Harmonized Rule-021 source priority with TES governance and GitHub canonical source-of-truth wording |
 | 1.4 | 2026-07-23 | Added Rule-020 through Rule-024 for transaction ownership, repository source priority, explicit action, analysis-first implementation, and AI task protocol |
 | 1.3 | 2026-07-13 | Added rule-15,-18 |
 | 1.2 | 2026-07-08 | Added reference to Documentation Governance framework |
@@ -553,16 +554,17 @@ This keeps business consistency rules visible at the service layer and prevents 
 
 ## Rule-021 Repository Source Priority
 
-When repository information conflicts, use the repository itself as the highest-priority source of truth.
+When repository information conflicts, use the GitHub repository committed and pushed state as the canonical source of truth.
 
 Priority order:
 
 1. GitHub committed and pushed state (remote repository).
-2. Accepted project documentation in the repository.
-3. Local unpushed commits.
-4. Local working-tree changes.
-5. Current task instructions.
-6. Conversation history or AI memory.
+2. Local repository commits that have not yet been pushed.
+3. Local working-tree changes.
+4. Current task instructions.
+5. Conversation history or AI memory.
+
+Accepted project documentation is authoritative when it is part of the applicable repository state above.
 
 Do not override repository facts with memory, assumptions, or outdated conversation history.
 
