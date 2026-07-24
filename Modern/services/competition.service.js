@@ -500,19 +500,24 @@ connection
 
 }
 
-async function updateMatch(matchId,score1,score2,status){
+async function updateMatch(tournamentIdValue,matchId,score1,score2,status){
 
-const tournamentId = 1;
+const tournamentId = parseCompetitionId(tournamentIdValue);
 
 return db.withTransaction(async (connection) => {
 
-await matchRepository.updateMatchScore(
+const result = await matchRepository.updateMatchScore(
+    tournamentId,
     matchId,
     score1,
     score2,
     status,
     connection
 );
+
+if(result.affectedRows === 0){
+    throw makeNotFoundError("Match not found for competition");
+}
 
 await playerRepository.resetPlayerRuntimeStatsByTournament(
     tournamentId,

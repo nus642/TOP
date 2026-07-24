@@ -21,11 +21,13 @@ const original = {
     createPairing: pairingRepository.createPairing,
     deleteMatchesByTournament: matchRepository.deleteMatchesByTournament,
     createMatch: matchRepository.createMatch,
+    updateMatchScore: matchRepository.updateMatchScore,
     deletePlayersByTournament: playerRepository.deletePlayersByTournament,
     deletePlayerPartnersByTournament: playerRepository.deletePlayerPartnersByTournament,
     deletePlayerOpponentsByTournament: playerRepository.deletePlayerOpponentsByTournament,
     createPlayer: playerRepository.createPlayer,
-    getPlayerMap: playerRepository.getPlayerMap
+    getPlayerMap: playerRepository.getPlayerMap,
+    resetPlayerRuntimeStatsByTournament: playerRepository.resetPlayerRuntimeStatsByTournament
 };
 
 test.beforeEach(() => {
@@ -43,11 +45,52 @@ test.afterEach(() => {
     pairingRepository.createPairing = original.createPairing;
     matchRepository.deleteMatchesByTournament = original.deleteMatchesByTournament;
     matchRepository.createMatch = original.createMatch;
+    matchRepository.updateMatchScore = original.updateMatchScore;
     playerRepository.deletePlayersByTournament = original.deletePlayersByTournament;
     playerRepository.deletePlayerPartnersByTournament = original.deletePlayerPartnersByTournament;
     playerRepository.deletePlayerOpponentsByTournament = original.deletePlayerOpponentsByTournament;
     playerRepository.createPlayer = original.createPlayer;
     playerRepository.getPlayerMap = original.getPlayerMap;
+    playerRepository.resetPlayerRuntimeStatsByTournament = original.resetPlayerRuntimeStatsByTournament;
+});
+
+
+test("updateMatch scopes score updates to the supplied competition", async () => {
+    const connection = { marker: "transaction" };
+    const calls = [];
+
+    db.withTransaction = async (work) => work(connection);
+    matchRepository.updateMatchScore = async (tournamentId, matchId, score1, score2, status, activeConnection) => {
+        calls.push(["updateMatchScore", tournamentId, matchId, score1, score2, status, activeConnection]);
+        return { affectedRows: 1 };
+    };
+    playerRepository.resetPlayerRuntimeStatsByTournament = async (tournamentId, activeConnection) => {
+        calls.push(["resetRuntimeStats", tournamentId, activeConnection]);
+    };
+
+    const result = await competitionService.updateMatch(7, 42, 11, 9, "finished");
+
+    assert.deepEqual(result, { success: true });
+    assert.deepEqual(calls, [
+        ["updateMatchScore", 7, 42, 11, 9, "finished", connection],
+        ["resetRuntimeStats", 7, connection]
+    ]);
+});
+
+test("updateMatch rejects matches outside the supplied competition", async () => {
+    let resetCalled = false;
+
+    matchRepository.updateMatchScore = async () => ({ affectedRows: 0 });
+    playerRepository.resetPlayerRuntimeStatsByTournament = async () => {
+        resetCalled = true;
+    };
+
+    await assert.rejects(
+        () => competitionService.updateMatch(7, 42, 11, 9, "finished"),
+        { code: "NOT_FOUND" }
+    );
+
+    assert.equal(resetCalled, false);
 });
 
 test("POST service creates a competition", async () => {
