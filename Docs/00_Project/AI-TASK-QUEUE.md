@@ -2,63 +2,12 @@
 
 ## READY
 
-### TASK-DOC-001
-Title:
-Referee Manual
-
-Type:
-DOC
-
-Priority:
-Medium
-
-Dependency:
-None
-
-Output:
-PR
-
-
-### TASK-DOC-002
-Title:
-Organizer Manual
-
-Type:
-DOC
-
-Priority:
-Medium
-
-Dependency:
-None
-
-Output:
-PR
-
-
 ### TASK-DOC-003
 Title:
 Player Guide
 
 Type:
 DOC
-
-Priority:
-Medium
-
-Dependency:
-None
-
-Output:
-PR
-
-
-### TASK-TEST-001
-Title:
-Regression Test Expansion
-
-Type:
-TEST
 
 Priority:
 Medium
@@ -85,5 +34,27 @@ High
 Dependency:
 TASK-TOP-007C-1
 
-Status:
-Blocked
+
+## TODO
+
+### TASK-TEST-001
+Title:
+Regression Test Expansion
+
+Type:
+TEST
+
+Priority:
+Medium
+
+Dependency:
+None
+
+
+## DONE
+
+TASK-DOC-001
+Referee Manual
+
+TASK-DOC-002
+Organizer Manual
