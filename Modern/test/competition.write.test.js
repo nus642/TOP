@@ -6,13 +6,25 @@ process.env.MYSQL_HOST = process.env.MYSQL_HOST || "localhost";
 const db = require("../database/db");
 const tournamentRepository = require("../repositories/tournament.repository");
 const pairingRepository = require("../repositories/pairing.repository");
+const matchRepository = require("../repositories/match.repository");
+const playerRepository = require("../repositories/player.repository");
 const competitionService = require("../services/competition.service");
 
 const original = {
     withTransaction: db.withTransaction,
     createTournament: tournamentRepository.createTournament,
     updateTournament: tournamentRepository.updateTournament,
-    deleteTournament: tournamentRepository.deleteTournament
+    deleteTournament: tournamentRepository.deleteTournament,
+    updateTournamentName: tournamentRepository.updateTournamentName,
+    deletePairingsByTournament: pairingRepository.deletePairingsByTournament,
+    createPairing: pairingRepository.createPairing,
+    deleteMatchesByTournament: matchRepository.deleteMatchesByTournament,
+    createMatch: matchRepository.createMatch,
+    deletePlayersByTournament: playerRepository.deletePlayersByTournament,
+    deletePlayerPartnersByTournament: playerRepository.deletePlayerPartnersByTournament,
+    deletePlayerOpponentsByTournament: playerRepository.deletePlayerOpponentsByTournament,
+    createPlayer: playerRepository.createPlayer,
+    getPlayerMap: playerRepository.getPlayerMap
 };
 
 test.beforeEach(() => {
@@ -24,6 +36,16 @@ test.afterEach(() => {
     tournamentRepository.createTournament = original.createTournament;
     tournamentRepository.updateTournament = original.updateTournament;
     tournamentRepository.deleteTournament = original.deleteTournament;
+    tournamentRepository.updateTournamentName = original.updateTournamentName;
+    pairingRepository.deletePairingsByTournament = original.deletePairingsByTournament;
+    pairingRepository.createPairing = original.createPairing;
+    matchRepository.deleteMatchesByTournament = original.deleteMatchesByTournament;
+    matchRepository.createMatch = original.createMatch;
+    playerRepository.deletePlayersByTournament = original.deletePlayersByTournament;
+    playerRepository.deletePlayerPartnersByTournament = original.deletePlayerPartnersByTournament;
+    playerRepository.deletePlayerOpponentsByTournament = original.deletePlayerOpponentsByTournament;
+    playerRepository.createPlayer = original.createPlayer;
+    playerRepository.getPlayerMap = original.getPlayerMap;
 });
 
 test("POST service creates a competition", async () => {
@@ -156,7 +178,6 @@ test("DELETE service returns not found for an unknown id", async () => {
     );
 });
 
-const playerRepository = require("../repositories/player.repository");
 
 test("registerPlayer creates a player for an existing competition", async () => {
     const saved = {
@@ -263,4 +284,182 @@ test("withdrawPlayer rejects an unknown player", async () => {
 
     tournamentRepository.getTournamentByIdWithConnection = saved.getTournamentByIdWithConnection;
     playerRepository.getPlayerByIdForTournament = saved.getPlayerByIdForTournament;
+});
+
+test("saveSchedule propagates the existing lifecycle transaction connection", async () => {
+    const connection = { marker: "transaction" };
+    const calls = [];
+
+    db.withTransaction = async (work) => work(connection);
+    tournamentRepository.updateTournamentName = async (id, name, activeConnection) => {
+        calls.push(["updateTournamentName", id, name, activeConnection]);
+    };
+    matchRepository.deleteMatchesByTournament = async (id, activeConnection) => {
+        calls.push(["deleteMatches", id, activeConnection]);
+    };
+    pairingRepository.deletePairingsByTournament = async (id, activeConnection) => {
+        calls.push(["deletePairings", id, activeConnection]);
+    };
+    playerRepository.deletePlayersByTournament = async (id, activeConnection) => {
+        calls.push(["deletePlayers", id, activeConnection]);
+    };
+    playerRepository.deletePlayerPartnersByTournament = async (id, activeConnection) => {
+        calls.push(["deletePartners", id, activeConnection]);
+    };
+    playerRepository.deletePlayerOpponentsByTournament = async (id, activeConnection) => {
+        calls.push(["deleteOpponents", id, activeConnection]);
+    };
+    playerRepository.createPlayer = async (player, activeConnection) => {
+        calls.push(["createPlayer", player.name, activeConnection]);
+        return { id: player.name === "Ada" ? 7 : 8, ...player };
+    };
+    playerRepository.getPlayerMap = async (id, activeConnection) => {
+        calls.push(["getPlayerMap", id, activeConnection]);
+        return { Ada: 7, Lin: 8 };
+    };
+    pairingRepository.createPairing = async (pairing, activeConnection) => {
+        calls.push(["createPairing", pairing.player1_id, pairing.player2_id, activeConnection]);
+    };
+    matchRepository.createMatch = async (match, activeConnection) => {
+        calls.push(["createMatch", match.player1_id, match.player2_id, activeConnection]);
+    };
+
+    const result = await competitionService.saveSchedule({
+        tournamentName: "Summer Open",
+        mode: "fixed-pair",
+        players: [
+            { name: "Ada", lv: 4, paired: true },
+            { name: "Lin", lv: 3, paired: true }
+        ],
+        pairs: [{ name: "Ada & Lin" }],
+        rounds: [[{
+            court: "Court 1",
+            p1: "Ada",
+            p2: "Lin",
+            p3: "Ada",
+            p4: "Lin",
+            team1: "Ada & Lin",
+            team2: "Ada & Lin"
+        }]]
+    });
+
+    assert.equal(result.success, true);
+    assert.deepEqual(
+        calls.map(([name]) => name),
+        [
+            "updateTournamentName",
+            "deleteMatches",
+            "deletePairings",
+            "deletePlayers",
+            "deletePartners",
+            "deleteOpponents",
+            "createPlayer",
+            "createPlayer",
+            "getPlayerMap",
+            "createPairing",
+            "createMatch"
+        ]
+    );
+    assert.ok(calls.every((call) => call.at(-1) === connection));
+});
+
+test("resetCompetition propagates the existing lifecycle transaction connection", async () => {
+    const connection = { marker: "transaction" };
+    const calls = [];
+
+    db.withTransaction = async (work) => work(connection);
+    matchRepository.deleteMatchesByTournament = async (id, activeConnection) => {
+        calls.push(["deleteMatches", id, activeConnection]);
+    };
+    pairingRepository.deletePairingsByTournament = async (id, activeConnection) => {
+        calls.push(["deletePairings", id, activeConnection]);
+    };
+    playerRepository.deletePlayersByTournament = async (id, activeConnection) => {
+        calls.push(["deletePlayers", id, activeConnection]);
+    };
+    playerRepository.deletePlayerPartnersByTournament = async (id, activeConnection) => {
+        calls.push(["deletePartners", id, activeConnection]);
+    };
+    playerRepository.deletePlayerOpponentsByTournament = async (id, activeConnection) => {
+        calls.push(["deleteOpponents", id, activeConnection]);
+    };
+    tournamentRepository.updateTournamentName = async (id, name, activeConnection) => {
+        calls.push(["updateTournamentName", id, name, activeConnection]);
+    };
+
+    const result = await competitionService.resetCompetition();
+
+    assert.deepEqual(result, { success: true });
+    assert.deepEqual(
+        calls.map(([name]) => name),
+        [
+            "deleteMatches",
+            "deletePairings",
+            "deletePlayers",
+            "deletePartners",
+            "deleteOpponents",
+            "updateTournamentName"
+        ]
+    );
+    assert.ok(calls.every((call) => call.at(-1) === connection));
+});
+
+test("generateCompetition propagates the existing lifecycle transaction connection", async () => {
+    const connection = { marker: "transaction" };
+    const calls = [];
+
+    db.withTransaction = async (work) => work(connection);
+    matchRepository.deleteMatchesByTournament = async (id, activeConnection) => {
+        calls.push(["deleteMatches", id, activeConnection]);
+    };
+    pairingRepository.deletePairingsByTournament = async (id, activeConnection) => {
+        calls.push(["deletePairings", id, activeConnection]);
+    };
+    playerRepository.deletePlayersByTournament = async (id, activeConnection) => {
+        calls.push(["deletePlayers", id, activeConnection]);
+    };
+    playerRepository.deletePlayerPartnersByTournament = async (id, activeConnection) => {
+        calls.push(["deletePartners", id, activeConnection]);
+    };
+    playerRepository.deletePlayerOpponentsByTournament = async (id, activeConnection) => {
+        calls.push(["deleteOpponents", id, activeConnection]);
+    };
+    tournamentRepository.updateTournamentName = async (id, name, activeConnection) => {
+        calls.push(["updateTournamentName", id, name, activeConnection]);
+    };
+    playerRepository.createPlayer = async (player, activeConnection) => {
+        const id = player.name === "Ada" ? 7 : 8;
+        calls.push(["createPlayer", player.name, activeConnection]);
+        return { id, ...player };
+    };
+    pairingRepository.createPairing = async (pairing, activeConnection) => {
+        calls.push(["createPairing", pairing.player1_id, pairing.player2_id, activeConnection]);
+    };
+
+    const result = await competitionService.generateCompetition({
+        tournamentName: "Summer Open",
+        mode: "fixed-pair",
+        players: [
+            { name: "Ada", lv: 4, paired: true },
+            { name: "Lin", lv: 3, paired: true }
+        ],
+        pairs: [{ name: "Ada & Lin" }]
+    });
+
+    assert.equal(result.success, true);
+    assert.deepEqual(
+        calls.map(([name]) => name),
+        [
+            "deleteMatches",
+            "deletePairings",
+            "deletePlayers",
+            "deletePartners",
+            "deleteOpponents",
+            "updateTournamentName",
+            "createPlayer",
+            "createPlayer",
+            "createPairing"
+        ]
+    );
+    assert.ok(calls.every((call) => call.at(-1) === connection));
 });
