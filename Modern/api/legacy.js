@@ -44,6 +44,7 @@ router.post('/save', async (req, res) => {
 router.put('/match/:id', async (req, res) => {
     try {
         const result = await competitionService.updateMatch(
+            1,
             req.params.id,
             req.body.score1,
             req.body.score2,

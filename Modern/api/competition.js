@@ -305,6 +305,7 @@ router.post("/save", async (req, res) => {
 router.put("/match/:id", async (req, res) => {
     try {
         const result = await competitionService.updateMatch(
+            getTournamentId(req),
             req.params.id,
             req.body.score1,
             req.body.score2,
@@ -313,7 +314,7 @@ router.put("/match/:id", async (req, res) => {
 
         res.json(result);
     } catch (err) {
-        sendServerError(res, "更新失败", err);
+        sendWriteError(res, err);
     }
 });
 

@@ -96,6 +96,7 @@ async function deleteMatchesByTournament(
 }
 
 async function updateMatchScore(
+    tournamentId,
     matchId,
     score1,
     score2,
@@ -107,12 +108,14 @@ async function updateMatchScore(
         UPDATE matches
         SET score1 = ?, score2 = ?, status = ?
         WHERE id = ?
+        AND tournament_id = ?
         `,
         [
             score1,
             score2,
             status,
-            matchId
+            matchId,
+            tournamentId
         ]
     );
 
