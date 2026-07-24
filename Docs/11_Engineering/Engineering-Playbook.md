@@ -553,16 +553,17 @@ This keeps business consistency rules visible at the service layer and prevents 
 
 ## Rule-021 Repository Source Priority
 
-When repository information conflicts, use the repository itself as the highest-priority source of truth.
+When repository information conflicts, use the GitHub repository committed and pushed state as the canonical source of truth.
 
 Priority order:
 
 1. GitHub committed and pushed state (remote repository).
-2. Accepted project documentation in the repository.
-3. Local unpushed commits.
-4. Local working-tree changes.
-5. Current task instructions.
-6. Conversation history or AI memory.
+2. Local repository commits that have not yet been pushed.
+3. Local working-tree changes.
+4. Current task instructions.
+5. Conversation history or AI memory.
+
+Accepted project documentation is authoritative when it is part of the applicable repository state above.
 
 Do not override repository facts with memory, assumptions, or outdated conversation history.
 

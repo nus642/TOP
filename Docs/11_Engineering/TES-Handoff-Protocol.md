@@ -2,6 +2,7 @@
 
 Version: 1.0
 Status: Draft
+Related Workflow: [ENG-036 AI Task Delivery Workflow](./ENG-036-AI-Task-Delivery-Workflow.md)
 Author: ChatGPT & Paul
 Applies To: TOP Engineering System (TES)
 
@@ -9,9 +10,9 @@ Applies To: TOP Engineering System (TES)
 
 # Purpose
 
-TOP-Handoffs is the communication protocol for the TOP Engineering System.
+TOP-Handoffs is the communication and delivery-artifact protocol for the TOP Engineering System.
 
-Its purpose is to eliminate manual conversation transfer between AI agents by replacing conversation with standardized engineering artifacts.
+Its purpose is to eliminate manual conversation transfer between AI agents by replacing conversation with standardized engineering artifacts. It defines handoff packages, artifact definitions, and delivery protocol; it does not define the sprint workflow, implementation workflow, or full engineering lifecycle. Use ENG-036 for the standard AI task delivery workflow.
 
 The primary communication object is no longer chat history.
 
@@ -27,15 +28,17 @@ AI agents exchange artifacts.
 
 They do not exchange conversations.
 
-Every engineering activity produces structured artifacts that become the input of the next engineering activity.
+Engineering activities produce structured artifacts that support the next engineering activity. These artifacts support the workflow defined in ENG-036; they do not replace it.
 
 ---
 
-## 2. Single Source of Truth
+## 2. Repository Source of Truth
 
 Every task owns exactly one Handoff Package.
 
-No information should exist only inside a chat conversation.
+The GitHub repository committed and pushed state is the canonical source of truth. A Handoff Package is an artifact set inside or attached to that repository state; it is not a higher-priority source than GitHub.
+
+No information required for engineering continuity should exist only inside a chat conversation.
 
 Anything required by another AI agent must exist inside the Handoff Package.
 
@@ -81,14 +84,15 @@ Qoder
 
 GitHub
 
-- Source of Truth
+- Canonical source of truth for committed and pushed state
 - Version history
 - Pull Request workflow
 
 TOP-Handoffs
 
-- Communication protocol
-- Engineering artifacts
+- Handoff package
+- Artifact definitions
+- Delivery protocol
 - Cross-AI handoff
 
 ---
@@ -238,9 +242,11 @@ Closed
 
 ---
 
-# Workflow
+# Handoff Delivery Sequence
 
-Sprint Definition
+This sequence describes how TES artifacts move between roles. It is not a competing primary workflow; the standard AI task delivery workflow is ENG-036.
+
+Task Definition
 
 ↓
 
@@ -260,7 +266,7 @@ Codex
 
 ↓
 
-GitHub Pull Request
+Pull Request
 
 ↓
 
@@ -272,7 +278,7 @@ Qoder Review
 
 ↓
 
-ChatGPT Decision
+Architecture Review
 
 ↓
 
@@ -316,11 +322,11 @@ instead of
 
 Rule 5
 
-The Handoff Package becomes the permanent engineering record.
+The Handoff Package becomes part of the engineering record when committed, pushed, or attached to the GitHub Pull Request.
 
 Chat conversations are temporary.
 
-Artifacts are permanent.
+Artifacts are durable deliverables, but GitHub committed and pushed state remains canonical.
 
 ---
 
@@ -343,7 +349,7 @@ Future versions may include:
 
 - Automatic artifact generation
 - Automatic task status updates
-- Integration with GitHub Pull Requests
+- Integration with Pull Requests
 - Integration with ChatGPT Projects
 - Multi-agent orchestration
 - AIOS-compatible workflow

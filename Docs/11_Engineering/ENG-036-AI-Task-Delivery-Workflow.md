@@ -8,14 +8,14 @@ Accepted.
 
 Define the standard AI-assisted development delivery workflow for TOP Modern.
 
-The workflow reduces manual copy/paste between ChatGPT, Codex, and local development while keeping the local Git repository as the final source of truth.
+The workflow defines the standard TOP AI task delivery lifecycle while keeping the GitHub repository committed and pushed state as the canonical source of truth.
 
 ## Context
 
 Previous AI-assisted development work showed:
 
 - Codex sandbox commits are not reliable project history.
-- The local Git repository must remain the final source of truth.
+- The GitHub repository committed and pushed state must remain the canonical source of truth.
 - AI implementation output should be easy to review and apply locally.
 
 ## Roles
@@ -36,33 +36,33 @@ Codex is responsible for producing focused implementation output:
 - Documentation update
 - Diff generation
 
-### Local Git
+### GitHub Repository
 
-Local Git is responsible for final project history:
+GitHub is responsible for canonical project history:
 
-- Review
-- Commit
-- Push
-- Final source of truth
+- Committed and pushed state
+- Pull Request workflow
+- Review record
+- Merge history
 
 ## Standard Flow
 
 ```text
 ChatGPT
   ↓
-Task Specification
+Task Definition
+  ↓
+Push task to GitHub
   ↓
 Codex Implementation
   ↓
-RESULT.md
+Pull Request
   ↓
-DIFF.patch
+Qoder Review
   ↓
-Local Review
+Architecture Review
   ↓
-Commit
-  ↓
-Push
+Merge
 ```
 
 ## Codex Output Standard
@@ -71,7 +71,7 @@ Codex output should be concise and reviewable.
 
 ### Required Outputs
 
-Codex should provide exactly the following delivery artifacts when requested for local application:
+Codex should provide the following reviewable delivery artifacts when requested. These files are artifacts, not a separate workflow:
 
 #### RESULT.md
 
@@ -82,9 +82,9 @@ Codex should provide exactly the following delivery artifacts when requested for
 - Summary
 - Verification
 
-#### DIFF.patch
+#### Patch artifact
 
-`DIFF.patch` should contain:
+The patch artifact, named `03-PATCH.diff` inside a TES Handoff Package, should contain:
 
 - Unified diff only
 
@@ -96,13 +96,13 @@ Codex output should avoid:
 - PR description
 - Sandbox commit dependency
 
-## Local Workflow
+## Local Verification
 
-The developer applies and verifies Codex output locally.
+Local repository work is a verification and staging step beneath the GitHub source of truth. When patch artifacts are used, the developer may verify them locally before pushing and opening or updating the Pull Request.
 
 ```bash
-git apply --check DIFF.patch
-git apply DIFF.patch
+git apply --check 03-PATCH.diff
+git apply 03-PATCH.diff
 git diff
 git diff --check
 git commit
@@ -111,9 +111,16 @@ git push
 
 ## Source of Truth Rule
 
-The local Git repository is the final source of truth for TOP Modern.
+The GitHub repository committed and pushed state is the canonical source of truth for TOP Modern.
 
-Codex sandbox commits are temporary execution artifacts only. They are not project history unless the developer reviews, applies, commits, and pushes the changes from the local repository.
+Priority order:
+
+1. GitHub repository committed and pushed state.
+2. Local repository commits.
+3. Local working-directory changes.
+4. Conversation history or AI memory.
+
+Codex sandbox commits and patch artifacts are temporary execution artifacts only. They are not project history unless the developer reviews, commits, and pushes the changes to GitHub.
 
 ## Constraints
 
