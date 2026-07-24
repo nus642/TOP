@@ -291,7 +291,10 @@ router.get("/pairings", async (req, res) => {
 
 router.post("/save", async (req, res) => {
     try {
-        const result = await competitionService.saveSchedule(req.body);
+        const result = await competitionService.saveSchedule(
+            getTournamentId(req),
+            req.body
+        );
 
         res.json(result);
     } catch (err) {
@@ -316,7 +319,9 @@ router.put("/match/:id", async (req, res) => {
 
 router.delete("/reset", async (req, res) => {
     try {
-        const result = await competitionService.resetCompetition();
+        const result = await competitionService.resetCompetition(
+            getTournamentId(req)
+        );
 
         res.json(result);
     } catch (err) {
@@ -337,6 +342,7 @@ router.delete("/:id", async (req, res) => {
 router.post("/generate", async (req, res) => {
     try {
         const result = await competitionService.generateCompetition(
+            getTournamentId(req),
             req.body
         );
 
