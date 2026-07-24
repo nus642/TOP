@@ -1,0 +1,94 @@
+diff --git a/.handoff/TASK-WORKFLOW-001/CHANGELOG.md b/.handoff/TASK-WORKFLOW-001/CHANGELOG.md
+new file mode 100644
+index 0000000..377b438
+--- /dev/null
++++ b/.handoff/TASK-WORKFLOW-001/CHANGELOG.md
+@@ -0,0 +1,9 @@
++# Changelog
++
++This is a workflow handoff experiment.
++
++Exact files created:
++- .handoff/TASK-WORKFLOW-001/README.md
++- .handoff/TASK-WORKFLOW-001/CHANGELOG.md
++- .handoff/TASK-WORKFLOW-001/VERIFY.md
++- .handoff/TASK-WORKFLOW-001/PATCH.diff
+diff --git a/.handoff/TASK-WORKFLOW-001/README.md b/.handoff/TASK-WORKFLOW-001/README.md
+new file mode 100644
+index 0000000..1c8fd53
+--- /dev/null
++++ b/.handoff/TASK-WORKFLOW-001/README.md
+@@ -0,0 +1,16 @@
++# TASK-WORKFLOW-001 Handoff
++
++- Task ID: TASK-WORKFLOW-001
++- Status: PASS
++- Repository: nus642/TOP
++- Base commit SHA: a88120e45364d261d1eb433a3db82bd2cccafd86
++- Files changed:
++  - .handoff/TASK-WORKFLOW-001/README.md
++  - .handoff/TASK-WORKFLOW-001/CHANGELOG.md
++  - .handoff/TASK-WORKFLOW-001/VERIFY.md
++  - .handoff/TASK-WORKFLOW-001/PATCH.diff
++- Patch filename: PATCH.diff
++- Verification filename: VERIFY.md
++- Next Action: Download the four handoff files and give PATCH.diff plus README.md to Qoder for local consumption testing.
++- Commit performed: No
++- Push performed: No
+diff --git a/.handoff/TASK-WORKFLOW-001/VERIFY.md b/.handoff/TASK-WORKFLOW-001/VERIFY.md
+new file mode 100644
+index 0000000..1494da0
+--- /dev/null
++++ b/.handoff/TASK-WORKFLOW-001/VERIFY.md
+@@ -0,0 +1,51 @@
++# Verification
++
++## Commands and Results
++
++### git status --short
++
++Result: PASS
++
++```
++ A .handoff/TASK-WORKFLOW-001/CHANGELOG.md
++ A .handoff/TASK-WORKFLOW-001/README.md
++ A .handoff/TASK-WORKFLOW-001/VERIFY.md
++?? .handoff/TASK-WORKFLOW-001/PATCH.diff
++```
++
++### git diff --check
++
++Result: PASS
++
++```
++
++```
++
++### git diff --name-only
++
++Result: PASS
++
++```
++.handoff/TASK-WORKFLOW-001/CHANGELOG.md
++.handoff/TASK-WORKFLOW-001/README.md
++.handoff/TASK-WORKFLOW-001/VERIFY.md
++```
++
++### git rev-parse HEAD
++
++Result: PASS
++
++```
++a88120e45364d261d1eb433a3db82bd2cccafd86
++```
++
++## Confirmations
++
++- Only .handoff/TASK-WORKFLOW-001/ files were created: PASS
++- Existing repository files were not modified: PASS
++- PATCH.diff is a valid unified diff: PASS
++- PATCH.diff includes README.md, CHANGELOG.md, and VERIFY.md: PASS
++- PATCH.diff does not contain itself: PASS
++- No existing project file was modified: PASS
++- No commit was created: PASS
++- No push was performed: PASS
