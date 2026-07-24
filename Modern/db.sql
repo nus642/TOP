@@ -19,6 +19,41 @@ CREATE TABLE IF NOT EXISTS players (
     FOREIGN KEY (tournament_id) REFERENCES tournaments(id) ON DELETE CASCADE
 ) DEFAULT CHARSET=utf8mb4;
 
+
+CREATE TABLE IF NOT EXISTS teams (
+    id INT PRIMARY KEY AUTO_INCREMENT,
+    tournament_id INT NOT NULL,
+    name VARCHAR(100) NOT NULL,
+    status VARCHAR(30) NOT NULL DEFAULT 'active',
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    FOREIGN KEY (tournament_id) REFERENCES tournaments(id) ON DELETE CASCADE,
+    UNIQUE KEY uq_teams_tournament_name (tournament_id, name)
+) DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE IF NOT EXISTS team_members (
+    id INT PRIMARY KEY AUTO_INCREMENT,
+    team_id INT NOT NULL,
+    player_id INT NOT NULL,
+    role VARCHAR(30) NOT NULL DEFAULT 'member',
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (team_id) REFERENCES teams(id) ON DELETE CASCADE,
+    FOREIGN KEY (player_id) REFERENCES players(id) ON DELETE CASCADE,
+    UNIQUE KEY uq_team_members_team_player (team_id, player_id)
+) DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE IF NOT EXISTS team_rooms (
+    id INT PRIMARY KEY AUTO_INCREMENT,
+    tournament_id INT NOT NULL,
+    code VARCHAR(50),
+    name VARCHAR(100),
+    status VARCHAR(30) NOT NULL DEFAULT 'draft',
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    FOREIGN KEY (tournament_id) REFERENCES tournaments(id) ON DELETE CASCADE,
+    UNIQUE KEY uq_team_rooms_tournament_code (tournament_id, code)
+) DEFAULT CHARSET=utf8mb4;
+
 CREATE TABLE IF NOT EXISTS matches (
     id INT PRIMARY KEY AUTO_INCREMENT,
     tournament_id INT NOT NULL,
