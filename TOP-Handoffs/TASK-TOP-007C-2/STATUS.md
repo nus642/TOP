@@ -7,18 +7,21 @@ TASK-TOP-007C-2
 Modern Scoped Schedule Routes
 
 ## Status
-Ready for Codex Implementation
+Pull Request Open
 
 ## Completed
 
 - Task definition created
 - Architecture decision completed
 - Implementation plan completed
+- Modern competition-scoped schedule route implemented
+- API regression coverage added for scoped context, invalid IDs, and missing competitions
+- Legacy schedule routes and tournamentId=1 behavior preserved
 
 ## Next Step
 
-Codex implementation and Pull Request review
+Qoder or reviewer should review the implementation Pull Request and provide a merge recommendation
 
 ## Important Note
 
-Do not modify any production code.
+Do not merge until the implementation has been reviewed and approved.
