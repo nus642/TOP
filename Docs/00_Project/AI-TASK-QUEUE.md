@@ -34,6 +34,44 @@ Excluded:
 
 ## BLOCKED
 
+## BACKLOG
+
+### TASK-REG-001
+Title:
+Modern Competition Registration
+
+Type:
+CODE
+
+Priority:
+Medium
+
+Dependency:
+TASK-REG-001-A
+
+Description:
+Implements modern competition registration foundation. Must follow Entry abstraction architecture.
+
+### TASK-MATCH-001
+Title:
+Modern Match Lifecycle Foundation
+
+Type:
+CODE
+
+Priority:
+Medium
+
+### IDEA-MATCH-001
+Title:
+Deterministic Match Sequence Number
+
+Type:
+IDEA
+
+Priority:
+Low
+
 ## DONE
 
 ### TASK-TOP-007C-2
@@ -72,17 +110,14 @@ Status Context:
 - Scoped generate route implemented
 - Legacy schedule lifecycle routes preserved
 - Regression tests added
-- 72 tests passing
+  - 72 tests passing
 
-TASK-DOC-001
-Referee Manual
+  ### TASK-REG-001-A
+  Title:
+  Registration Domain Model
 
-TASK-DOC-002
-Organizer Manual
+  Type:
+  ARCHITECTURE
 
-TASK-DOC-003
-Player Guide
-
-TASK-TEST-001
-Title:
-Regression Test Expansion
+  Status:
+  Architecture Decision Recorded
