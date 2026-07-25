@@ -9,6 +9,8 @@ const router = require("../api/competition");
 const original = {
     createCompetition: competitionService.createCompetition,
     getCompetition: competitionService.getCompetition,
+    generateCompetition: competitionService.generateCompetition,
+    resetCompetition: competitionService.resetCompetition,
     saveSchedule: competitionService.saveSchedule,
     transitionCompetition: competitionService.transitionCompetition,
     updateMatch: competitionService.updateMatch
@@ -17,6 +19,8 @@ const original = {
 test.afterEach(() => {
     competitionService.createCompetition = original.createCompetition;
     competitionService.getCompetition = original.getCompetition;
+    competitionService.generateCompetition = original.generateCompetition;
+    competitionService.resetCompetition = original.resetCompetition;
     competitionService.saveSchedule = original.saveSchedule;
     competitionService.transitionCompetition = original.transitionCompetition;
     competitionService.updateMatch = original.updateMatch;
@@ -214,4 +218,99 @@ test("POST /:competitionId/schedule maps an unknown competition to HTTP 404", as
 
     assert.equal(res.statusCode, 404);
     assert.deepEqual(res.payload, { error: "Competition not found" });
+});
+
+test("DELETE /:competitionId/schedule passes scoped competition context to the reset service", async () => {
+    const handler = findRoute("/:competitionId/schedule", "delete");
+    const calls = [];
+
+    competitionService.resetCompetition = async (...args) => {
+        calls.push(args);
+        return { success: true };
+    };
+
+    const res = createResponse();
+    await handler({ params: { competitionId: "31" } }, res);
+
+    assert.deepEqual(calls, [[31]]);
+    assert.equal(res.statusCode, 200);
+    assert.deepEqual(res.payload, { success: true });
+});
+
+test("POST /:competitionId/schedule/generate passes scoped competition context to the generate service", async () => {
+    const handler = findRoute("/:competitionId/schedule/generate", "post");
+    const body = { tournamentId: 99, players: [] };
+    const calls = [];
+
+    competitionService.generateCompetition = async (...args) => {
+        calls.push(args);
+        return { success: true };
+    };
+
+    const res = createResponse();
+    await handler({ params: { competitionId: "31" }, body }, res);
+
+    assert.deepEqual(calls, [[31, body]]);
+    assert.equal(res.statusCode, 200);
+    assert.deepEqual(res.payload, { success: true });
+});
+
+for (const [method, path, serviceName] of [
+    ["delete", "/:competitionId/schedule", "resetCompetition"],
+    ["post", "/:competitionId/schedule/generate", "generateCompetition"]
+]) {
+    test(`${method.toUpperCase()} ${path} rejects an invalid competition id`, async () => {
+        const handler = findRoute(path, method);
+        let serviceCalled = false;
+
+        competitionService[serviceName] = async () => {
+            serviceCalled = true;
+        };
+
+        const res = createResponse();
+        await handler({ params: { competitionId: "invalid" }, body: {} }, res);
+
+        assert.equal(serviceCalled, false);
+        assert.equal(res.statusCode, 400);
+        assert.deepEqual(res.payload, { error: "Valid competition id is required" });
+    });
+
+    test(`${method.toUpperCase()} ${path} maps an unknown competition to HTTP 404`, async () => {
+        const handler = findRoute(path, method);
+        const error = new Error("Competition not found");
+        error.code = "NOT_FOUND";
+        competitionService[serviceName] = async () => {
+            throw error;
+        };
+
+        const res = createResponse();
+        await handler({ params: { competitionId: "404" }, body: {} }, res);
+
+        assert.equal(res.statusCode, 404);
+        assert.deepEqual(res.payload, { error: "Competition not found" });
+    });
+}
+
+test("legacy reset and generate routes preserve explicit tournament context", async () => {
+    const resetHandler = findRoute("/reset", "delete");
+    const generateHandler = findRoute("/generate", "post");
+    const calls = [];
+    const body = { players: [] };
+
+    competitionService.resetCompetition = async (...args) => {
+        calls.push(["reset", ...args]);
+        return { success: true };
+    };
+    competitionService.generateCompetition = async (...args) => {
+        calls.push(["generate", ...args]);
+        return { success: true };
+    };
+
+    await resetHandler({ query: { tournamentId: "41" } }, createResponse());
+    await generateHandler({ query: { tournamentId: "42" }, body }, createResponse());
+
+    assert.deepEqual(calls, [
+        ["reset", 41],
+        ["generate", 42, body]
+    ]);
 });

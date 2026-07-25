@@ -253,6 +253,31 @@ router.post("/:competitionId/schedule", async (req, res) => {
     }
 });
 
+router.delete("/:competitionId/schedule", async (req, res) => {
+    try {
+        const result = await competitionService.resetCompetition(
+            getScopedCompetitionId(req)
+        );
+
+        res.json(result);
+    } catch (err) {
+        sendWriteError(res, err);
+    }
+});
+
+router.post("/:competitionId/schedule/generate", async (req, res) => {
+    try {
+        const result = await competitionService.generateCompetition(
+            getScopedCompetitionId(req),
+            req.body
+        );
+
+        res.json(result);
+    } catch (err) {
+        sendWriteError(res, err);
+    }
+});
+
 
 router.get("/", async (req, res) => {
     try {
