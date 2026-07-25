@@ -54,13 +54,33 @@ Status Context:
 - Modern API boundary established
 - Regression tests added
 
+### TASK-TOP-007C-3
+Title:
+Complete Modern Scoped Schedule Lifecycle
+
+Type:
+CODE
+
+Priority:
+Medium
+
+Dependency:
+TASK-TOP-007C-2
+Status Context:
+- PR merged
+- Scoped reset route implemented
+- Scoped generate route implemented
+- Legacy schedule lifecycle routes preserved
+- Regression tests added
+- 72 tests passing
+
 TASK-DOC-001
 Referee Manual
 
 TASK-DOC-002
 Organizer Manual
 
-TASK-DOC-03
+TASK-DOC-003
 Player Guide
 
 TASK-TEST-001
