@@ -18,20 +18,6 @@ Dependency:
 TASK-TOP-007C-1
 
 
-## TODO
-
-### TASK-TEST-001
-Title:
-Regression Test Expansion
-
-Type:
-TEST
-
-Priority:
-Medium
-
-Dependency:
-None
 
 
 ## DONE
@@ -44,3 +30,7 @@ Organizer Manual
 
 TASK-DOC-003
 Player Guide
+
+TASK-TEST-001
+Title:
+Regression Test Expansion
