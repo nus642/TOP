@@ -164,3 +164,54 @@ test("POST /save preserves explicit tournament context", async () => {
     assert.deepEqual(calls, [[23, body]]);
     assert.deepEqual(res.payload, { success: true });
 });
+
+test("POST /:competitionId/schedule passes scoped competition context to the schedule service", async () => {
+    const handler = findRoute("/:competitionId/schedule", "post");
+    const body = { tournamentId: 99, rounds: [] };
+    const calls = [];
+
+    competitionService.saveSchedule = async (...args) => {
+        calls.push(args);
+        return { success: true };
+    };
+
+    const res = createResponse();
+    await handler({ params: { competitionId: "23" }, body }, res);
+
+    assert.deepEqual(calls, [[23, body]]);
+    assert.equal(res.statusCode, 200);
+    assert.deepEqual(res.payload, { success: true });
+});
+
+for (const invalidCompetitionId of ["abc", "0", "-1", "1.5"]) {
+    test(`POST /:competitionId/schedule rejects invalid competition id ${invalidCompetitionId}`, async () => {
+        const handler = findRoute("/:competitionId/schedule", "post");
+        let serviceCalled = false;
+
+        competitionService.saveSchedule = async () => {
+            serviceCalled = true;
+        };
+
+        const res = createResponse();
+        await handler({ params: { competitionId: invalidCompetitionId }, body: {} }, res);
+
+        assert.equal(serviceCalled, false);
+        assert.equal(res.statusCode, 400);
+        assert.deepEqual(res.payload, { error: "Valid competition id is required" });
+    });
+}
+
+test("POST /:competitionId/schedule maps an unknown competition to HTTP 404", async () => {
+    const handler = findRoute("/:competitionId/schedule", "post");
+    const error = new Error("Competition not found");
+    error.code = "NOT_FOUND";
+    competitionService.saveSchedule = async () => {
+        throw error;
+    };
+
+    const res = createResponse();
+    await handler({ params: { competitionId: "404" }, body: { rounds: [] } }, res);
+
+    assert.equal(res.statusCode, 404);
+    assert.deepEqual(res.payload, { error: "Competition not found" });
+});

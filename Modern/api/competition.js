@@ -19,6 +19,18 @@ function getTournamentId(req) {
     return Number(req.query.tournamentId) || DEFAULT_TOURNAMENT_ID;
 }
 
+function getScopedCompetitionId(req) {
+    const competitionId = Number(req.params.competitionId);
+
+    if (!Number.isInteger(competitionId) || competitionId <= 0) {
+        const error = new Error("Valid competition id is required");
+        error.code = "VALIDATION_ERROR";
+        throw error;
+    }
+
+    return competitionId;
+}
+
 function sendWriteError(res, err) {
     if (err.code === "VALIDATION_ERROR") {
         res.status(400).json({
@@ -220,6 +232,19 @@ router.post("/:id/transition", async (req, res) => {
         const result = await competitionService.transitionCompetition(
             req.params.id,
             req.body.status
+        );
+
+        res.json(result);
+    } catch (err) {
+        sendWriteError(res, err);
+    }
+});
+
+router.post("/:competitionId/schedule", async (req, res) => {
+    try {
+        const result = await competitionService.saveSchedule(
+            getScopedCompetitionId(req),
+            req.body
         );
 
         res.json(result);
