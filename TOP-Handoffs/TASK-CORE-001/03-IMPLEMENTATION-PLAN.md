@@ -16,27 +16,38 @@ Modern Core Domain Foundation
 1. Define Competition domain model
    - Competition entity
    - Competition properties (name, description, status, etc.)
-   - Competition lifecycle methods
+   - Competition construction validation
+   - Competition ownership invariants
 
 2. Define Group domain model
    - Group entity
    - Group properties (name, type, rules, etc.)
-   - Group lifecycle methods
+   - Group construction validation
+   - Group ownership invariants
 
 3. Define Event domain model
    - Event entity
    - Event properties (name, format, rules, etc.)
-   - Event lifecycle methods
+   - Event owns competition format, entry composition rules, and sport-specific constraints
+   - Event construction validation
+   - Event ownership invariants
 
 4. Define Entry domain model
    - Entry entity
+   - Entry owns participation state and participant associations
+   - Entry must NOT own scoring rules, scheduling rules, or event format rules
    - Entry properties (composition, rules, status, etc.)
-   - Entry lifecycle methods
+   - Entry construction validation
+   - Entry ownership invariants
 
 5. Define Participant domain model
    - Participant entity
+   - Participant is an Entry-scoped association to a Player/identity
+   - Participant is NOT the owner of long-lived player identity
    - Participant properties (identity, personal info, etc.)
-   - Participant lifecycle methods
+   - Participant construction validation
+   - Participant ownership invariants
+  +++++++ REPLACE
 
 **Deliverables**:
 
@@ -106,7 +117,8 @@ Modern Core Domain Foundation
 1. Unit tests for each domain model
    - Model creation
    - Model validation
-   - Model lifecycle transitions
+   - Model construction validation
+   - Ownership invariants validation
 
 2. Integration tests for ownership relationships
    - Valid Competition → Group → Event → Entry relationships
@@ -122,6 +134,7 @@ Modern Core Domain Foundation
 4. Legacy regression tests
    - Existing tests remain passing
    - Legacy data compatibility verified
+  +++++++ REPLACE
 
 **Deliverables**:
 
@@ -143,11 +156,14 @@ Modern Core Domain Foundation
 
 **New Files**:
 
-- `Modern/engine/domains/Competition.js`
-- `Modern/engine/domains/Group.js`
-- `Modern/engine/domains/Event.js`
-- `Modern/engine/domains/Entry.js`
-- `Modern/engine/domains/Participant.js`
+- `Modern/engine/competition/domain/competition.js`
+- `Modern/engine/competition/domain/group.js`
+- `Modern/engine/competition/domain/event.js`
+- `Modern/engine/competition/domain/entry.js`
+- `Modern/engine/competition/domain/participant.js`
+- `Modern/engine/competition/domain/domain-error.js`
+- `Modern/engine/competition/domain/index.js`
+  +++++++ REPLACE
 
 **Changes**:
 
@@ -191,7 +207,86 @@ Modern Core Domain Foundation
 - Ensure existing tests remain passing
 
 
+# Integration Boundary
+
+## No External Layer Modifications
+
+**Important**: This task does NOT modify external layers.
+
+**Rationale**:
+
+- API layer must remain unchanged
+- Service layer is out of scope
+- Repository layer is out of scope
+- Database schema is out of scope
+- Legacy code must remain unchanged
+
+**Impact**:
+
+- No changes to `Modern/api/`
+- No changes to `Modern/services/`
+- No changes to `Modern/repositories/`
+- No changes to `Modern/db.sql`
+- No changes to Legacy code
+
+**Future Considerations**:
+
+- API boundaries will be defined in TASK-CORE-002
+- Service layer will be implemented in TASK-CORE-003
+- Repository layer will be implemented in TASK-CORE-003
+- Database schema will be designed in TASK-CORE-002
+- Legacy code integration will be handled in future tasks
+
+
+# Lifecycle Constraints
+
+## No New Lifecycle State Machines
+
+**Important**: Do not introduce new lifecycle state machines for Group/Event/Entry/Participant.
+
+**Rationale**:
+
+- This task focuses on domain model foundation
+- Lifecycle state machines are out of scope
+- Future tasks will define lifecycle management
+- Keep changes minimal and focused
+
+**Impact**:
+
+- No state machine implementations
+- No state transition logic
+- No lifecycle event handlers
+
+**Only Implement**:
+
+- Construction validation
+- Ownership invariants
+
+## No New Architecture Decisions
+
+**Important**: Do not add new architecture decisions.
+
+**Rationale**:
+
+- This task establishes the foundation
+- Do not introduce new patterns or principles
+- Keep changes incremental and focused
+
+**Impact**:
+
+- No new architectural patterns
+- No new design principles
+- No new abstractions
+
+**Only Update**:
+
+- Existing architecture decisions
+- Documentation clarifications
+- Implementation details
+
+
 # API Boundary Considerations
+  +++++++ REPLACE
 
 ## No API Changes
 
@@ -353,11 +448,11 @@ Modern Core Domain Foundation
 
 ## Test Tools
 
-**Framework**: Jest (existing framework)
+**Framework**: Node built-in test runner (`node:test`)
 
-**Coverage Tool**: Jest coverage plugin
+**Assertion Library**: `node:assert/strict`
 
-**Test Runner**: Jest
+**Test Runner**: Node.js built-in test runner
 
 ## Test Execution
 
@@ -365,16 +460,16 @@ Modern Core Domain Foundation
 
 ```bash
 # Run all tests
-npm test
+node --test Modern/test/
 
 # Run domain tests only
-npm test -- --testPathPattern=domains
+node --test Modern/test/domains/
 
 # Run legacy regression tests
-npm test -- --testPathPattern=legacy-regression
+node --test Modern/test/domains/legacy-regression.test.js
 
-# Run tests with coverage
-npm test -- --coverage
+# Run tests with coverage (if coverage tool available)
+node --test --experimental-coverage Modern/test/
 ```
 
 ## Test Coverage Goals
@@ -383,6 +478,7 @@ npm test -- --coverage
 - Ownership relationship tests: 95%+ coverage
 - Edge case tests: 85%+ coverage
 - Legacy regression tests: 100% coverage (all existing tests pass)
+  +++++++ REPLACE
 
 
 # Legacy Regression Strategy
@@ -456,13 +552,16 @@ If implementation fails or introduces critical issues, rollback to previous stat
 
 **Files to Remove**:
 
-- `Modern/engine/domains/Competition.js`
-- `Modern/engine/domains/Group.js`
-- `Modern/engine/domains/Event.js`
-- `Modern/engine/domains/Entry.js`
-- `Modern/engine/domains/Participant.js`
+- `Modern/engine/competition/domain/competition.js`
+- `Modern/engine/competition/domain/group.js`
+- `Modern/engine/competition/domain/event.js`
+- `Modern/engine/competition/domain/entry.js`
+- `Modern/engine/competition/domain/participant.js`
+- `Modern/engine/competition/domain/domain-error.js`
+- `Modern/engine/competition/domain/index.js`
 - `Modern/engine/domains/validators/*.js`
 - `Modern/test/domains/*.test.js`
+  +++++++ REPLACE
 
 **Files to Restore**:
 
