@@ -41,26 +41,31 @@ Modern Core Domain Foundation
    - Entry ownership invariants
 
 5. Define Participant domain model
-   - Participant entity
-   - Participant is an Entry-scoped association to a Player/identity
-   - Participant is NOT the owner of long-lived player identity
-   - Participant properties (identity, personal info, etc.)
-   - Participant construction validation
-   - Participant ownership invariants
+    - Participant entity
+    - Participant is an Entry-scoped association to a Player/identity
+    - Participant must NOT own long-lived identity
+    - Participant must NOT own personal information
+    - Participant must NOT own global participation history
+    - Participant references Player/identity through a reference field
+    - Participant construction validation
+    - Participant ownership invariants
   +++++++ REPLACE
 
 **Deliverables**:
 
 - Domain model definitions
 - Ownership relationship validation logic
-- Basic lifecycle validation logic
+- Construction validation logic
+- Ownership invariants validation logic
 
 **Acceptance Criteria**:
 
 - All domain models defined
 - Ownership relationships validated
-- Basic lifecycle methods implemented
+- Construction validation implemented
+- Ownership invariants validated
 - Domain tests passing
+  +++++++ REPLACE
 
 
 ## Phase 2: Domain Validation
@@ -170,7 +175,7 @@ Modern Core Domain Foundation
 - Add domain model classes
 - Implement ownership relationships
 - Add validation logic
-- Add lifecycle methods
+  +++++++ REPLACE
 
 ## Domain Validation
 

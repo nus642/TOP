@@ -63,13 +63,14 @@ Event:
 
 Entry:
 - Participation representation
-- Entry-specific rules
-- Entry-level statistics
+- Participant associations
 
 Participant:
-- Individual person identity
-- Personal information
-- Participation history
+- Entry-scoped association to Player/identity
+- Participant must NOT own long-lived identity
+- Participant must NOT own personal information
+- Participant must NOT own global participation history
+  +++++++ REPLACE
 
 
 # Why Entry Belongs to Event
