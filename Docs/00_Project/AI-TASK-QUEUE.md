@@ -121,3 +121,14 @@ Status Context:
 
   Status:
   Architecture Decision Recorded
+
+### TASK-CORE-001
+Modern Competition Core Domain Foundation
+- Competition domain foundation implemented
+- Competition → Group → Event → Entry → Participant hierarchy established
+- Ownership validation implemented
+- Association validation implemented
+- Domain tests added
+- PR #20 reviewed and merged
+- 80 tests passing
+- No Legacy/API/Service/Repository/Database changes
