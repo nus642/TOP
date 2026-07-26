@@ -181,11 +181,21 @@ Modern Core Domain Foundation
 
 **New Files**:
 
-- `Modern/engine/domains/validators/CompetitionValidator.js`
-- `Modern/engine/domains/validators/GroupValidator.js`
-- `Modern/engine/domains/validators/EventValidator.js`
-- `Modern/engine/domains/validators/EntryValidator.js`
-- `Modern/engine/domains/validators/ParticipantValidator.js`
+Validation remains inside the competition domain modules.
+
+Validation responsibilities are implemented within:
+
+Modern/engine/competition/domain/
+
+Each domain entity owns its own construction and association validation.
+
+Examples:
+
+- Competition validates Group ownership
+- Group validates Event ownership
+- Event validates Entry ownership
+- Entry validates Participant association
+- Participant validates identity reference
 
 **Changes**:
 
@@ -564,7 +574,9 @@ If implementation fails or introduces critical issues, rollback to previous stat
 - `Modern/engine/competition/domain/participant.js`
 - `Modern/engine/competition/domain/domain-error.js`
 - `Modern/engine/competition/domain/index.js`
-- `Modern/engine/domains/validators/*.js`
+Validation utilities are not separated into an independent validator layer in TASK-CORE-001.
+
+Future extraction of shared validation utilities should only happen when justified by repeated domain needs.
 - `Modern/test/domains/*.test.js`
   +++++++ REPLACE
 
