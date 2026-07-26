@@ -9,7 +9,6 @@
 **Background:** TOP is evolving from Legacy tournament workflows into a Modern tournament operation platform. Approved architecture defines the domain hierarchy: Competition → Group → Event → Entry → Participant. This implementation establishes the core objects and ownership relationships without implementing registration, scheduling algorithms, or match operations.
 
 **Domain Location:** `Modern/engine/competition/domain/`
-  +++++++ REPLACE
 
 **Scope Included:**  
 - Competition context foundation
@@ -44,7 +43,6 @@
 8. Entry owns participation state and participant associations.
 9. Entry must NOT own scoring rules, scheduling rules, or event format rules.
 10. Existing Legacy APIs and workflows must remain unchanged.
-  +++++++ REPLACE
 
 **Acceptance Criteria:**
 - Competition can own Groups
@@ -67,7 +65,6 @@ Include tests for:
 - Legacy regression protection
 - Domain model construction validation
 - Ownership invariants validation
-  +++++++ REPLACE
 
 **Integration Boundary:**
 
@@ -91,4 +88,3 @@ Do not add new architecture decisions.
 **Important Notes:**
 
 This is the first Modern domain implementation. Keep changes incremental. Do not redesign unrelated services. Do not modify production code outside the required domain scope. Follow TES Handoff Protocol.
-  +++++++ REPLACE
