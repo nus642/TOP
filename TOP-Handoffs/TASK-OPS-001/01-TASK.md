@@ -4,7 +4,7 @@
 **Title:** Match Operations Implementation Handoff  
 **Type:** DOCUMENTATION  
 **Priority:** High  
-**Dependency:** TASK-REG-001-D, TASK-OPS-002  
+**Dependency:** TASK-REG-001-D, TASK-CORE-001, TASK-OPS-002  
 **Date:** 2026-07-26  
 **Status:** Documentation Complete
 
@@ -19,6 +19,32 @@ Prepare future implementation handoff based on approved architecture. This docum
 ## Reference
 
 - `Docs/11_Engineering/TOP-Modern-Tournament-Operations-Architecture.md`
+
+---
+
+## Dependencies
+
+- TASK-REG-001-D
+- TASK-CORE-001: Modern Competition Core Domain Foundation
+- TASK-OPS-002
+
+---
+
+## Implementation Boundary
+
+TASK-OPS-001 consumes the Competition Core Domain provided by TASK-CORE-001.
+
+TASK-OPS-001 does not recreate or redefine:
+
+- Competition
+- Group
+- Event
+- Entry
+- Participant
+
+These entities remain owned by the Competition Core Domain.
+
+Match Operations works on confirmed competition data and uses Entry as the participation boundary.
 
 ---
 
