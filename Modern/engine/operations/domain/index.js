@@ -7,6 +7,7 @@ const { MatchResult } = require("./match-result");
 const { MasterConfirmation } = require("./master-confirmation");
 const { CompetitionUpdateIntent } = require("./competition-update-intent");
 const { DrawInput } = require("./draw-input");
+const { DrawInputValidator } = require("./draw-input-validator");
 
 module.exports = {
   OperationsError,
@@ -17,5 +18,6 @@ module.exports = {
   MatchResult,
   MasterConfirmation,
   CompetitionUpdateIntent,
-  DrawInput
+  DrawInput,
+  DrawInputValidator
 };
