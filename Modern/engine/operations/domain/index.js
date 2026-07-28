@@ -6,6 +6,7 @@ const { MatchExecutionContext } = require("./match-execution-context");
 const { MatchResult } = require("./match-result");
 const { MasterConfirmation } = require("./master-confirmation");
 const { CompetitionUpdateIntent } = require("./competition-update-intent");
+const { DrawInput } = require("./draw-input");
 
 module.exports = {
   OperationsError,
@@ -15,5 +16,6 @@ module.exports = {
   MatchExecutionContext,
   MatchResult,
   MasterConfirmation,
-  CompetitionUpdateIntent
+  CompetitionUpdateIntent,
+  DrawInput
 };
