@@ -1,4 +1,5 @@
 const { OperationsError } = require("./operations-error");
+const { MatchResult } = require("./match-result");
 
 class RefereeOperationalContext {
   constructor(options) {
@@ -9,6 +10,10 @@ class RefereeOperationalContext {
       throw new OperationsError('INVALID_MATCH_CONTEXT_TYPE', 'Invalid MatchContext type');
     }
     this.matchContext = options.matchContext;
+  }
+
+  recordResult(options) {
+    return new MatchResult(options);
   }
 
   validateOperation(operation) {
