@@ -17,7 +17,8 @@ Implement TASK-OPS-001-A3 match execution records
 - TASK-OPS-001-A1
   - MatchContext foundation
 
-- TASK-OPS-001-A2
+
+- TASK-OPS-001-A2 
   - Match execution boundary design
 
 - TASK-OPS-001-A3
@@ -25,26 +26,16 @@ Implement TASK-OPS-001-A3 match execution records
   - MatchResult
   - MasterConfirmation
   - CompetitionUpdateIntent
-
-## Design Completed
-
-TASK-OPS-001-A4
-
-- A4.1 DrawInput boundary
-- A4.2 DrawInputValidator boundary
-- A4.3 Readiness query boundary
-- A4 Final Review
+  
+- TASK-OPS-001-A4
+  - A4.1 DrawInput value object
+  - A4.2 DrawInput validation boundary
+  - A4.3 Operational readiness preparation query
+  - A4 implementation audit
 
 ## Next Action
 
-Implement:
-
-TASK-OPS-001-A4.1
-
-Scope:
-- DrawInput value object
-- tests
-- exports only
+- TASK-OPS-001-A5 design phase
 
 Do not modify:
 - MatchContext
