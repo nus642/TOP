@@ -1,7 +1,7 @@
 # TOP Development Checkpoint
 
 Date:
-2026-07-30
+2026-07-31
 
 ## Current Branch
 
@@ -105,6 +105,47 @@ Scheduling does not own:
 - competition records
 - ranking
 - analytics
+
+- Legacy Master Operations Analysis
+  - Master is an actor, not a domain owner
+  - Master is an operational role that performs authorized actions across domains
+  - Master does not own independent domain facts
+  - Master actions create facts owned by their respective domains
+
+Master responsibilities are distributed:
+- Manual result entry → Competition Result Recording
+- Scheduling operations → Scheduling
+- Referee and court management operations → Resource Management
+- Player/team management → Registration or Competition Configuration
+
+Architectural principle:
+Authorization and permission handling belong to the application layer, not domain ownership.
+
+Non-goals (avoid):
+- Master domain owning all operational data
+- Master workflow engine
+- Master-owned resource lifecycle
+- Master-owned match/result lifecycle
+
+- Legacy Player Registration Analysis
+  - Player is not currently justified as a standalone domain
+  - Player represents a competition participant / registration subject, not a Resource Management resource
+  - Registration concerns identified as a future domain boundary
+  - Match participation facts are owned by Match Operations
+  - Competition owns competition structure and participation rules
+  - Team membership and lineup concepts require future Registration boundary definition
+
+Player-related concepts are separated:
+- Registration facts → future Registration boundary
+- Competition participation rules → Competition
+- Actual match participants → Match Operations
+- Scheduling constraints → Scheduling when applicable
+
+Non-goals (avoid):
+- Player domain owning ranking
+- Player domain owning analytics
+- Player domain owning history
+- Player availability being treated as Resource Management core ownership
 
 ## Next Action
 
