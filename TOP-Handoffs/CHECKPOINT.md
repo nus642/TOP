@@ -1,7 +1,7 @@
 # TOP Development Checkpoint
 
 Date:
-2026-07-29
+2026-07-30
 
 ## Current Branch
 
@@ -33,9 +33,33 @@ Implement TASK-OPS-001-A3 match execution records
   - A4.3 Operational readiness preparation query
   - A4 implementation audit
 
+- TASK-OPS-001-A5
+  - Match Outcome Fact Boundary
+  - A5.1 Confirmed Match Outcome Boundary
+    - domain model implemented
+  - A5.2 Confirmation Evidence Boundary
+    - domain model implemented
+  - A5.3 Fact Consumer Boundary
+    - documentation only
+    - no production implementation required
+
+A5 established Match Operations as a domain fact producer:
+- confirmed match outcome facts
+- confirmation facts
+- evidence references
+
+A5 does not own:
+- ranking
+- analytics
+- scheduling
+- resource lifecycle
+- consumer workflows
+
 ## Next Action
 
-- TASK-OPS-001-A5 design phase
+- Prepare next domain boundary planning
+
+Do not introduce a new implementation task yet.
 
 Do not modify:
 - MatchContext
