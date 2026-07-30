@@ -1,4 +1,4 @@
-const { DrawInput, DrawInputValidator, OperationsError, MatchContext, MasterOperationalContext, RefereeOperationalContext, Confirmation, ConfirmedMatchOutcome, checkReadinessPreparation } = require('./domain');
+const { DrawInput, DrawInputValidator, OperationsError, MatchContext, MasterOperationalContext, RefereeOperationalContext, Confirmation, ConfirmationEvidence, ConfirmedMatchOutcome, checkReadinessPreparation } = require('./domain');
 
 module.exports = {
   OperationsError,
@@ -6,6 +6,7 @@ module.exports = {
   MasterOperationalContext,
   RefereeOperationalContext,
   Confirmation,
+  ConfirmationEvidence,
   ConfirmedMatchOutcome,
   DrawInput,
   DrawInputValidator,
