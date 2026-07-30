@@ -55,6 +55,27 @@ A5 does not own:
 - resource lifecycle
 - consumer workflows
 
+- TASK-COMP-001
+  - Competition Result Recording Boundary
+  - Official Competition Record boundary
+  - Master actor model
+  - Referee-confirmed and master-entered creation paths
+  - Source preservation
+  - Correction history principle
+
+TASK-COMP-001 established Competition Result Recording as official record owner:
+- accepts Confirmed Match Outcome from Match Operations
+- accepts master-entered results for edge cases
+- preserves source for every record
+- records are stable; future corrections are additive
+
+TASK-COMP-001 does not own:
+- ranking
+- advancement
+- analytics
+- scheduling
+- workflow engine
+
 ## Next Action
 
 - Prepare next domain boundary planning
