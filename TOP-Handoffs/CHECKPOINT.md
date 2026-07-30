@@ -76,6 +76,12 @@ TASK-COMP-001 does not own:
 - scheduling
 - workflow engine
 
+- TASK-RES-001-A1
+  - Resource Management Boundary
+  - Court resource facts
+  - Referee resource facts
+  - Availability separated from scheduling
+
 ## Next Action
 
 - Prepare next domain boundary planning
