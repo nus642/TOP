@@ -7,6 +7,7 @@ const { MatchResult } = require("./match-result");
 const { MasterConfirmation } = require("./master-confirmation");
 const { CompetitionUpdateIntent } = require("./competition-update-intent");
 const { Confirmation } = require("./confirmation");
+const { ConfirmationEvidence } = require("./confirmation-evidence");
 const { ConfirmedMatchOutcome } = require("./confirmed-match-outcome");
 const { DrawInput } = require("./draw-input");
 const { DrawInputValidator } = require("./draw-input-validator");
@@ -22,6 +23,7 @@ module.exports = {
   MasterConfirmation,
   CompetitionUpdateIntent,
   Confirmation,
+  ConfirmationEvidence,
   ConfirmedMatchOutcome,
   DrawInput,
   DrawInputValidator,
