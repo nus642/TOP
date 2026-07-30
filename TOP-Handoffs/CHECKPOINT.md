@@ -82,6 +82,30 @@ TASK-COMP-001 does not own:
   - Referee resource facts
   - Availability separated from scheduling
 
+- TASK-SCHED-001-A1
+  - Scheduling Boundary
+  - Scheduling owns assignment facts
+  - Match scheduling facts
+  - Court assignment facts
+  - Referee assignment facts
+  - Schedule date/time facts
+  - Assignment history facts
+  - Assignment does not imply resource ownership
+
+TASK-SCHED-001-A1 established Scheduling as the owner of assignment facts while keeping Resource Management as the owner of resource facts.
+
+Scheduling consumes resource facts and creates assignments.
+
+Scheduling does not own:
+- resource identity
+- resource lifecycle
+- availability management
+- match execution
+- match outcomes
+- competition records
+- ranking
+- analytics
+
 ## Next Action
 
 - Prepare next domain boundary planning
