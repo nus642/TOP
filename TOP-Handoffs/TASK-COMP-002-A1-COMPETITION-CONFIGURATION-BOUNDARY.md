@@ -33,7 +33,7 @@ It owns:
 
 - competition identity within an event and its entrant kind: individual/pair or team;
 - configured categories, divisions, pools, or groups, once their meanings are explicitly distinguished;
-- accepted entrant placement in a configured group or competition position;
+- configured group definitions, group structure, and pairing policies;
 - configured contest identity and the opposing entrant sides;
 - the structural relationship of a contest to a group, stage, round, or team encounter, where those concepts are explicitly configured;
 - match discipline/kind such as singles or doubles;
@@ -311,7 +311,10 @@ Buttons such as “parse and dispatch,” forced placeholder tasks, modal confir
 | Statement | Classification |
 |---|---|
 | Entrant A is accepted for competition C | Registration fact |
-| Entrant A is placed in group G | Competition Configuration fact |
+| Group G is configured with an intra-group pairing policy |
+Competition Configuration fact |
+| Entrant A is classified into Group G |
+ Registration fact |
 | Entrant A will contest entrant B in contest M | Competition Configuration fact |
 | M is best-of-three games to the configured score | Competition Configuration fact |
 | M is assigned to court 2 at 10:00 with referee R | Scheduling fact |
