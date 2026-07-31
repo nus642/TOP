@@ -48,6 +48,15 @@ Implement TASK-OPS-001-A3 match execution records
   - Registration does not own match participation, scheduling, competition structure, result recording, ranking, or analytics.
   - Registration boundary documentation reviewed and accepted.
 
+- Legacy Competition Configuration Analysis
+
+  - Competition configuration boundary analyzed
+  - Competition owns structure and pairing facts
+  - Scheduling owns placement and assignment facts
+  - Match Operations owns execution facts
+  - Competition Result Recording remains official record owner
+  - Draw behavior not inferred where legacy evidence is missing
+
 A5 established Match Operations as a domain fact producer:
 - confirmed match outcome facts
 - confirmation facts
