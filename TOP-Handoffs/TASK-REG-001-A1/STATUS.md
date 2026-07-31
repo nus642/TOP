@@ -36,8 +36,8 @@
 
 | Domain | Fact ownership |
 |--------|----------------|
-| Competition | Competition structure, team contests, lineup slots, participation rules, and official competition records |
-| Competition Result Recording |  official competition records |
+| Competition | Competition structure, team contests, lineup slots and participation rules |
+| Competition Result Recording |  Official competition records |
 | Registration | Accepted entrants, competition roster membership/submission, participation-constraint satisfaction/evidence, and confirmed lineup selections |
 | Scheduling | Schedule date/time, court/referee assignments, assignment history, and participant assignment conflicts |
 | Match Operations | Actual match participants, execution, live match facts, scoring, confirmation, and outcomes |
