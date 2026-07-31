@@ -43,6 +43,11 @@ Implement TASK-OPS-001-A3 match execution records
     - documentation only
     - no production implementation required
 
+- TASK-REG-001-A1 Registration Boundary
+  - Registration owns registration facts, accepted entrants, roster membership, lineup submission, and eligibility facts.
+  - Registration does not own match participation, scheduling, competition structure, result recording, ranking, or analytics.
+  - Registration boundary documentation reviewed and accepted.
+
 A5 established Match Operations as a domain fact producer:
 - confirmed match outcome facts
 - confirmation facts
