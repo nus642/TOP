@@ -166,6 +166,7 @@ This task does **not** design or introduce:
 - automatic scheduling, optimization, or conflict resolution;
 - match generation, execution, scoring, outcomes, or official competition records;
 - production models, APIs, schemas, persistence, user interfaces, or authorization implementation.
+- Production registration API design is intentionally deferred to a later implementation-focused sub-task.
 
 ## Open Business Questions
 
