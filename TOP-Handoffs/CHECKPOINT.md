@@ -161,6 +161,57 @@ Non-goals (avoid):
 - Player domain owning history
 - Player availability being treated as Resource Management core ownership
 
+- Legacy Match Generation Analysis
+  - Match generation behavior analyzed
+  - Competition owns generated contest structure facts
+  - Pairing generation is not draw ownership
+  - Scheduling owns placement and assignment facts
+  - Match Operations owns execution and outcome facts
+  - Legacy task objects contained mixed concerns and are not carried forward
+
+Match generation boundary conclusions:
+- Competition defines what contests exist (all-pairs rule, explicit pairing, team encounter composition)
+- Generation establishes that a contest exists (prospective fact, not execution)
+- Scheduling places contests (date/time, court, referee, queue)
+- Match Operations executes contests (actual participants, live scoring, outcome)
+- Competition Result Recording records official results
+
+Legacy generation paths identified:
+- Individual all-pairs generation within a group
+- Explicit individual VS import from spreadsheet
+- Manual individual creation
+- Team encounter generation (room creation)
+- Team constituent-match resolution (lineup pairing)
+- Forced unresolved team matches (operator override)
+
+Non-goals (avoid):
+- Automatic scheduling
+- Workflow engine
+- Draw system inference
+- Ranking/advancement logic
+
+- TASK-COMP-003-A1 Contest Generation Boundary
+  - Contest Generation is a fact creation boundary within the Competition domain.
+  - Competition Configuration defines rules, structure, templates, and constraints.
+  - Contest Generation creates contest facts from configured rules.
+  - Generated contests represent that a contest exists; they are not scheduling assignments.
+  - Registration remains authoritative for entrant facts, roster facts, eligibility, and lineup submission facts.
+  - Scheduling remains authoritative for placement facts including date/time, court, referee, and assignment history.
+  - Match Operations remains authoritative for execution facts, actual participants, scoring, completion, and outcome facts.
+  - Competition Result Recording remains authoritative for official competition records.
+
+Architectural decision:
+- Contest Generation is a domain fact boundary, not a workflow stage.
+- Fact ownership is separated from orchestration and process flow.
+
+Non-goals (avoid):
+- Automatic scheduling
+- Workflow engine
+- Draw system inference
+- Ranking or advancement logic
+- Result generation
+- Cross-domain ownership transfer
+
 ## Next Action
 
 - Prepare next domain boundary planning
