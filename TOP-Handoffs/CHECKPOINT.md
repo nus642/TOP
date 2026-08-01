@@ -57,7 +57,11 @@ Implement TASK-OPS-001-A3 match execution records
   - Competition Result Recording remains official record owner
   - Draw behavior not inferred where legacy evidence is missing
 
- - Legacy Competition Lifecycle & Versioning Analysis
+- Legacy Competition Lifecycle & Versioning Analysis
+  - Configuration changes do not automatically rewrite generated contest facts.
+  - Generated contests require explicit governance for identity, correction, supersession, and historical reference.
+  - Legacy behavior does not establish versioning, regeneration, or replacement policy.
+  - Lifecycle decisions are cross-boundary governance concerns, not a new domain ownership area.
 
 A5 established Match Operations as a domain fact producer:
 - confirmed match outcome facts
