@@ -21,6 +21,7 @@
 - [x] Responsibility matrix proposed (pending business approval).
 - [x] Policy scenarios identified (pending decisions).
 - [x] Non-goals and exit criteria stated.
+- [x] Decision questions classified and sequenced without answering business policy.
 - [ ] Awaiting policy decision from business authority.
 
 ## Deliverables
@@ -29,6 +30,7 @@
 |------|--------|
 | `TOP-Handoffs/TASK-COMP-004-A1/01-TASK.md` | ✅ Complete |
 | `TOP-Handoffs/TASK-COMP-004-A1/02-EXECUTIVE-SUMMARY.md` | ✅ Complete |
+| `TOP-Handoffs/TASK-COMP-004-A1/03-DECISION-CLASSIFICATION.md` | ✅ Complete |
 | `TOP-Handoffs/TASK-COMP-004-A1/STATUS.md` | ✅ Complete |
 
 ## Policy Decision Areas Requiring Approval
