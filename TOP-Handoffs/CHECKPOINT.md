@@ -218,6 +218,18 @@ Non-goals (avoid):
 - Result generation
 - Cross-domain ownership transfer
 
+- TASK-COMP-004-A1 Contest Identity / Configuration Reference Policy
+  - Task created; awaiting business policy decisions
+  - Six policy decision areas defined:
+    1. Contest identity meaning
+    2. Contest continuity across configuration changes
+    3. Configuration reference responsibility
+    4. Historical interpretation guarantees
+    5. Correction and supersession governance
+    6. Cross-domain reference responsibilities
+  - Implementation planning blocked until exit criteria are met
+  - Documentation only; no implementation designed
+
 ## Next Action
 
 - Prepare next domain boundary planning
