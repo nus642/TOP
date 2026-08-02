@@ -57,15 +57,15 @@ This is therefore a genuine business-governance gap exposed by the completed bou
 
 Implementation structure will inevitably embody answers to the open policy questions. Starting implementation first would allow choices about technical keys, mutable references, copied context, or destructive replacement to become accidental policy. Those choices would also constrain Scheduling, Match Operations, and Competition Result Recording even though those boundaries own their own facts.
 
-Another general legacy analysis should not precede this task. The existing analyses already establish the relevant legacy evidence and, importantly, its limits. A further evidence investigation is justified only if TASK-COMP-004-A1 discovers a narrow, answerable legacy question. Desired future governance still requires business approval and cannot be recovered solely from code.
+Another general legacy analysis should not precede this task. The existing analyses already establish the relevant legacy evidence and, importantly, its limits. A further evidence investigation is justified only if TASK-COMP-004-A1 discovers a narrow, answerable legacy question. Desired future governance still requires domain-rule confirmation by the responsible business owners and cannot be recovered solely from code.
 
 Another domain-boundary task should not precede it either. No presently identified fact lacks an owner. The missing decision concerns the relationship among facts whose ownership is already established.
 
 The sequencing should therefore be:
 
 1. complete TASK-COMP-004-A1 as a documentation-only policy task;
-2. obtain explicit approval or record unresolved cases as blockers or deliberate deferrals; and
-3. only then authorize implementation planning to translate the approved policy.
+2. obtain explicit domain-rule confirmation or record unresolved cases as blockers or deliberate deferrals; and
+3. only then authorize implementation planning to translate the confirmed domain rules.
 
 The task is complete only when later implementation planning can proceed without deciding contest continuity or historical-reference policy by accident.
 
@@ -124,7 +124,7 @@ Produce a responsibility matrix that preserves existing ownership:
 | Scheduling | Preserve assignment history against the contest to which each assignment applied. |
 | Match Operations | Preserve execution and actual-participation facts against the contest context in which they were recorded. |
 | Competition Result Recording | Preserve the official record and its historically meaningful relationship to the contest and confirmed outcome. |
-| Application layer | Coordinate authorized intents and resolve references according to approved policy without becoming a fact owner or workflow engine. |
+| Application layer | Coordinate authorized intents and resolve references according to confirmed domain rules without becoming a fact owner or workflow engine. |
 
 ### 3.5 Policy scenarios and invariants
 
@@ -143,13 +143,13 @@ For each scenario, record only:
 - whether the same-contest versus distinct-contest question is resolved;
 - what historical facts must remain interpretable;
 - which owner remains authoritative; and
-- whether the case is approved, prohibited, deferred, or a blocker.
+- whether the case is confirmed as permitted, prohibited, deferred, or a blocker.
 
 ### 3.6 Decisions, non-decisions, and exit criteria
 
 The deliverable should clearly distinguish:
 
-- approved business policy;
+- confirmed business domain rules;
 - architectural invariants derived from existing ownership decisions;
 - unresolved questions requiring a named business authority;
 - deliberate deferrals and the conditions that would reopen them; and
@@ -157,7 +157,7 @@ The deliverable should clearly distinguish:
 
 Recommended exit criteria are:
 
-1. business owners have approved enough continuity policy to distinguish an existing contest from a distinct replacement in every scenario required for the first implementation scope;
+1. business owners have confirmed enough continuity policy as domain rules to distinguish an existing contest from a distinct replacement in every scenario required for the first implementation scope;
 2. required historical interpretation of governing configuration is stated without prescribing a mechanism;
 3. downstream reference guarantees preserve all established fact owners;
 4. unresolved cases are explicit blockers or bounded deferrals rather than guessed rules; and
@@ -207,7 +207,7 @@ It is **not**:
 - a generic enterprise identifier standard; or
 - an implementation concern disguised as architecture policy.
 
-The application layer may later coordinate authorized actions under this policy, but coordination does not confer domain ownership. Each boundary remains responsible for its own facts and for honoring the approved reference invariants.
+The application layer may later coordinate authorized actions under this policy, but coordination does not confer domain ownership. Each boundary remains responsible for its own facts and for honoring the confirmed reference invariants.
 
 ---
 
@@ -239,7 +239,7 @@ TOP may be unable to answer which sides, format, structural context, assignment,
 
 ### Premature lock-in
 
-Schemas and APIs designed before policy approval may constrain the business to legacy behavior or require costly migration once continuity and reference requirements are finally decided.
+Schemas and APIs designed before domain-rule confirmation may constrain the business to legacy behavior or require costly migration once continuity and reference requirements are confirmed as domain rules.
 
 ### False confidence from legacy IDs
 
@@ -251,7 +251,7 @@ Path-dependent legacy identifiers may be treated as stable business identity eve
 
 Create **TASK-COMP-004-A1** next, before implementation planning.
 
-Keep it documentation-only and decision-oriented. Its purpose is to secure the minimum business-approved continuity and historical-reference policy needed to implement already established boundaries safely. Classify it under Competition for stewardship, while explicitly treating its reference guarantees as cross-domain governance. Do not use it to invent a new domain or to select any technical mechanism.
+Keep it documentation-only and decision-oriented. Its purpose is to secure the minimum business-confirmed continuity and historical-reference domain rules needed to implement already established boundaries safely. Classify it under Competition for stewardship, while explicitly treating its reference guarantees as cross-domain governance. Do not use it to invent a new domain or to select any technical mechanism.
 
 ---
 

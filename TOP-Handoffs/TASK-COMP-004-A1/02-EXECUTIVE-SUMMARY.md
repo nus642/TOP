@@ -28,7 +28,7 @@ This task defines the policy decisions required to close that gap.
 
 **Policy before mechanism.**
 
-This task records the questions that require business decisions and the invariants that must hold once those decisions are approved. It does not choose identifiers, schemas, versioning strategies, APIs, or workflow machinery.
+This task records the questions that require business decisions and the invariants that must hold once those decisions are confirmed as domain rules. It does not choose identifiers, schemas, versioning strategies, APIs, or workflow machinery.
 
 ## The Policy Gap in One Line
 
@@ -47,7 +47,7 @@ This task records the questions that require business decisions and the invarian
 
 ## Why This Matters
 
-Without approved policy:
+Without confirmed domain rules:
 
 - Technical keys, mutable objects, or copied values may silently decide what "same contest" means.
 - A later configuration edit could change how an earlier schedule, execution record, or official result is interpreted.

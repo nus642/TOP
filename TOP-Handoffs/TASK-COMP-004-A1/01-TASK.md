@@ -14,7 +14,7 @@
 
 Define the policy decisions required to govern contest identity, contest continuity, and configuration reference semantics across TOP domain boundaries.
 
-This task does **not** design implementation. It records the questions that require business decisions and the invariants that must hold once those decisions are approved.
+This task does **not** design implementation. It records the questions that require business decisions and the invariants that must hold once those decisions are confirmed as domain rules.
 
 ## Core Principle
 
@@ -118,7 +118,7 @@ Decisions required:
 
 ## Responsibility Matrix (Proposed)
 
-The following matrix preserves existing ownership and proposes reference responsibilities. Business approval is required.
+The following matrix preserves existing ownership and proposes reference responsibilities. Domain-rule confirmation by the responsible business owners is required.
 
 | Concern | Policy responsibility |
 |---------|----------------------|
@@ -128,13 +128,13 @@ The following matrix preserves existing ownership and proposes reference respons
 | Scheduling | Preserve assignment history against the contest to which each assignment applied. |
 | Match Operations | Preserve execution and actual-participation facts against the contest context in which they were recorded. |
 | Competition Result Recording | Preserve the official record and its historically meaningful relationship to the contest and confirmed outcome. |
-| Application layer | Coordinate authorized intents and resolve references according to approved policy without becoming a fact owner or workflow engine. |
+| Application layer | Coordinate authorized intents and resolve references according to confirmed domain rules without becoming a fact owner or workflow engine. |
 
 ---
 
 ## Policy Scenarios
 
-The following scenarios must be tested against the approved policy. For each, record whether the same-contest versus distinct-contest question is resolved, what historical facts must remain interpretable, which owner remains authoritative, and whether the case is approved, prohibited, deferred, or a blocker.
+The following scenarios must be tested against the confirmed domain rules. For each, record whether the same-contest versus distinct-contest question is resolved, what historical facts must remain interpretable, which owner remains authoritative, and whether the case is confirmed as permitted, prohibited, deferred, or a blocker.
 
 | # | Scenario | Decision status |
 |---|----------|-----------------|
@@ -174,7 +174,7 @@ This task does **not** define or design:
 
 The task is complete when:
 
-1. Business owners have approved enough continuity policy to distinguish an existing contest from a distinct replacement in every scenario required for the first implementation scope.
+1. Business owners have confirmed enough continuity policy as domain rules to distinguish an existing contest from a distinct replacement in every scenario required for the first implementation scope.
 2. Required historical interpretation of governing configuration is stated without prescribing a mechanism.
 3. Downstream reference guarantees preserve all established fact owners.
 4. Unresolved cases are explicit blockers or bounded deferrals rather than guessed rules.
