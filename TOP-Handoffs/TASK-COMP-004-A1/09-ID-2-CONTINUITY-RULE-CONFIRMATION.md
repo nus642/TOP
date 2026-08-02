@@ -22,6 +22,12 @@ This document does not design a mechanism for representing, storing, applying, o
 
 # 2. Relationship with ID-1
 
+## ID terminology traceability
+
+Earlier package framing placed “same contest versus replacement” criteria in ID-1 and described structural position, configured sides, temporal context, and other possible sources of contest identity meaning as ID-2. The current domain-rule-confirmation framing absorbs those identity-source questions into ID-1 because they define what contest identity means.
+
+ID-2 therefore does not redefine identity. It applies the contest identity meaning confirmed by ID-1 to permitted change scenarios and prepares confirmation of continuity interpretation. This refinement preserves the original open questions under clearer responsibilities; it does not answer either question or select a continuity outcome.
+
 ID-1 and ID-2 address separate, ordered domain questions:
 
 | Decision | Domain question | Boundary |

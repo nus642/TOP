@@ -1,6 +1,6 @@
 # TASK-COMP-004-A1 ID-1 Domain Rule Confirmation
 
-**Decision question:** ID-1 — What business criteria make an authorized change concern the same contest rather than a distinct replacement?
+**Decision question:** ID-1 — What business meaning makes a contest the same contest?
 
 **Status:** Preparation artifact — no domain rule confirmed
 
@@ -19,6 +19,12 @@
 # Purpose
 
 This document prepares a domain rule confirmation artifact for contest identity meaning.
+
+## ID terminology traceability
+
+Earlier package framing placed “same contest versus replacement” criteria in ID-1 and described structural position, configured sides, temporal context, and other possible sources of identity meaning as ID-2. The current domain-rule-confirmation framing absorbs those identity-source questions into ID-1 because they define what contest identity means.
+
+Under this refinement, ID-2 does not redefine identity. ID-2 applies the contest identity meaning confirmed through ID-1 to permitted change scenarios and asks how continuity is interpreted. This traceability statement changes the organization of the open questions; it does not answer ID-1 or ID-2.
 
 It frames the boundary between external competition operations and TOP responsibility, states the existing invariants, presents the ID-1 confirmation questions, and provides scenario prompts for responsible business owners to confirm the domain rule.
 
@@ -46,7 +52,7 @@ All domain rules remain open and require confirmation by responsible business ow
 
 This confirmation covers the domain rule for ID-1:
 
-**What business criteria make an authorized change concern the same contest rather than a distinct replacement?**
+**What business meaning makes a contest the same contest?**
 
 The confirmation establishes the business meaning of contest continuity and replacement. It determines how TOP interprets and preserves the historical meaning of facts after external competition operations occur.
 
@@ -382,9 +388,9 @@ The following items remain unresolved until the domain rule is confirmed:
 
 | Item | Description | Dependency |
 |---|---|---|
-| ID-1 domain rule | The business criteria for continuity versus replacement | Requires confirmation by responsible business owners |
-| ID-2 domain rule | The candidate sources of contest identity meaning | Depends on ID-1 confirmation |
-| ID-3 domain rule | Uniform or mode-specific identity meaning | Depends on ID-1 and ID-2 confirmation |
+| ID-1 domain rule | The business meaning of contest identity, including the original identity-source questions | Requires confirmation by responsible business owners |
+| ID-2 domain rule | Continuity interpretation when permitted changes occur | Applies the confirmed ID-1 meaning and does not redefine identity |
+| ID-3 domain rule | Uniform or mode-specific identity meaning | Depends on the applicable ID-1 confirmation; its relationship to ID-2 remains a scoped confirmation question |
 | CT-1 through CT-3 | Effect of configuration changes | Depends on ID-1 confirmation |
 | CT-4 and CT-5 | Replacement threshold and change classification | Depends on ID-1 confirmation |
 | CT-6 | Effective scope and permitted change | Depends on ID-1 confirmation |
