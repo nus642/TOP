@@ -18,7 +18,7 @@
 - [x] Based on architecture recommendation dated 2026-08-01.
 - [x] Policy decision areas defined.
 - [x] Questions recorded without inventing business decisions.
-- [x] Responsibility matrix proposed (pending business approval).
+- [x] Responsibility matrix proposed (pending domain-rule confirmation by the responsible business owners).
 - [x] Policy scenarios identified (pending decisions).
 - [x] Non-goals and exit criteria stated.
 - [x] Decision questions classified and sequenced without answering business policy.
@@ -40,7 +40,7 @@
 | `TOP-Handoffs/TASK-COMP-004-A1/07-ID-1-DECISION-FACILITATION.md` | ✅ Complete — preparation artifact |
 | `TOP-Handoffs/TASK-COMP-004-A1/STATUS.md` | ✅ Complete |
 
-## Policy Decision Areas Requiring Approval
+## Policy Decision Areas Requiring Domain-Rule Confirmation
 
 | # | Area | Status |
 |---|------|--------|
@@ -69,7 +69,7 @@ This is a policy decision task, not an implementation task.
 
 ## Next Step
 
-Obtain business policy decisions for the six decision areas. Once approved, record the decisions and invariants. Implementation planning may proceed only after the exit criteria are met.
+Obtain business policy decisions for the six decision areas. Once confirmed as domain rules, record the decisions and invariants. Implementation planning may proceed only after the exit criteria are met.
 
 ---
 

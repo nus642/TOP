@@ -30,7 +30,7 @@ This document does **not**:
 - rank or prefer any policy direction;
 - invent business answers or stakeholder positions.
 
-All policy decisions remain open and require authorized business approval.
+All policy decisions remain open and require domain-rule confirmation by authorized business owners.
 
 ---
 
@@ -59,7 +59,7 @@ An established contest may later be affected by a correction, participant change
 - Another may treat it as the end of the original obligation and the creation of a replacement.
 - Both views may describe the same visible change but attach different importance to the reason for the change, its material effect, or how much history already exists.
 
-Without an explicit business rule, continuity could be determined unintentionally by whichever record happens to be edited or whichever technical reference remains unchanged. Legacy capability to overwrite or delete information is evidence of past implementation behavior, not evidence of an approved future policy.
+Without an explicit business rule, continuity could be determined unintentionally by whichever record happens to be edited or whichever technical reference remains unchanged. Legacy capability to overwrite or delete information is evidence of past implementation behavior, not evidence of a confirmed future domain rule.
 
 ## What the decision affects
 
@@ -104,11 +104,11 @@ Before deciding, stakeholders should confirm shared understanding of the followi
 | Same contest | The business meaning of continuity: the changed facts still concern the original sporting obligation. |
 | Distinct replacement | A different sporting obligation that is related to but not continuous with the original. |
 | Correction | An authorized change that fixes an error or deficiency. Whether correction preserves continuity is part of the decision. |
-| Change | An authorized modification to contest context. Whether change preserves continuity depends on the approved criteria. |
+| Change | An authorized modification to contest context. Whether change preserves continuity depends on the confirmed domain-rule criteria. |
 | Cancellation | An authorized action that ends a contest. Whether downstream references remain historical is a separate decision. |
 | Replacement | An authorized action that establishes a distinct contest in place of the original. |
 | Supersession | An authorized action that establishes a distinct contest that coexists historically with the original. |
-| Regeneration | Repeated generation activity. Whether it continues prior contests or establishes distinct contests depends on the approved criteria. |
+| Regeneration | Repeated generation activity. Whether it continues prior contests or establishes distinct contests depends on the confirmed domain-rule criteria. |
 | Material change | A change that alters the sporting obligation in a significant way. The definition of "material" is part of the decision. |
 | Essential characteristics | The business characteristics that define what makes a contest the contest it is. Which characteristics are essential is part of the decision. |
 | Milestone | A point in the contest lifecycle: generation, assignment, start, completion, official recording. Whether milestones affect identity is part of the decision. |
@@ -170,11 +170,11 @@ For each policy direction that stakeholders wish to explore further:
 
 If stakeholders reach a decision, record:
 
-- the approved business statement;
+- the confirmed domain-rule statement;
 - the included modes and scenarios;
 - the decisive criteria and their rationale;
 - named exceptions and unresolved edge cases;
-- the approving authority and date;
+- the confirming authority and date;
 - any bounded deferrals with owners and reopening conditions.
 
 If stakeholders cannot reach a decision, record:
@@ -292,7 +292,7 @@ The same proposed change may have a different continuity outcome depending on wh
 
 ## Direction E — Authorized intent and purpose
 
-The declared and approved business purpose is central. Correcting an error may preserve continuity, while cancelling an obligation and commissioning another may create a replacement even when the visible facts are similar.
+The declared business purpose confirmed under the domain rules is central. Correcting an error may preserve continuity, while cancelling an obligation and commissioning another may create a replacement even when the visible facts are similar.
 
 **Potential benefits:** Distinguishes error correction from a new competitive decision; aligns continuity with the authorized business act; handles visually identical changes with different meanings.
 
@@ -359,11 +359,11 @@ TBD
 
 TBD
 
-## Approving authority
+## Confirming authority
 
 TBD
 
-## Approval date
+## Confirmation date
 
 TBD
 

@@ -12,7 +12,7 @@
 
 ## Purpose
 
-This paper prepares business stakeholders to discuss what makes a contest remain the **same contest** when an authorized change occurs and what makes it a **distinct replacement**. It does not answer that question, express a preference, or approve a policy.
+This paper prepares business stakeholders to discuss what makes a contest remain the **same contest** when an authorized change occurs and what makes it a **distinct replacement**. It does not answer that question, express a preference, or confirm a domain rule.
 
 The discussion is deliberately about business meaning rather than technical representation. A contest may be referred to by systems in many ways, but none of those technical references should decide sporting or operational continuity by accident.
 
@@ -53,7 +53,7 @@ The options below are discussion patterns, not proposals. They may be refined, c
 
 A contest can be corrected or changed after it is established. The change might concern its participants, its place in the competition, its timing, or another part of its governing context. Existing ownership boundaries say who owns each affected fact, but they do not say whether the business should continue to regard the contest as the original sporting obligation or as a new obligation replacing it.
 
-Without an explicit business rule, continuity could be determined unintentionally by whichever record happens to be edited or whichever technical reference remains unchanged. Legacy capability to overwrite or delete information is evidence of past implementation behavior, not evidence of an approved future policy.
+Without an explicit business rule, continuity could be determined unintentionally by whichever record happens to be edited or whichever technical reference remains unchanged. Legacy capability to overwrite or delete information is evidence of past implementation behavior, not evidence of a confirmed future domain rule.
 
 ### 2. What business meaning it affects
 
@@ -141,7 +141,7 @@ Continuity is assessed through a stated combination of materiality, milestone, a
 
 “The same contest” can mean different things to different stakeholders. One person may mean the contest occupying a particular place in a competition structure; another may mean a meeting between particular sides; another may mean the obligation intended for a particular round or period. Those meanings can diverge when sides change, a contest moves, or competition structure is corrected.
 
-ID-1 asks for the boundary between continuity and replacement. ID-2 asks which business characteristics inform that boundary. These characteristics are meanings to approve, not fields or components of an identifier.
+ID-1 asks for the boundary between continuity and replacement. ID-2 asks which business characteristics inform that boundary. These characteristics are meanings to confirm as domain rules, not fields or components of an identifier.
 
 ### 2. What business meaning it affects
 
@@ -158,7 +158,7 @@ It therefore affects how the business explains participant substitutions, struct
 
 | Downstream domain | Dependency on the answer |
 |---|---|
-| **Contest Generation** | Needs the approved business characteristics that distinguish continuation from creation of a distinct contest. |
+| **Contest Generation** | Needs the confirmed business characteristics that distinguish continuation from creation of a distinct contest. |
 | **Scheduling** | Needs to distinguish the contest's business temporal context from Scheduling-owned placement and assignment facts. |
 | **Match Operations** | Needs stable business interpretation of the contest context against which execution is recorded, while preserving actual participation as its own fact. |
 | **Competition Result Recording** | Needs to understand which contest the official record concerns when structural, side, or temporal context changes. |
@@ -185,11 +185,11 @@ No technical key, matching rule, or data layout should be chosen to resolve thes
 
 #### Option A — Structural position is primary
 
-Continuity primarily follows the contest's business place in the competition structure, even if configured sides or timing change within approved limits.
+Continuity primarily follows the contest's business place in the competition structure, even if configured sides or timing change within limits established by confirmed domain rules.
 
 #### Option B — Configured sides are primary
 
-Continuity primarily follows the intended meeting of the configured sides, even if its structural placement or temporal context changes within approved limits.
+Continuity primarily follows the intended meeting of the configured sides, even if its structural placement or temporal context changes within limits established by confirmed domain rules.
 
 #### Option C — Temporal context is primary
 
@@ -286,7 +286,7 @@ Define contest identity separately for round-robin, explicit-pairing, and team-e
 
 #### Option D — Decide the first-scope modes and defer the rest
 
-Approve a policy only for explicitly included modes. Record each excluded mode, why it is excluded, who must revisit it, and the event that reopens the decision.
+Confirm a policy as domain rules only for explicitly included modes. Record each excluded mode, why it is excluded, who must revisit it, and the event that reopens the decision.
 
 ### 6. Trade-offs of the options
 
@@ -313,15 +313,15 @@ The discussion may move back and forth where an example exposes ambiguity, but n
 
 For each question, the meeting record should capture only policy-level outcomes:
 
-- decision status: approved, not approved, or bounded deferral;
-- the approved business statement, if decided;
+- decision status: confirmed as a domain rule, not confirmed, or bounded deferral;
+- the confirmed domain-rule statement, if decided;
 - included modes and scenarios;
 - named exceptions or unresolved edge cases;
-- the authorized decision-maker or approving body;
+- the authorized decision-maker or confirming body;
 - the business rationale; and
 - for a deferral, the responsible stakeholder and reopening condition.
 
-The meeting record should not translate those outcomes into identifiers, schemas, versioning, storage, or APIs. Those choices remain deferred until the policy is approved.
+The meeting record should not translate those outcomes into identifiers, schemas, versioning, storage, or APIs. Those choices remain deferred until the policy is confirmed as domain rules.
 
 ---
 

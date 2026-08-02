@@ -26,7 +26,7 @@ This document does **not**:
 - invent business answers or stakeholder positions;
 - produce final policy statements.
 
-All decisions remain open and require authorized business approval.
+All decisions remain open and require domain-rule confirmation by authorized business owners.
 
 ---
 
@@ -187,7 +187,7 @@ These questions define the audit and reconstructability guarantees the business 
 
 **Why the decision matters:**
 
-Legacy behavior permitted destructive overwrite, but technical capability is not business approval. Without explicit governance, replacement may erase the distinction between original and corrected facts, orphan downstream references, or silently rewrite history. Each domain boundary must know what it may and must preserve when another boundary's facts change.
+Legacy behavior permitted destructive overwrite, but technical capability is not confirmation of a domain rule. Without explicit governance, replacement may erase the distinction between original and corrected facts, orphan downstream references, or silently rewrite history. Each domain boundary must know what it may and must preserve when another boundary's facts change.
 
 **Affected domain boundaries:**
 
@@ -222,7 +222,7 @@ Legacy behavior permitted destructive overwrite, but technical capability is not
 
 **Why the decision matters:**
 
-Each boundary owns its own facts and references contests independently. Without an approved behavioral contract, Scheduling could resolve a contest reference against one meaning while Match Operations resolves it against another. The overall history could contradict itself even though each record appears locally valid.
+Each boundary owns its own facts and references contests independently. Without a confirmed domain-rule contract, Scheduling could resolve a contest reference against one meaning while Match Operations resolves it against another. The overall history could contradict itself even though each record appears locally valid.
 
 **Affected domain boundaries:**
 
@@ -264,11 +264,11 @@ Each boundary owns its own facts and references contests independently. Without 
 
 **Why the decision matters:**
 
-Implementation choices embody answers to policy questions. If technical design proceeds before policy approval, choices about keys, mutable references, copied context, or destructive replacement become accidental business rules that are expensive to reverse. Explicitly deferring these topics protects the policy decision process.
+Implementation choices embody answers to policy questions. If technical design proceeds before domain-rule confirmation, choices about keys, mutable references, copied context, or destructive replacement become accidental business rules that are expensive to reverse. Explicitly deferring these topics protects the domain-rule confirmation process.
 
 **Affected domain boundaries:**
 
-All boundaries are affected because implementation planning will translate approved policy into technical design for each.
+All boundaries are affected because implementation planning will translate confirmed domain rules into technical design for each.
 
 **Questions that must remain policy-level:**
 
@@ -329,11 +329,11 @@ This agenda does not discuss or decide:
 
 For each decision area, the session should produce:
 
-1. The approved business outcome or explicit prohibition.
+1. The confirmed domain-rule outcome or explicit prohibition.
 2. The modes and scenarios to which it applies.
 3. The historical facts that must remain interpretable.
 4. The established fact owners that remain authoritative.
-5. The named decision authority and approval date.
+5. The named decision authority and confirmation date.
 6. Any bounded deferral and its reopening condition.
 
 No identifier format, schema, snapshot strategy, event model, API, workflow, or storage mechanism should be recorded as part of a policy answer.

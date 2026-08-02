@@ -12,7 +12,7 @@
 
 This analysis prepares a focused business decision session for ID-1. It frames the ambiguity, the situations that expose it, the available policy directions, their benefits and risks, the dependent decisions, and the questions that business owners must answer.
 
-The analysis is neutral. It does not select or rank a direction. It also does not prescribe how an approved policy would be delivered. The listed directions may be refined, combined, or rejected by the authorized business owners.
+The analysis is neutral. It does not select or rank a direction. It also does not prescribe how confirmed domain rules would be delivered. The listed directions may be refined, combined, or rejected by the authorized business owners.
 
 ## Decision Boundary
 
@@ -63,7 +63,7 @@ No boundary may infer the answer merely from the fact that one of its own facts 
 - an official record cannot retroactively determine what every earlier correction meant; and
 - a change in competition structure cannot silently redefine independently owned assignment, execution, or official facts.
 
-The legacy material also cannot supply the answer. It shows that operators could edit, overwrite, delete, and repeat generation activity, but it does not preserve the business intent needed to distinguish correction, cancellation, duplication, and replacement. Technical capability is therefore evidence of an unresolved governance gap, not evidence of an approved continuity rule.
+The legacy material also cannot supply the answer. It shows that operators could edit, overwrite, delete, and repeat generation activity, but it does not preserve the business intent needed to distinguish correction, cancellation, duplication, and replacement. Technical capability is therefore evidence of an unresolved governance gap, not evidence of a confirmed continuity rule.
 
 ## 3. Scenarios Requiring Stakeholder Judgment
 
@@ -109,7 +109,7 @@ The same proposed change may have a different continuity outcome depending on wh
 
 ### Direction E — Authorized intent and purpose
 
-The declared and approved business purpose is central. Correcting an error may preserve continuity, while cancelling an obligation and commissioning another may create a replacement even when the visible facts are similar.
+The declared business purpose confirmed under the domain rules is central. Correcting an error may preserve continuity, while cancelling an obligation and commissioning another may create a replacement even when the visible facts are similar.
 
 ### Direction F — Narrow continuity
 
@@ -145,10 +145,10 @@ ID-1 is the prerequisite meaning for later policy decisions. It does not answer 
 | Dependent decision area | Dependency on ID-1 |
 |---|---|
 | Sources of identity meaning (ID-2) | Must identify which characteristics provide evidence that the sporting obligation continues or has been replaced. |
-| Uniform or mode-specific meaning (ID-3) | Must determine whether the approved continuity boundary applies to every included competition mode. |
+| Uniform or mode-specific meaning (ID-3) | Must determine whether the confirmed continuity boundary applies to every included competition mode. |
 | Effect of configuration changes (CT-1 through CT-3) | Must distinguish changes to an existing contest from changes that establish a replacement, before and after downstream history exists. |
 | Replacement threshold and change classification (CT-4 and CT-5) | Must turn the ID-1 meaning into clear distinctions among correction, prospective change, and replacement. |
-| Effective scope and permitted change (CT-6) | Must decide when approved changes take effect and whether continuity remains possible at later milestones. |
+| Effective scope and permitted change (CT-6) | Must decide when changes permitted by confirmed domain rules take effect and whether continuity remains possible at later milestones. |
 | Historical interpretation (GC-3, GC-4, HI-1, HI-2, and HI-6) | Must state what earlier meaning remains explainable when the same contest changes or when a replacement is established. |
 | Correction, cancellation, and supersession (CS-1 through CS-7 and CS-9) | Must define the relationship between the original obligation, authorized corrective action, a distinct replacement, and independently owned downstream facts. |
 | Partial change (CS-10) | Must decide whether continuity is judged for each affected contest, for a collective set, or for a parent and its constituents. |
@@ -203,7 +203,7 @@ The established ownership rules remain constraints throughout: a decision that a
 3. Test each policy direction against the scenario table without ranking the directions in advance.
 4. For each scenario, record the proposed classification and the business reason that controls it.
 5. Compare answers for contradictions, especially where intent, material effect, and timing point in different directions.
-6. Record an approved rule only if it states scope, decisive criteria, exceptions, and treatment of unresolved cases.
+6. Record a confirmed domain rule only if it states scope, decisive criteria, exceptions, and treatment of unresolved cases.
 7. Carry consequences into the dependent decision sessions rather than deciding them implicitly during ID-1.
 
 ## Expected Session Output
@@ -215,7 +215,7 @@ The ID-1 session should produce, if the authorized owners reach a decision:
 - the included modes and contest forms;
 - the significance of material effect, authorized purpose, and timing;
 - named exceptions and scenario outcomes;
-- the approving authority and rationale; and
+- the confirming authority and rationale; and
 - bounded deferrals with owners and reopening conditions.
 
 If stakeholders cannot reach a decision, the session should record the precise unresolved criterion or scenario rather than allowing later delivery work to infer an answer.

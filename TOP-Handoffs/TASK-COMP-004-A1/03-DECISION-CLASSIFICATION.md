@@ -10,13 +10,13 @@
 
 This document prepares the TASK-COMP-004-A1 policy decision process. It does **not** select a policy outcome.
 
-The source documents sometimes combine a policy question with a possible technical mechanism. Those parts are separated below so that approving a required business outcome does not accidentally approve an identifier, schema, snapshot, versioning, or storage design.
+The source documents sometimes combine a policy question with a possible technical mechanism. Those parts are separated below so that confirming a required business outcome as a domain rule does not accidentally select an identifier, schema, snapshot, versioning, or storage design.
 
 | Class | Meaning in this document | Decision owner / timing |
 |---|---|---|
 | **A — Business policy decision required** | Defines sporting or operational meaning, permitted change, continuity, correction, supersession, or the historical guarantee the business requires. | Authorized business stakeholders must decide before affected implementation proceeds. |
 | **B — Architecture invariant that can be defined now** | Restates an already established ownership or cross-boundary constraint without choosing a new business rule. | Architecture may record now; implementation must preserve it. |
-| **C — Implementation decision (must defer)** | Chooses how approved policy is represented, persisted, addressed, resolved, or enforced. | Defer until policy is approved and implementation planning begins. |
+| **C — Implementation decision (must defer)** | Chooses how confirmed domain rules are represented, persisted, addressed, resolved, or enforced. | Defer until the domain rules are confirmed and implementation planning begins. |
 | **D — Requires stakeholder clarification** | The question cannot yet be put to a decision authority cleanly because scope, terminology, actor, scenario, or required implementation slice is unspecified. | Clarify first, then reclassify the resulting bounded question as A, B, or C. |
 
 “Blocker” below means a blocker for the implementation slice that encounters the question. It does not mean every unresolved question blocks every possible piece of work.
@@ -32,7 +32,7 @@ The source documents sometimes combine a policy question with a possible technic
 | ID-1 | What business criteria make an authorized change concern the same contest rather than a distinct replacement? | **A** | **Blocks** contest identity and mutation design. | This is the central continuity policy; a technical key must not answer it. |
 | ID-2 | Is contest identity determined by structural position, configured sides, temporal context, or some business-defined combination? | **A** | **Blocks** identity and regeneration matching behavior. | These are candidate business meanings, not identifier fields. |
 | ID-3 | Does contest identity meaning differ among round-robin, explicit-pairing, and team-encounter modes? | **D** | **Blocks only modes included in the first implementation scope.** | Stakeholders must first confirm the supported modes and whether one rule or mode-specific rules are required. |
-| ID-4 | What stable technical identities, formats, and keys represent a contest, side, encounter, structural position, configuration revision, or generation action? | **C** | Does **not** belong in this policy decision. | Stable business meaning must be approved first; identifier format and key selection are implementation choices. |
+| ID-4 | What stable technical identities, formats, and keys represent a contest, side, encounter, structural position, configuration revision, or generation action? | **C** | Does **not** belong in this policy decision. | Stable business meaning must be confirmed as domain rules first; identifier format and key selection are implementation choices. |
 | CT-1 | Which configuration changes affect already generated contests, future contests, or both before scheduling? | **A** | **Blocks** post-generation configuration changes. | This determines effective scope of change. |
 | CT-2 | Which configuration changes affect already generated contests, future contests, or both after scheduling? | **A** | **Blocks** configuration changes involving assignments. | The answer must not be inferred from mutable legacy records. |
 | CT-3 | Which configuration changes affect already generated contests, future contests, or both after execution or official recording? | **A** | **Blocks** changes involving execution or official history. | This is historical continuity policy. |
@@ -47,7 +47,7 @@ The source documents sometimes combine a policy question with a possible technic
 |---|---|---|---|---|
 | GC-1 | Must Competition Configuration preserve the authoritative meaning and provenance of the configuration facts it owns? | **B** | **Blocks** any design that would lose owned authoritative meaning. | Fact ownership is already established; a reference does not move this responsibility. The required retention extent remains a policy question. |
 | GC-2 | Must Contest Generation preserve that a contest was established and its relationship to the governing configuration context? | **B** | **Blocks** contest persistence/reference design. | The source configuration and generated contest are distinct facts; preserving their meaningful relationship follows from the established boundary. |
-| GC-3 | Which governing categories must remain interpretable: sides, structural position, group/stage, discipline, format, scoring, template position, parent encounter, and provenance? | **A** | **Blocks** the minimum historical-context contract. | Stakeholders must approve required meaning category by category; the list must not imply a storage layout. |
+| GC-3 | Which governing categories must remain interpretable: sides, structural position, group/stage, discipline, format, scoring, template position, parent encounter, and provenance? | **A** | **Blocks** the minimum historical-context contract. | Stakeholders must confirm required meaning category by category; the list must not imply a storage layout. |
 | GC-4 | May a later configuration edit change how an earlier contest is interpreted? | **A** | **Blocks** current-value lookup and mutation behavior. | This defines the historical guarantee rather than the mechanism that satisfies it. |
 | HI-1 | Must an authorized reader be able to explain why a contest had its configured sides and structural context? | **A** | **Blocks** historical-context requirements. | This is an audit/reconstructability outcome. |
 | HI-2 | Must an authorized reader be able to explain which discipline, format, scoring rules, or template position governed at execution time? | **A** | **Blocks** execution-context requirements. | This decides required historical meaning, not whether data is copied or referenced. |
@@ -56,7 +56,7 @@ The source documents sometimes combine a policy question with a possible technic
 | HI-5 | Must an official record retain a historically meaningful relationship to the contest and confirmed outcome it records? | **B** | **Blocks** official-record references that resolve only to mutable current meaning. | Competition Result Recording owns the stable official record; upstream changes cannot silently rewrite it. |
 | HI-6 | What minimum provenance must explain why a contest existed and which rules, sides, or template governed it? | **A** | **Blocks** the provenance requirement. | The outcome and required evidence are policy; fields and storage are deferred. |
 | HI-7 | How long must cancelled, superseded, deleted, or erroneous facts remain visible to authorized users? | **D** | Can remain open unless retention is part of the first slice or legal/audit obligations apply. | A named retention authority, record classes, jurisdictions, and visibility meanings are needed before a policy decision can be framed. |
-| HI-8 | Which values are copied, referenced, snapshotted, or stored on a contest or official record, and how are historical links persisted? | **C** | Must remain open until historical guarantees are approved. | These are representation and persistence mechanisms, including the legacy analysis's “minimal snapshot” question. |
+| HI-8 | Which values are copied, referenced, snapshotted, or stored on a contest or official record, and how are historical links persisted? | **C** | Must remain open until historical guarantees are confirmed as domain rules. | These are representation and persistence mechanisms, including the legacy analysis's “minimal snapshot” question. |
 
 ### 1.3 Correction, cancellation, supersession, and regeneration
 
@@ -67,7 +67,7 @@ The source documents sometimes combine a policy question with a possible technic
 | CS-3 | Must cancellation preserve downstream references as historical, or may any references be invalidated, and under what business conditions? | **A** | **Blocks** cancellation where downstream facts exist. | The answer must distinguish historical preservation from operational validity. |
 | CS-4 | Does replacement or supersession create a distinct contest that coexists historically with the original? | **A** | **Blocks** replacement and supersession design. | This decides historical identity, not how an active replacement is technically found. |
 | CS-5 | What should happen, at the policy level, to Scheduling, Match Operations, and official-record references when a contest is superseded? | **A** | **Blocks** supersession with downstream history. | Each owner must retain its facts; policy must decide their relationship and operational treatment. |
-| CS-6 | Is destructive overwrite or deletion of original facts ever acceptable, and under what business conditions? | **A** | **Blocks** destructive mutation/deletion. | Legacy technical capability is not approval; any exception requires explicit policy. |
+| CS-6 | Is destructive overwrite or deletion of original facts ever acceptable, and under what business conditions? | **A** | **Blocks** destructive mutation/deletion. | Legacy technical capability is not confirmation of a domain rule; any exception requires explicit policy. |
 | CS-7 | What provenance must a correction or supersession preserve, such as actor, authority, reason, evidence, time, prior meaning, and affected references? | **A** | **Blocks** minimum correction/supersession audit requirements. | Policy selects required evidence; schema and fields are deferred. |
 | CS-8 | Who may authorize correction, cancellation, voiding, replacement, or supersession, and when is escalation required? | **D** | **Blocks** exposing these operations. | Stakeholders must identify the business authorities and governance scope before detailed authorization policy is decided. Role-model implementation remains out of scope. |
 | CS-9 | May a contest be superseded after assignment, start, outcome confirmation, or official result creation? | **A** | **Blocks** supersession at each included milestone. | This is a permission/prohibition policy. |
@@ -76,7 +76,7 @@ The source documents sometimes combine a policy question with a possible technic
 | RG-2 | Must regeneration retain a meaningful relationship to prior generation and a reason for occurring? | **A** | **Blocks** regeneration provenance requirements. | This chooses the guarantee, not its representation. |
 | RG-3 | Can regeneration occur after Scheduling, Match Operations, or Result Recording facts exist? | **A** | **Blocks** regeneration at those milestones. | Cross-domain facts cannot be cascaded or erased implicitly. |
 | RG-4 | Are placeholder team contests the same contests later completed with prospective detail, or distinct contests replaced by resolved constituent contests? | **D** | **Blocks** placeholder behavior if that legacy concept is retained in the first scope. | Stakeholders must first clarify whether placeholders are a future business concept or only a legacy implementation artifact. |
-| RG-5 | How are unchanged, removed, added, and materially changed contests matched during regeneration? | **C** | Must defer until ID-1, ID-2, and RG-1 are approved. | Recognition and matching are algorithms that implement identity policy. |
+| RG-5 | How are unchanged, removed, added, and materially changed contests matched during regeneration? | **C** | Must defer until ID-1, ID-2, and RG-1 are confirmed as domain rules. | Recognition and matching are algorithms that implement identity policy. |
 
 ### 1.4 Cross-domain responsibilities, disputes, and scope
 
@@ -98,14 +98,14 @@ The source documents sometimes combine a policy question with a possible technic
 The order below minimizes circular decisions and prevents implementation mechanisms from becoming accidental policy.
 
 1. **Clarify the decision frame (D):** identify the authorized business decision-makers; define the first implementation scope by competition mode and scenario; clarify whether placeholders are future concepts; and identify any legal, audit, or retention authority.
-2. **Ratify established invariants (B):** confirm unchanged fact ownership, non-transfer of ownership through references, no silent cross-boundary rewriting, and application-layer coordination without a new lifecycle owner. These are constraints on all later options, not choices among policy outcomes.
+2. **Confirm established invariants (B):** confirm unchanged fact ownership, non-transfer of ownership through references, no silent cross-boundary rewriting, and application-layer coordination without a new lifecycle owner. These are constraints on all later options, not choices among policy outcomes.
 3. **Decide contest identity meaning (A):** answer ID-1 and ID-2, then the bounded mode-specific form of ID-3. A shared meaning of “same contest” is prerequisite to correction, replacement, and regeneration decisions.
 4. **Decide continuity and effective-change policy (A):** answer CT-1 through CT-6 for the milestones and modes in scope, including the distinction among correction, prospective change, and replacement.
-5. **Decide required governing context and historical guarantees (A):** approve the categories and provenance that must remain interpretable (GC-3, GC-4, HI-1, HI-2, and HI-6). Apply the already established Scheduling, Match Operations, and official-record invariants.
+5. **Decide required governing context and historical guarantees (A):** confirm the categories and provenance as domain rules that must remain interpretable (GC-3, GC-4, HI-1, HI-2, and HI-6). Apply the already established Scheduling, Match Operations, and official-record invariants.
 6. **Decide correction, cancellation, supersession, and regeneration semantics (A):** answer CS-1 through CS-7, CS-9, CS-10, and RG-1 through RG-3 for the scoped scenarios. Clarify authorization and dispute questions before exposing those capabilities.
 7. **Decide cross-domain consumer behavior (A):** specify XR-4 and XR-6 without changing ownership, and test the results against every in-scope scenario from `01-TASK.md`.
 8. **Record bounded deferrals:** name excluded modes and scenarios, the condition that reopens each question, and the responsible stakeholder. An unbounded “later” is not a decision.
-9. **Only then begin implementation planning (C):** select identifiers, schemas, snapshot/reference strategies, persistence, APIs, matching algorithms, and enforcement mechanisms that satisfy the approved policy and invariants.
+9. **Only then begin implementation planning (C):** select identifiers, schemas, snapshot/reference strategies, persistence, APIs, matching algorithms, and enforcement mechanisms that satisfy the confirmed domain rules and invariants.
 
 ---
 
@@ -114,9 +114,9 @@ The order below minimizes circular decisions and prevents implementation mechani
 ### 3.1 Block all contest identity / historical-reference implementation planning
 
 - **SC-1:** the first implementation slice must be bounded.
-- **ID-1 and ID-2:** the business meaning of same contest versus distinct contest must be approved.
-- **GC-3 and GC-4:** required governing context and the effect of later edits on historical meaning must be approved.
-- **XR-4:** cross-domain reference consumers need an approved historical behavior contract.
+- **ID-1 and ID-2:** the business meaning of same contest versus distinct contest must be confirmed as domain rules.
+- **GC-3 and GC-4:** required governing context and the effect of later edits on historical meaning must be confirmed as domain rules.
+- **XR-4:** cross-domain reference consumers need a confirmed domain-rule contract for historical behavior.
 
 Without these decisions, identifier, reference, schema, or mutation design would decide policy accidentally.
 
@@ -160,11 +160,11 @@ The central identity decision (ID-1/ID-2), minimum governing-context guarantee (
 
 For each A-class question taken to stakeholders, record only:
 
-1. the approved business outcome or explicit prohibition;
+1. the confirmed domain-rule outcome or explicit prohibition;
 2. the modes and scenarios to which it applies;
 3. the historical facts that must remain interpretable;
 4. the established fact owners that remain authoritative;
-5. the named decision authority and approval date; and
+5. the named decision authority and confirmation date; and
 6. any bounded deferral and its reopening condition.
 
 Do not record an identifier format, schema, snapshot strategy, event model, API, workflow, or storage mechanism as part of the policy answer.
