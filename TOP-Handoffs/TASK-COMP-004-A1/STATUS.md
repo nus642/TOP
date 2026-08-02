@@ -31,6 +31,7 @@
 | `TOP-Handoffs/TASK-COMP-004-A1/01-TASK.md` | ✅ Complete |
 | `TOP-Handoffs/TASK-COMP-004-A1/02-EXECUTIVE-SUMMARY.md` | ✅ Complete |
 | `TOP-Handoffs/TASK-COMP-004-A1/03-DECISION-CLASSIFICATION.md` | ✅ Complete |
+| `TOP-Handoffs/TASK-COMP-004-A1/05-DECISION-SESSION-AGENDA.md` | ✅ Complete — preparation artifact |
 | `TOP-Handoffs/TASK-COMP-004-A1/STATUS.md` | ✅ Complete |
 
 ## Policy Decision Areas Requiring Approval
