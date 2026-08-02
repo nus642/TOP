@@ -1,6 +1,6 @@
 # TASK-COMP-004-A1 Decision Batch 1 — ID-1 Decision Analysis
 
-**Decision question:** What business criteria make an authorized change concern the same contest rather than a distinct replacement?
+**Decision question:** What business meaning makes a contest the same contest?
 
 **Status:** Input for business facilitation — no policy decision made
 
@@ -16,12 +16,18 @@ The analysis is neutral. It does not select or rank a direction. It also does no
 
 ## Decision Boundary
 
-ID-1 asks what the business means when it says that a contest continues despite an authorized change. It separates two outcomes:
+### ID terminology traceability
+
+Earlier package framing placed “same contest versus replacement” criteria in ID-1 and treated the sources of identity meaning as ID-2. The domain-rule-confirmation framing absorbs those identity-source questions into ID-1 because structural position, configured sides, temporal context, or another business characteristic can only be assessed as part of defining what contest identity means.
+
+Under the refined framing, ID-2 does not redefine identity. It applies the contest identity meaning confirmed by ID-1 to permitted change scenarios and asks how continuity is interpreted. The analysis below remains preparation material for ID-1: its change examples expose the meaning that must be confirmed, but do not themselves decide ID-2 or classify a continuity outcome.
+
+ID-1 asks what business meaning makes a contest the same contest. That meaning supplies the basis later used to distinguish:
 
 - **continuity:** the changed facts still concern the original sporting obligation; and
 - **replacement:** the change establishes a different sporting obligation, even if it is related to the original.
 
-The decision concerns the meaning of the contest, not merely whether an organizer is permitted to make a change. Authorization answers **whether and by whom** an action may be taken. ID-1 answers **what that authorized action means** for contest continuity.
+The decision concerns the meaning of the contest, not merely whether an organizer is permitted to make a change. Authorization answers **whether and by whom** an action may be taken. ID-1 establishes the identity meaning; ID-2 later applies it to interpret continuity when permitted changes occur.
 
 The decision should also keep three different matters separate:
 
@@ -39,7 +45,7 @@ An established contest may later be affected by a correction, participant change
 - Another may treat it as the end of the original obligation and the creation of a replacement.
 - Both views may describe the same visible change but attach different importance to the reason for the change, its material effect, or how much history already exists.
 
-ID-1 resolves which business considerations control that distinction. In particular, it must establish whether continuity follows the underlying sporting obligation, the characteristics of the intended contest, the authorized purpose of the change, the point at which the change occurs, or a stated combination of those considerations.
+ID-1 confirms which business considerations define contest identity. In particular, it must establish whether that meaning arises from the underlying sporting obligation, the characteristics of the intended contest, or a stated combination of business considerations. References in this analysis to purpose and timing are prompts for testing that meaning; their application to permitted change scenarios belongs to ID-2.
 
 Without that decision, ordinary language remains unreliable. Terms such as “correct,” “change,” “redo,” “regenerate,” and “replace” can describe an organizer's activity without saying whether the original contest continues. The ambiguity becomes consequential whenever historical assignments, actual play, or an official record already concern the contest.
 
@@ -144,7 +150,7 @@ ID-1 is the prerequisite meaning for later policy decisions. It does not answer 
 
 | Dependent decision area | Dependency on ID-1 |
 |---|---|
-| Sources of identity meaning (ID-2) | Must identify which characteristics provide evidence that the sporting obligation continues or has been replaced. |
+| Continuity interpretation (ID-2) | Must apply the identity meaning confirmed by ID-1 to permitted change scenarios without introducing a different identity test. |
 | Uniform or mode-specific meaning (ID-3) | Must determine whether the confirmed continuity boundary applies to every included competition mode. |
 | Effect of configuration changes (CT-1 through CT-3) | Must distinguish changes to an existing contest from changes that establish a replacement, before and after downstream history exists. |
 | Replacement threshold and change classification (CT-4 and CT-5) | Must turn the ID-1 meaning into clear distinctions among correction, prospective change, and replacement. |

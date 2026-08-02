@@ -27,10 +27,20 @@ The source documents sometimes combine a policy question with a possible technic
 
 ### 1.1 Contest identity and continuity
 
+#### ID terminology traceability
+
+The earlier classification framed ID-1 as the criteria for “same contest versus replacement” and ID-2 as the possible sources of contest identity meaning, such as structural position, configured sides, and temporal context. The domain-rule-confirmation package refines that division without discarding either set of questions:
+
+- **ID-1 now confirms the business meaning of contest identity.** The original identity-source questions are absorbed into ID-1 because deciding which business characteristics are relevant defines what contest identity means.
+- **ID-2 now confirms continuity interpretation when permitted changes occur.** It applies the contest identity meaning confirmed by ID-1 to change scenarios.
+- **ID-2 does not redefine contest identity.** It depends on the applicable ID-1 confirmation and cannot supply missing identity meaning.
+
+This traceability note records a terminology refinement only. It does not answer either decision or select a continuity outcome.
+
 | ID | Normalized decision question | Class | Implementation effect | Rationale / clarification needed |
 |---|---|---|---|---|
-| ID-1 | What business criteria make an authorized change concern the same contest rather than a distinct replacement? | **A** | **Blocks** contest identity and mutation design. | This is the central continuity policy; a technical key must not answer it. |
-| ID-2 | Is contest identity determined by structural position, configured sides, temporal context, or some business-defined combination? | **A** | **Blocks** identity and regeneration matching behavior. | These are candidate business meanings, not identifier fields. |
+| ID-1 | What business meaning makes a contest the same contest? | **A** | **Blocks** contest identity and mutation design. | This absorbs the original identity-source questions because candidate characteristics are parts of the business meaning, not identifier fields. |
+| ID-2 | When permitted business changes occur, does the same contest meaning continue? | **A** | **Blocks** continuity interpretation and regeneration matching behavior. | This applies confirmed ID-1 meaning to change scenarios and does not redefine identity. |
 | ID-3 | Does contest identity meaning differ among round-robin, explicit-pairing, and team-encounter modes? | **D** | **Blocks only modes included in the first implementation scope.** | Stakeholders must first confirm the supported modes and whether one rule or mode-specific rules are required. |
 | ID-4 | What stable technical identities, formats, and keys represent a contest, side, encounter, structural position, configuration revision, or generation action? | **C** | Does **not** belong in this policy decision. | Stable business meaning must be confirmed as domain rules first; identifier format and key selection are implementation choices. |
 | CT-1 | Which configuration changes affect already generated contests, future contests, or both before scheduling? | **A** | **Blocks** post-generation configuration changes. | This determines effective scope of change. |
@@ -99,8 +109,8 @@ The order below minimizes circular decisions and prevents implementation mechani
 
 1. **Clarify the decision frame (D):** identify the authorized business decision-makers; define the first implementation scope by competition mode and scenario; clarify whether placeholders are future concepts; and identify any legal, audit, or retention authority.
 2. **Confirm established invariants (B):** confirm unchanged fact ownership, non-transfer of ownership through references, no silent cross-boundary rewriting, and application-layer coordination without a new lifecycle owner. These are constraints on all later options, not choices among policy outcomes.
-3. **Decide contest identity meaning (A):** answer ID-1 and ID-2, then the bounded mode-specific form of ID-3. A shared meaning of “same contest” is prerequisite to correction, replacement, and regeneration decisions.
-4. **Decide continuity and effective-change policy (A):** answer CT-1 through CT-6 for the milestones and modes in scope, including the distinction among correction, prospective change, and replacement.
+3. **Decide contest identity meaning (A):** answer ID-1, including the original identity-source questions now absorbed into it, then the bounded mode-specific form of ID-3. A shared meaning of “same contest” is prerequisite to continuity interpretation, correction, replacement, and regeneration decisions.
+4. **Decide continuity and effective-change policy (A):** apply confirmed ID-1 meaning through ID-2, then answer CT-1 through CT-6 for the milestones and modes in scope, including the distinction among correction, prospective change, and replacement.
 5. **Decide required governing context and historical guarantees (A):** confirm the categories and provenance as domain rules that must remain interpretable (GC-3, GC-4, HI-1, HI-2, and HI-6). Apply the already established Scheduling, Match Operations, and official-record invariants.
 6. **Decide correction, cancellation, supersession, and regeneration semantics (A):** answer CS-1 through CS-7, CS-9, CS-10, and RG-1 through RG-3 for the scoped scenarios. Clarify authorization and dispute questions before exposing those capabilities.
 7. **Decide cross-domain consumer behavior (A):** specify XR-4 and XR-6 without changing ownership, and test the results against every in-scope scenario from `01-TASK.md`.
@@ -114,7 +124,8 @@ The order below minimizes circular decisions and prevents implementation mechani
 ### 3.1 Block all contest identity / historical-reference implementation planning
 
 - **SC-1:** the first implementation slice must be bounded.
-- **ID-1 and ID-2:** the business meaning of same contest versus distinct contest must be confirmed as domain rules.
+- **ID-1:** the business meaning of contest identity, including the original identity-source questions, must be confirmed as a domain rule.
+- **ID-2:** continuity interpretation must be confirmed by applying the applicable ID-1 meaning to change scenarios without redefining identity.
 - **GC-3 and GC-4:** required governing context and the effect of later edits on historical meaning must be confirmed as domain rules.
 - **XR-4:** cross-domain reference consumers need a confirmed domain-rule contract for historical behavior.
 
@@ -152,7 +163,7 @@ The following may remain open only under an explicit bounded deferral. The imple
 | **All C-class questions** (ID-4, HI-8, RG-5) | Policy work is still underway. | Implementation planning begins after the prerequisite A decisions and B invariants are recorded. |
 | Out-of-scope policy scenarios | The deferral names the scenario, responsible authority, prohibition/default-safe behavior, and reopening condition. | The scenario becomes necessary for delivery. |
 
-The central identity decision (ID-1/ID-2), minimum governing-context guarantee (GC-3/GC-4), and in-scope cross-domain behavior (XR-4) cannot be left open while implementing contest identity or historical references. Doing so would violate the task's exit condition.
+The central identity decision (ID-1), its application to continuity interpretation (ID-2), the minimum governing-context guarantee (GC-3/GC-4), and in-scope cross-domain behavior (XR-4) cannot be left open while implementing contest identity or historical references. Doing so would violate the task's exit condition.
 
 ---
 
