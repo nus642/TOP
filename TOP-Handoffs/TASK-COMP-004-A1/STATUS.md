@@ -22,6 +22,7 @@
 - [x] Policy scenarios identified (pending decisions).
 - [x] Non-goals and exit criteria stated.
 - [x] Decision questions classified and sequenced without answering business policy.
+- [x] Decision Batch 1 discussion paper prepared for ID-1, ID-2, and ID-3 without answering them.
 - [ ] Awaiting policy decision from business authority.
 
 ## Deliverables
@@ -32,6 +33,7 @@
 | `TOP-Handoffs/TASK-COMP-004-A1/02-EXECUTIVE-SUMMARY.md` | ✅ Complete |
 | `TOP-Handoffs/TASK-COMP-004-A1/03-DECISION-CLASSIFICATION.md` | ✅ Complete |
 | `TOP-Handoffs/TASK-COMP-004-A1/05-DECISION-SESSION-AGENDA.md` | ✅ Complete — preparation artifact |
+| `TOP-Handoffs/TASK-COMP-004-A1/06-DECISION-BATCH-1-DISCUSSION-PAPER.md` | ✅ Complete — preparation artifact |
 | `TOP-Handoffs/TASK-COMP-004-A1/STATUS.md` | ✅ Complete |
 
 ## Policy Decision Areas Requiring Approval
