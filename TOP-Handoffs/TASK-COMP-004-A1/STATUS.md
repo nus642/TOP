@@ -2,7 +2,7 @@
 
 **Task:** Contest Identity / Configuration Reference Policy
 
-**Status:** Awaiting Policy Decision
+**Status:** Awaiting Domain Rule Confirmation
 
 **Created:** 2026-08-02
 
@@ -25,7 +25,8 @@
 - [x] Decision Batch 1 discussion paper prepared for ID-1, ID-2, and ID-3 without answering them.
 - [x] ID-1 decision analysis prepared for business facilitation without answering it.
 - [x] ID-1 decision facilitation artifact prepared for stakeholder discussion without answering it.
-- [ ] Awaiting policy decision from business authority.
+- [x] ID-1 domain rule confirmation artifact prepared for responsible business owners without answering it.
+- [ ] Awaiting domain rule confirmation from responsible business owners.
 
 ## Deliverables
 
@@ -38,6 +39,7 @@
 | `TOP-Handoffs/TASK-COMP-004-A1/06-DECISION-BATCH-1-DISCUSSION-PAPER.md` | ✅ Complete — preparation artifact |
 | `TOP-Handoffs/TASK-COMP-004-A1/07-ID-1-DECISION-ANALYSIS.md` | ✅ Complete — preparation artifact |
 | `TOP-Handoffs/TASK-COMP-004-A1/07-ID-1-DECISION-FACILITATION.md` | ✅ Complete — preparation artifact |
+| `TOP-Handoffs/TASK-COMP-004-A1/08-ID-1-DOMAIN-RULE-CONFIRMATION.md` | ✅ Complete — preparation artifact |
 | `TOP-Handoffs/TASK-COMP-004-A1/STATUS.md` | ✅ Complete |
 
 ## Policy Decision Areas Requiring Domain-Rule Confirmation
