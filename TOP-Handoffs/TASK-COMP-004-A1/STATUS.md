@@ -27,6 +27,7 @@
 - [x] ID-1 decision facilitation artifact prepared for stakeholder discussion without answering it.
 - [x] ID-1 domain rule confirmation artifact prepared for responsible business owners without answering it.
 - [x] ID-2 continuity rule confirmation artifact prepared without confirming continuity rules.
+- [x] ID-3 mode scope rule confirmation artifact prepared without confirming a scope rule.
 - [ ] Awaiting domain rule confirmation from responsible business owners.
 
 **Confirmed domain rules:** None.
@@ -44,6 +45,7 @@
 | `TOP-Handoffs/TASK-COMP-004-A1/07-ID-1-DECISION-FACILITATION.md` | ✅ Complete — preparation artifact |
 | `TOP-Handoffs/TASK-COMP-004-A1/08-ID-1-DOMAIN-RULE-CONFIRMATION.md` | ✅ Complete — preparation artifact |
 | `TOP-Handoffs/TASK-COMP-004-A1/09-ID-2-CONTINUITY-RULE-CONFIRMATION.md` | ✅ Complete — preparation artifact |
+| `TOP-Handoffs/TASK-COMP-004-A1/10-ID-3-MODE-SCOPE-RULE-CONFIRMATION.md` | ✅ Complete — preparation artifact |
 | `TOP-Handoffs/TASK-COMP-004-A1/STATUS.md` | ✅ Complete |
 
 ## Policy Decision Areas Requiring Domain-Rule Confirmation
