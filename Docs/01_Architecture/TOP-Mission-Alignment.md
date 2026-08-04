@@ -55,6 +55,8 @@ Operations Engine 负责跨运动项目复用的现场运营能力：
 - Match control；
 - Result confirmation。
 
+与 Blueprint 的映射关系：Operations Engine 对应 Blueprint 中的 Tournament Operation Core 与 Operations Engine 方向，承接其中的现场 workflow、check-in、officials/referee operation、court management、match control、display、API 与 user management 等现场运营能力。本文使用更聚焦的命名，是为了在 Modern 语境下突出 Master / Referee / Court / Match / Result 这条现场运营主线，而不是扩大 Blueprint 已定义的平台边界。
+
 两者的分工保证 TOP 可以通过 Competition Engine 表达不同比赛规则，同时以 Operations Engine 保持一致的现场运营主线。本文件不改变两者在现有架构文档中的接口或实现方式。
 
 ## 4. Legacy Contribution
@@ -142,12 +144,12 @@ Organization / Customer
 TOP 不只是保存比赛结果。赛事运营过程中，TOP 还应形成可追溯的**可信现场记录（Trusted On-site Record）**，包括：
 
 - Check-in；
-- Risk acknowledgement；
+- Risk acknowledgement（作为 check-in / participation readiness 流程中的现场确认记录，而不是独立的保险、法务或合规产品能力）；
 - Lineup confirmation；
 - Referee confirmation；
 - Result confirmation。
 
-这些记录共同说明参与者是否到场、必要确认是否完成、谁执行并确认了比赛，以及结果如何在现场产生。它们构成赛事现场事实链，也是 Master 处理异常与完成赛事交付的重要依据。
+这些记录共同说明参与者是否到场、必要确认是否完成、谁执行并确认了比赛，以及结果如何在现场产生。Risk acknowledgement 在此仅表示现场运营所需的参与确认事实；其模板、法律效力、保险责任或监管合规边界，应由外部组织政策或专门系统定义。它们构成赛事现场事实链，也是 Master 处理异常与完成赛事交付的重要依据。
 
 ## 8. Modern Direction
 
@@ -176,7 +178,17 @@ Modern 不是重新发明 TOP，也不是逐页复制 Legacy。Modern 的方向�
 
 P0 是验证 Modern 是否仍然服务 Tournament Operations Platform 的首要标准。P1 在核心运营闭环上补充现场协作能力。P2 必须建立在 P0 与 P1 已稳定、且不偏离平台使命的前提之上。
 
-## 9. Architecture Alignment Guardrails
+## 9. Cross-reference
+
+本文件应作为阅读以下文档时的使命与边界上下文：
+
+- `Docs/01_Architecture/TOP-Blueprint.md`：平台使命、Blueprint 级边界与 Operations / Competition 双引擎来源。
+- `Docs/11_Engineering/TOP-Modern-Tournament-Operations-Architecture.md`：Modern 对赛事现场运营、Match execution、Referee workflow 与 Result collection 的工程化表达。
+- `Docs/11_Engineering/TOP-Modern-Domain-Architecture.md`：Modern domain 边界与 Competition / Operations 数据关系。
+
+这些文档定义具体架构、领域模型或工程实现时，应保持与本文的使命、角色授权和平台边界一致。本文不覆盖它们的接口、数据模型或实现决策。
+
+## 10. Architecture Alignment Guardrails
 
 后续 Modern 决策应持续使用以下问题进行校验：
 
