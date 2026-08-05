@@ -16,6 +16,8 @@
 
 TOP（Tournament Operations Platform）是**以赛事现场运营为核心的数字化平台**。它的使命是帮助现场角色掌握赛事状态、协调人员与场地、可靠执行比赛，并形成可信的现场记录。
 
+TOP 的核心原则是 **Professional Tournament Operation**：平台应服务于专业、可交付、可追溯的赛事运营，而不是只完成单点工具或面向观众的展示体验。该原则要求 TOP 在使命层面持续关注现场责任、角色协作、比赛执行和结果确认，并在架构边界上保持 Operations Engine 与 Competition Engine 的职责清晰。
+
 TOP 不是：
 
 - 报名系统；
@@ -151,6 +153,8 @@ TOP 不只是保存比赛结果。赛事运营过程中，TOP 还应形成可追
 
 这些记录共同说明参与者是否到场、必要确认是否完成、谁执行并确认了比赛，以及结果如何在现场产生。Risk acknowledgement 在此仅表示现场运营所需的参与确认事实；其模板、法律效力、保险责任或监管合规边界，应由外部组织政策或专门系统定义。它们构成赛事现场事实链，也是 Master 处理异常与完成赛事交付的重要依据。
 
+在 Competition Engine 与 Operations Engine 协作的边界上，TOP 还应形成**可信竞赛记录（Trusted Competition Record）**：它不是新的功能清单或独立产品，而是由比赛规则、编排、执行、确认与现场记录共同支撑的竞赛事实表达。Trusted Competition Record 用于说明一场比赛或一个赛事结果是在既定赛制与现场确认流程下产生的，从而连接 Competition Engine 的规则一致性与 Operations Engine 的现场可追溯性。
+
 ## 8. Modern Direction
 
 Modern 不是重新发明 TOP，也不是逐页复制 Legacy。Modern 的方向是：**用新的架构重新实现 Legacy 已验证的现场运营能力**，并保持 Operations Engine 与 Competition Engine 的既定边界。
@@ -195,7 +199,7 @@ P0 是验证 Modern 是否仍然服务 Tournament Operations Platform 的首要�
 1. 该能力是否帮助 Master 运营赛事，或帮助 Referee 可靠执行比赛？
 2. 该能力属于 Operations Engine、Competition Engine，还是应由外部系统提供？
 3. 该实现是否保留了 Legacy 已验证的现场能力，而非机械复制 Legacy 代码？
-4. 该数据是否有助于形成可信现场记录？
+4. 该数据是否有助于形成可信现场记录或可信竞赛记录？
 5. 平台管理能力是否保持 Super Admin 授权、Master 现场运营的职责分离？
 
 若一个方向无法通过以上校验，应回到 TOP Blueprint 与现有 Architecture 文档重新评估，而不是通过本文件扩大 TOP 的业务边界。
