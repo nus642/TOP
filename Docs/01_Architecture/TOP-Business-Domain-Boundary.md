@@ -34,7 +34,7 @@ Responsibilities include:
 
 ### 3.2 Tournament Operations
 
-The Tournament Operations domain manages the live operational flow of a tournament. It is responsible for coordinating execution once competition structure and schedule references exist.
+The Tournament Operations domain manages the live operational flow of a tournament. It is responsible for coordinating execution once competition structure and schedule references exist. Tournament Operations is the core business domain of TOP and represents the primary value delivered by the platform.
 
 Responsibilities include:
 
@@ -46,7 +46,7 @@ Responsibilities include:
 
 ### 3.3 Participant Readiness
 
-The Participant Readiness domain confirms that participants are eligible and prepared to participate in the operational flow of the competition.
+The Participant Readiness domain confirms that participants are ready and prepared to participate in the operational flow of the competition.
 
 Responsibilities include:
 
@@ -68,7 +68,19 @@ Responsibilities include:
 
 ### 3.5 Platform Governance
 
-The Platform Governance domain controls authority, organizational ownership, and administrative boundaries across TOP Modern.
+The Platform Governance domain controls authority, organizational ownership, and administrative boundaries across TOP Modern. Super Admin is a platform governance and authorization role.
+
+Authorization relationship:
+
+```
+Super Admin
+    ↓ authorizes
+Organization / Customer
+    ↓ manages
+Master
+    ↓ operates
+Tournament
+```
 
 Responsibilities include:
 
@@ -86,7 +98,17 @@ TOP does not replace:
 - **Ranking system**: TOP may use or reference ranking information, but ranking calculation and ranking authority remain outside this boundary.
 - **Media platform**: TOP may support operational or record references related to competition activity, but media publishing, streaming, and media distribution remain outside this boundary.
 
-## 5. Out of Scope
+## 5. Competition Engine Relationship
+
+TOP does not replace external competition management capabilities. Competition context, rules, scheduling, and ranking authority may come from external competition systems. TOP consumes the required competition context to support on-site tournament operations, and Tournament Operations is TOP's primary business responsibility.
+
+## 6. Document Cross-Reference
+
+- **TOP-Blueprint.md** defines the overall platform position.
+- **TOP-Mission-Alignment.md** defines mission and operating boundaries.
+- **TOP-Business-Domain-Boundary.md** defines business responsibility separation.
+
+## 7. Out of Scope
 
 This document does not include or define:
 
