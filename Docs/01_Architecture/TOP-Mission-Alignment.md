@@ -155,6 +155,15 @@ TOP 不只是保存比赛结果。赛事运营过程中，TOP 还应形成可追
 
 在 Competition Engine 与 Operations Engine 协作的边界上，TOP 还应形成**可信竞赛记录（Trusted Competition Record）**：它不是新的功能清单或独立产品，而是由比赛规则、编排、执行、确认与现场记录共同支撑的竞赛事实表达。Trusted Competition Record 用于说明一场比赛或一个赛事结果是在既定赛制与现场确认流程下产生的，从而连接 Competition Engine 的规则一致性与 Operations Engine 的现场可追溯性。
 
+Trusted Competition Record 可以按不同业务目的理解为以下可信记录类别：
+
+- **Participant Protection Record**：用于说明参与者到场、参与准备与必要现场确认的事实，服务于现场责任与参与保护边界。
+- **Match Official Record**：用于说明 Referee / official 对比赛执行、比分记录与结果确认的责任链，服务于比赛执行可信度。
+- **Competition Data Archive**：用于沉淀赛制、编排、比分、结果与排名等竞赛事实，服务于赛事交付后的复核与归档。
+- **Event Timeline**：用于描述 check-in、上场、比赛执行、确认与异常处理等关键现场事件的发生顺序，服务于运营复盘与争议定位。
+
+这些类别表达的是可信记录的不同业务用途，而不是新增产品功能、技术实现或独立系统边界。
+
 ## 8. Modern Direction
 
 Modern 不是重新发明 TOP，也不是逐页复制 Legacy。Modern 的方向是：**用新的架构重新实现 Legacy 已验证的现场运营能力**，并保持 Operations Engine 与 Competition Engine 的既定边界。
