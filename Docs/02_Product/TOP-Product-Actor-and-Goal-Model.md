@@ -1,6 +1,6 @@
 # TOP Product Actor and Goal Model
 
-Version: 1.0
+Version: 1.1
 
 Status: Active
 
@@ -15,25 +15,37 @@ TOP Product Team
 
 | Version | Date | Changes |
 |---------|------|---------|
+| 1.1 | 2026-08-06 | Clarified the capability-to-actor-to-goal derivation and the boundary with future Product Stories |
 | 1.0 | 2026-08-06 | Initial Product Actor and Goal Model derived from the established TOP operational capabilities and core business objects |
 
 ---
 
 # Purpose
 
-This document defines the product actors and business outcomes they need to achieve through TOP. It is the first goal-oriented translation of the TOP Operational Capability Model into the Product Layer.
+This document defines the product actors and business outcomes they need to achieve through TOP. It establishes the Product Layer relationship from an established Operational Capability, to the actor who pursues its outcome, to that actor's Business Outcome Goal.
 
-The model preserves the roles, responsibilities, ownership, and external-authority boundaries established by Business Architecture. It does not redefine actors or capabilities. It also does not specify features, user interfaces, permissions, workflows, or technical implementation.
+The model preserves the roles, responsibilities, ownership, and external-authority boundaries established by Business Architecture. It does not redefine actors or capabilities.
+
+This document does not define:
+
+- Product Stories;
+- Workflows;
+- Product Scope;
+- UI;
+- Permissions; or
+- Implementation.
 
 # Position and Sources
 
 ```text
-TOP Operational Capability Model ─┐
-                                  ├─→ Product Actor and Goal Model
-TOP Core Business Object Model ───┤
-                                  │
-TOP Product Layer Definition ─────┘
+Operational Capability
+        ↓
+Actor
+        ↓
+Business Outcome Goal
 ```
+
+This is the complete derivation established by this document. It does not establish an Actor → Goal → Future Story model and does not define a story as a subsequent element of this model.
 
 The authoritative inputs are:
 
@@ -173,10 +185,17 @@ TOP may use competition definitions, event structures, rules, schedules, and par
 4. **Object references do not transfer ownership.** TOP owns operational facts created through TOP-managed activity, references externally authoritative competition and participant information, and remains outside registration, ranking, and media authority.
 5. **Readiness is not registration.** Participant goals concern operational readiness only. They do not establish entry, qualification, eligibility, payment, legal policy, insurance policy, or regulatory policy.
 6. **Consumption is not downstream ownership.** Providing trusted facts does not make TOP responsible for media production, publishing, streaming, broadcasting, or audience distribution.
-7. **No solution definition is implied.** This model defines no features, UI, permissions, workflows, services, APIs, databases, modules, infrastructure, or other technical implementation.
+7. **No downstream Product Layer or solution definition is implied.** This model defines no Product Stories, Workflows, Product Scope, features, UI, Permissions, services, APIs, databases, modules, infrastructure, or Implementation.
 
 # Use in Later Product Work
 
-Later Product Layer deliverables may derive user stories, operational workflows, and bounded Product Scope from these actor goals. Those deliverables must retain the goal identifiers and architecture traces in this model, and they must continue to preserve the established capability, object, record-ownership, and external-authority boundaries.
+Future Product Stories will be derived in later Product Layer deliverables; they are not defined or mapped in this document. Those later deliverables must preserve traceability to:
+
+- Actor;
+- Business Outcome Goal;
+- Capability; and
+- Business Object context.
+
+This traceability requirement does not add Product Stories to the model defined here. Later deliverables must also preserve the established record-ownership and external-authority boundaries.
 
 If later work reveals an apparent need to change an actor, responsibility, capability, object, or ownership rule, that issue must return to the appropriate Business Architecture authority. It must not be silently resolved in the Product Layer.
