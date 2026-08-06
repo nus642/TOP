@@ -1,6 +1,6 @@
 # TOP Product Layer Definition
 
-Version: 1.0
+Version: 1.1
 
 Status: Active
 
@@ -15,6 +15,7 @@ TOP Product Team
 
 | Version | Date | Changes |
 |---------|------|---------|
+| 1.1 | 2026-08-06 | Added translation principles, readiness relationship, and ownership guardrails |
 | 1.0 | 2026-08-06 | Initial Product Layer definition |
 
 ---
@@ -49,6 +50,14 @@ The Product Layer receives the following authoritative inputs from Business Arch
 
 These inputs are interpreted for product use; they are not redefined or reassigned by the Product Layer.
 
+# Product Layer Translation Principles
+
+- **Business Domains constrain product definition.** Product goals, stories, workflows, and scope must remain within established domain responsibilities and boundaries. Cross-domain product needs may coordinate outcomes but do not merge or relocate domain responsibility.
+- **Business Capabilities become product outcomes.** The Product Layer expresses the user value and observable result enabled by an established capability; it does not redefine the capability or its owner.
+- **Business Objects support stories and workflows.** Stories and workflows use the established meaning and relationships of Business Objects to describe the business information users encounter, create, or act upon. Their use does not change object or record ownership.
+- **Operational Capabilities derive operational workflows.** The role, operational outcome, handoff, and boundary described by an Operational Capability provide the basis for a user-oriented workflow. The workflow makes that operation understandable without altering the underlying responsibility.
+- **Product Scope does not change ownership.** Including an outcome, story, workflow, or Business Object in Product Scope identifies what the product must enable; it does not assign or transfer domain, capability, object, or record ownership.
+
 # Outputs
 
 The Product Layer produces:
@@ -77,8 +86,11 @@ The Product Layer is responsible for:
 
 The Product Layer does not define or own:
 
+- Mission
 - Business Domain definition
 - Capability ownership
+- Business Object ownership
+- Record ownership
 - Technical architecture
 - Database design
 - API design
@@ -97,3 +109,12 @@ Questions in these areas must be resolved by the appropriate Architecture or Eng
 | Engineering Design | Defines how the system supports the product goals and workflows. | Selects technical structures and implementation approaches while preserving product intent and business boundaries. |
 
 The handoff is therefore directional: Architecture defines the business frame, Product defines the user-oriented intent within that frame, and Engineering designs the system support for that intent. Feedback may expose a need for clarification, but a downstream layer does not silently redefine an upstream decision.
+
+## Relationship with the TOP Engineering Readiness Plan
+
+The Product Layer and the TOP Engineering Readiness Plan are complementary views, not competing layers:
+
+- The **Product Layer** defines the user goals, user stories, operational workflows, and Product Scope that state what users must be able to achieve.
+- The **TOP Engineering Readiness Plan** defines the validation and readiness path toward implementation, making the evidence needed for operational confidence visible.
+
+Product outputs therefore inform readiness planning, while readiness findings may identify product intent that needs clarification. Engineering Readiness does not replace Product definition, and Product definition does not establish readiness gates or validation evidence.
