@@ -1,6 +1,6 @@
 # TOP Product Story Definition Rules
 
-Version: 1.0
+Version: 1.1
 
 Status: Active
 
@@ -15,6 +15,7 @@ TOP Product Team
 
 | Version | Date | Changes |
 |---------|------|---------|
+| 1.1 | 2026-08-06 | Clarified the Product Canon position and added Operational Outcome and mandatory Business Object context rules |
 | 1.0 | 2026-08-06 | Initial governance rules for future TOP Product Stories |
 
 ---
@@ -25,21 +26,25 @@ This document governs how future TOP Product Stories are defined, reviewed, main
 
 The rules keep stories business-first, capability-driven, and boundary-aware. They do not create Product Stories or authorize product scope.
 
-# Position and Authority
+# Position in the TOP Product Canon
 
 ```text
-Business Architecture
+Operational Capability
         ↓
-Product Actor and Goal Model
+Actor
         ↓
-Product Story Definition Rules
+Business Outcome Goal
         ↓
-Future Product Stories
+Product Story
         ↓
-Later Product Work and Engineering Design
+Operational Workflow
+        ↓
+Product Scope
 ```
 
-These rules govern the definition of future Product Stories. They do not make stories part of the Actor and Goal Model, and they do not change the authority of any upstream source.
+PR #55 defines the Actor and Business Outcome Goal positions in this canon. This document defines the rules for deriving Product Stories from those established positions and their Operational Capability source. It does not define any Product Stories.
+
+Operational Workflows and Product Scope are later, separate Product Layer artifacts. A Product Story neither defines those artifacts nor implies their content, approval, or sequence. These rules do not make stories part of the Actor and Goal Model, and they do not change the authority of any upstream source.
 
 The authoritative inputs are:
 
@@ -101,8 +106,9 @@ A candidate may enter Product Story definition only when all of the following ar
 | Goal | Exactly one primary Business Outcome Goal assigned to that actor |
 | Need | A distinct need necessary to contribute to the goal |
 | Value | An observable business contribution consistent with the goal's outcome evidence |
+| Operational outcome | The observable business state or result after the need is satisfied |
 | Capability | At least one established Operational Capability, with one marked primary |
-| Business context | Relevant Core Business Objects, if any, used with their established meanings |
+| Business context | At least one established Core Business Object used with its established meaning |
 | Boundary | Applicable ownership, responsibility, provenance, and external-authority constraints |
 
 A candidate is ineligible when it:
@@ -127,9 +133,10 @@ Every future Product Story must have a stable record containing all fields below
 | Business Outcome Goal | One goal ID belonging to the primary actor. |
 | Need statement | One concise, solution-neutral statement of what the actor needs in business terms. |
 | Intended business value | Why satisfying the need contributes to the cited goal and its outcome evidence. |
+| Operational Outcome | The observable business state or result after the story need is satisfied. It is not acceptance criteria, workflow steps, or implementation behavior. |
 | Primary capability | One established Operational Capability that principally enables the need. |
 | Supporting capabilities | Optional established capabilities essential to the same need; each requires a short rationale. |
-| Business object context | Relevant established Core Business Objects and how each participates in the need. This field may be `None` only with a rationale. |
+| Business object context | At least one established Core Business Object and how it participates in the need. An approved story may not omit this trace through a `None` value or free-form rationale. |
 | Boundary notes | Applicable responsibility, ownership, record, provenance, external-authority, and out-of-scope constraints. |
 | Source references | Exact governing document sections or table rows used to validate the traces. |
 | Open questions | Unresolved business ambiguity. An unresolved boundary or traceability question prevents approval. |
@@ -197,12 +204,14 @@ Convenient implementation grouping is never sufficient justification.
 
 # Business Object and Information Rules
 
-1. Stories use only the established business meaning of Tournament, Competition Context, Match, Court, Participant, Official Assignment, Readiness Record, and Competition Record.
-2. A story may identify the business facts an actor needs to understand, establish, use, or preserve, but must not prescribe their fields, format, storage, transport, or technical representation.
-3. Relationships between objects are business relationships and do not imply schemas, object models, APIs, modules, or service boundaries.
-4. Competition Context and participant source information remain referenced information governed by the appropriate external source.
-5. Operational facts created through TOP-managed activity and the trusted record assembled from them retain the ownership rules of the Core Business Object Model.
-6. Where externally governed and TOP-owned facts meet, boundary notes must state the distinction and required provenance.
+1. Every approved Product Story must reference at least one established Core Business Object.
+2. Stories use only the established business meaning of Tournament, Competition Context, Match, Court, Participant, Official Assignment, Readiness Record, and Competition Record.
+3. A story may identify the business facts an actor needs to understand, establish, use, or preserve, but must not prescribe their fields, format, storage, transport, or technical representation.
+4. Relationships between objects are business relationships and do not imply schemas, object models, APIs, modules, or service boundaries.
+5. Competition Context and participant source information remain referenced information governed by the appropriate external source.
+6. Operational facts created through TOP-managed activity and the trusted record assembled from them retain the ownership rules of the Core Business Object Model.
+7. Where externally governed and TOP-owned facts meet, boundary notes must state the distinction and required provenance.
+8. If an exceptional candidate appears not to involve an established Core Business Object, it requires explicit governance review. The candidate cannot be Approved unless that review identifies and validates an established object trace; free-form omission is not permitted.
 
 # Prohibited Scope and Content
 
@@ -229,12 +238,13 @@ Reviewers must apply the following gates in order:
 
 1. **Source gate** — confirm the actor and goal exist and correspond.
 2. **Value gate** — confirm the need makes a clear contribution to the goal's outcome evidence.
-3. **Capability gate** — confirm the primary and any supporting capabilities exist and genuinely enable the need.
-4. **Object gate** — confirm object terms, relationships, ownership, and provenance are accurate.
-5. **Boundary gate** — confirm role, domain, record, external-authority, and TOP scope guardrails are preserved.
-6. **Neutrality gate** — confirm no feature, UI, workflow, acceptance, or engineering decision is embedded.
-7. **Atomicity gate** — confirm the story states one coherent need for one primary actor and goal.
-8. **Completeness gate** — confirm every required record field and source reference is present and consistent.
+3. **Outcome gate** — confirm the Operational Outcome states an observable business state or result without becoming acceptance criteria, workflow steps, or implementation behavior.
+4. **Capability gate** — confirm the primary and any supporting capabilities exist and genuinely enable the need.
+5. **Object gate** — confirm at least one established Core Business Object is traced and that object terms, relationships, ownership, and provenance are accurate.
+6. **Boundary gate** — confirm role, domain, record, external-authority, and TOP scope guardrails are preserved.
+7. **Neutrality gate** — confirm no feature, UI, workflow, acceptance, or engineering decision is embedded.
+8. **Atomicity gate** — confirm the story states one coherent need for one primary actor and goal.
+9. **Completeness gate** — confirm every required record field and source reference is present and consistent.
 
 Failure at any gate returns the candidate for clarification or escalation. Reviewers must not compensate for missing evidence by assuming a solution.
 
@@ -246,9 +256,10 @@ A story may be marked **Approved** only when every answer is yes:
 - Does the goal belong to that actor?
 - Is the need distinct and business-oriented?
 - Does the value directly contribute to the goal's outcome evidence?
+- Does the Operational Outcome describe an observable business state or result without defining acceptance criteria, workflow steps, or implementation behavior?
 - Is one established primary capability identified?
 - Are supporting capabilities essential and justified?
-- Are business objects used consistently with their established meaning?
+- Is at least one established Core Business Object referenced and used consistently with its established meaning?
 - Are ownership and provenance preserved?
 - Are actor, domain, TOP-scope, and external-authority boundaries explicit and intact?
 - Is the statement free of feature, UI, workflow, acceptance, and engineering design decisions?
