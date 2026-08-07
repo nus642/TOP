@@ -1,6 +1,6 @@
 # TOP Operational Workflow Structure
 
-Version: 1.1
+Version: 1.2
 
 Status: Active
 
@@ -15,6 +15,7 @@ TOP Product Team
 
 | Version | Date | Changes |
 |---------|------|---------|
+| 1.2 | 2026-08-07 | Added the Business Domain Boundary baseline, clarified domain and capability authority, and separated their source-currency validation |
 | 1.1 | 2026-08-07 | Replaced actor-goal-capability placement with Business Domain → Workflow Area → Workflow → Activity organization and added Workflow Area governance |
 | 1.0 | 2026-08-07 | Initial governance structure for organizing future TOP Operational Workflows |
 
@@ -53,7 +54,15 @@ The authoritative inputs to this structure are:
 | `TOP-Operational-Workflow-Definition-Rules.md` | Workflow identity, activities, required record, eligibility, quality gates, lifecycle, and boundary rules |
 | `TOP-Initial-Product-Story-Map.md` | Current governed Product Story inventory and each story's canonical Actor → Goal → Theme placement |
 | `TOP-Product-Layer-Definition.md` | Product Layer responsibilities, translation principles, and exclusions |
-| `TOP-Operational-Capability-Model.md` | Architecture-defined Business Domains, established capabilities, domain responsibility, role boundaries, and external-authority guardrails |
+| `TOP-Business-Domain-Boundary.md` | Business Domain identity, meaning, and responsibility boundaries |
+| `TOP-Operational-Capability-Model.md` | Operational Capability definitions, capability-to-domain mapping, role boundaries, and external-authority guardrails |
+
+Authority remains separated between the two Business Architecture inputs:
+
+| Authority | Ownership preserved |
+|-----------|---------------------|
+| `TOP-Business-Domain-Boundary.md` | Owns Business Domain identity, Business Domain meaning, and Business Domain responsibility boundaries. |
+| `TOP-Operational-Capability-Model.md` | Owns Operational Capability definitions and the capability-to-domain mapping. It references domains but does not redefine their identity, meaning, or responsibility boundaries. |
 
 Actor, goal, story, capability, business-object, domain, ownership, provenance, and source-authority facts reached through these inputs remain owned by their upstream authorities. This document owns Workflow Area organization only. If it conflicts with an authoritative input, the input prevails and the conflict is returned to its owner. Collection governance must not silently repair an upstream record.
 
@@ -138,7 +147,7 @@ Every Workflow Area has a stable governance record:
 
 ## Derivation from Business Domain
 
-A Workflow Area must derive from exactly one parent Business Domain. Its definition and criteria must express a coherent subset of operational subject matter already inside that domain's established responsibility. Derivation must cite the domain evidence available through the Operational Capability Model and any authoritative domain source that model references.
+A Workflow Area must derive from exactly one parent Business Domain. Its definition and criteria must express a coherent subset of operational subject matter already inside that domain's established responsibility. Derivation must cite `TOP-Business-Domain-Boundary.md` for the domain's identity, meaning, and responsibility boundary. The `TOP-Operational-Capability-Model.md` capability-to-domain mapping may support capability traceability but is not the authority for the domain definition.
 
 A Workflow Area must not:
 
@@ -326,12 +335,14 @@ Every view must label relationship type, retain stable IDs, resolve back to auth
 | Object and boundary trace | Are object, ownership, provenance, domain, and external-authority traces intact? | Exceptions and affected Workflow/Activity IDs |
 | Domain representation | Which domains contain an Approved workflow? | Status counts and controlled disposition per domain |
 | Workflow Area representation | Which current areas contain an Approved workflow? | Status counts, empty areas, and controlled disposition per area |
-| Source currency | Have authoritative baselines or workflow versions changed? | Impact-review list and affected Workflow/Activity IDs |
+| Business Domain source currency | Has the recorded `TOP-Business-Domain-Boundary.md` version or date changed? | Recorded version/date, impact-review list, and affected Domain, Area, Workflow, and Activity IDs |
+| Capability source currency | Has the recorded `TOP-Operational-Capability-Model.md` version or date changed? | Recorded version/date, impact-review list, and affected Capability, Workflow, and Activity IDs |
+| Other source currency | Have other authoritative baselines or workflow versions changed? | Impact-review list and affected Workflow/Activity IDs |
 | Neutrality | Does organization avoid stages, scope, UI, technical, team, feature, and release semantics? | Prohibited-semantic findings and correction state |
 
 ## Coverage records and dispositions
 
-Every active domain and every current Workflow Area has a coverage record containing its ID and parent relationship, workflow counts by controlled status, activity-reference count, disposition, rationale, last validation date, reviewing authority, and source baseline.
+Every active domain and every current Workflow Area has a coverage record containing its ID and parent relationship, workflow counts by controlled status, activity-reference count, disposition, rationale, last validation date, reviewing authority, and source baseline. The baseline records the Business Domain Boundary version or date separately from the Operational Capability Model version or date so that domain and capability currency can be reviewed against their respective authorities.
 
 | Disposition | Meaning |
 |-------------|---------|
@@ -344,15 +355,15 @@ Only `Approved` workflows with reconciled activity references count as `Represen
 
 ## Validation procedure
 
-1. **Baseline sources** — record exact input versions, the workflow inventory snapshot, and every authoritative workflow version.
-2. **Reconcile domains** — compare active architecture-defined domains with the complete hierarchy, including empty domains.
+1. **Baseline sources** — record the exact `TOP-Business-Domain-Boundary.md` version or date, the exact `TOP-Operational-Capability-Model.md` version or date, all other input versions or dates, the workflow inventory snapshot, and every authoritative workflow version.
+2. **Reconcile domains** — validate Business Domain identity, meaning, and responsibility boundaries against the recorded `TOP-Business-Domain-Boundary.md` version or date, then compare its active domains with the complete hierarchy, including empty domains.
 3. **Validate Workflow Areas** — apply identity, derivation, creation, uniqueness, overlap, neutrality, lifecycle, and source rules.
 4. **Reconcile workflows** — identify missing, duplicate, unknown, current, and historical Workflow IDs.
 5. **Validate placement** — confirm each workflow's responsible domain and exactly one qualifying Workflow Area.
 6. **Reconcile activities** — compare every workflow version's authoritative activity set with its contained references and historical changes.
 7. **Validate Approved records** — reapply the Definition Rules to any workflow represented as Approved.
-8. **Build secondary indexes** — derive actor, goal, story, capability, object, boundary, domain, area, workflow, activity, and source views with zero-result rows.
-9. **Validate boundaries and neutrality** — detect changed meanings, authority expansion, overlap, and prohibited grouping semantics.
+8. **Build secondary indexes** — validate Operational Capability definitions and capability-to-domain mappings against the recorded `TOP-Operational-Capability-Model.md` version or date, then derive actor, goal, story, capability, object, boundary, domain, area, workflow, activity, and source views with zero-result rows.
+9. **Validate boundaries and neutrality** — independently reconcile domain evidence to the Business Domain Boundary baseline and capability evidence to the Operational Capability Model baseline, then detect changed meanings, authority expansion, overlap, and prohibited grouping semantics.
 10. **Assess coverage and record evidence** — calculate counts, assign dispositions, and retain findings, rationale, escalation, reviewer, date, and follow-up.
 
 Coverage validation is complete only when domains, areas, workflows, and activities reconcile; every current workflow and activity has one valid canonical location; all current areas pass governance rules; secondary indexes include zero results without becoming ownership structures; Approved workflows remain definition-valid; coverage records have current counts and dispositions; and boundary and source impacts are resolved or visibly under review.
