@@ -48,8 +48,8 @@ This is a Product Layer artifact. Story approval validates definition quality on
 |--------|---------------|-----------------------|
 | `TOP-Product-Layer-Definition.md` | Version 1.1, 2026-08-06 | Product translation principles, responsibilities, and boundaries |
 | `TOP-Product-Actor-and-Goal-Model.md` | Version 1.1, 2026-08-06 | Actors, goal IDs, outcome evidence, capability traces, and object traces |
-| `TOP-Product-Story-Definition-Rules.md` | Version 1.0, 2026-08-06 | Story record, statement form, validation, lifecycle, and traceability rules |
-| `TOP-Product-Story-Map-Structure.md` | Version 1.0, 2026-08-06 | Canonical placement, theme governance, coverage, and map integrity rules |
+| `TOP-Product-Story-Definition-Rules.md` | Version 1.1, 2026-08-06 | Story record, statement form, validation, lifecycle, and traceability rules |
+| `TOP-Product-Story-Map-Structure.md` | Version 1.1, 2026-08-07 | Canonical placement, theme governance, coverage, and map integrity rules |
 | `TOP-Operational-Capability-Model.md` | Business Architecture Reference Document, 2026-08-05 | Established Operational Capabilities and capability boundaries |
 | `TOP-Core-Business-Object-Model.md` | Business Architecture Reference Document, 2026-08-05 | Established Core Business Objects, relationships, ownership, and provenance |
 
@@ -631,7 +631,7 @@ Story inventory: Version 1.0, 18 Approved stories
 | Story definition | Pass — all 18 stories include the complete governed record and satisfy source, value, outcome, capability, object, boundary, neutrality, atomicity, and completeness gates. |
 | Capability and object traceability | Pass — reverse indexes cover every established capability and Core Business Object, including explicit zero-result capability rows. |
 | Boundary integrity | Pass — responsibilities, TOP-owned operational facts, referenced external authority, registration limits, and media limits remain explicit. |
-| Source currency | Pass — records were validated against the source baseline above. |
+| Source currency | Pass — records were revalidated against the active Product Story Definition Rules Version 1.1 and Product Story Map Structure Version 1.1 recorded in the source baseline above. |
 
 No unresolved traceability or boundary questions remain for these initial stories. This validation does not assert exhaustive story discovery, workflow completeness, Product Scope, priority, release readiness, or engineering authorization.
 
