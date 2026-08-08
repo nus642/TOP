@@ -2,10 +2,12 @@ const { OperationsError } = require("./operations-error");
 
 const STATES = Object.freeze({
   IDLE: "idle",
-  ASSIGNED: "assigned",
-  PLAYING: "playing",
-  AWAITING_CONFIRMATION: "awaiting_confirmation",
-  CONFIRMED: "confirmed"
+  UPCOMING: "upcoming",
+  ASSIGNED: "assigned", // Referee responsibility is established.
+  PLAYING: "playing", // Match execution is in progress.
+  SCORED: "scored", // The score is captured but is not official yet.
+  CONFIRMED: "confirmed", // The assigned Referee officially confirmed the result.
+  FINISHED: "finished" // The existing Match lifecycle is completed.
 });
 
 function required(value, field) {
@@ -30,7 +32,7 @@ class MatchOperation {
 
   assign(refereeId) {
     required(refereeId, "refereeId");
-    if (![STATES.IDLE, "upcoming"].includes(this.status)) {
+    if (![STATES.IDLE, STATES.UPCOMING].includes(this.status)) {
       throw new OperationsError("INVALID_OPERATION_STATE", "Only an idle match can be assigned");
     }
     this.refereeId = refereeId;
@@ -57,13 +59,14 @@ class MatchOperation {
     }
     this.score1 = score1;
     this.score2 = score2;
-    this.status = STATES.AWAITING_CONFIRMATION;
+    // A captured score is not yet an officially confirmed result.
+    this.status = STATES.SCORED;
     return this;
   }
 
   confirm(refereeId) {
     this.assertAssignedReferee(refereeId);
-    if (this.status !== STATES.AWAITING_CONFIRMATION) {
+    if (this.status !== STATES.SCORED) {
       throw new OperationsError("INVALID_OPERATION_STATE", "A recorded result is required before confirmation");
     }
     this.status = STATES.CONFIRMED;

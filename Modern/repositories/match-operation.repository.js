@@ -42,7 +42,7 @@ async function acceptResponsibility(tournamentId, matchId, connection = db) {
 
 async function recordScore(tournamentId, matchId, score1, score2, connection = db) {
   await connection.query(
-    `UPDATE matches SET score1 = ?, score2 = ?, status = 'awaiting_confirmation'
+    `UPDATE matches SET score1 = ?, score2 = ?, status = 'scored'
      WHERE tournament_id = ? AND id = ?`, [score1, score2, tournamentId, matchId]
   );
   return findById(tournamentId, matchId, connection);
