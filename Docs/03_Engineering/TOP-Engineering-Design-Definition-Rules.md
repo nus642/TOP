@@ -1,6 +1,6 @@
 # TOP Engineering Design Definition Rules
 
-Version: 1.0
+Version: 1.1
 
 Status: Active
 
@@ -15,6 +15,7 @@ TOP Engineering Governance
 
 | Version | Date | Changes |
 |---------|------|---------|
+| 1.1 | 2026-08-08 | Clarified the downstream relationship between approved design governance and Implementation |
 | 1.0 | 2026-08-08 | Initial governance rules for future Engineering Design Records and Engineering Decisions |
 
 ---
@@ -41,9 +42,13 @@ Engineering Readiness
 Engineering Design Record
         ↓
 Engineering Decisions
+        ↓
+Implementation
 ```
 
 An approved Engineering Readiness Assessment with status `Ready` is the immediate authority to begin Engineering Design. An **Engineering Design Record** is the controlled container for design context, rationale, decisions, impacts, reviews, and history. **Engineering Decisions** are the individually identifiable technical determinations governed within that record.
+
+**Implementation** is the downstream consumer of an Approved Engineering Design Record and its Approved Engineering Decisions. This relationship requires Implementation to conform to that approved design baseline; it does not make Implementation part of Engineering Design governance or give Implementation authority over the design record or its upstream sources.
 
 Neither a record nor a decision changes an upstream artifact. Approval means only that the recorded design is an acceptable technical response to the exact approved baseline.
 
@@ -309,7 +314,7 @@ Every Engineering Design Record has exactly one status:
 
 Individual Engineering Decisions use `Proposed`, `In Review`, `Approved`, `Rejected`, or `Superseded`. A record cannot become `Approved` unless every required decision is `Approved`, every material finding is closed, and all gates pass. A rejected decision remains historical evidence but cannot form part of an approved design.
 
-`Approved` authorizes the design baseline for the governed downstream engineering process. It does not certify implementation, testing, deployment, release, operational readiness, or delivery.
+`Approved` authorizes the approved design baseline only. It does not authorize or certify implementation completion, testing completion, release, deployment, operational readiness, or delivery.
 
 # Review Lifecycle
 
@@ -339,7 +344,7 @@ The Design Decision Authority applies every gate and records `Approved`, `Change
 
 ## 7. Hand off and preserve
 
-The approved record and its immutable review evidence become the governed design baseline. Downstream work must cite it and may not silently reinterpret it. The record remains available for audit.
+The Approved Engineering Design Record, its Approved Engineering Decisions, and their immutable review evidence become the governed design baseline consumed by Implementation. Implementation must cite and conform to that baseline. It cannot silently redefine an Engineering Decision, alter the design baseline, or reinterpret upstream business or product meaning. The record remains available for audit.
 
 ## 8. Monitor and reconsider
 
@@ -388,6 +393,8 @@ A governed review is required when:
 6. Review covers direct and transitive effects across decisions. Unaffected decisions may be carried forward only with recorded evidence that their inputs, rationale, and impacts remain valid.
 7. Supersession preserves the previous record, decisions, rationale, alternatives, findings, approvals, and effective period.
 8. Emergency or temporary technical action does not retrospectively approve a design. It must follow the applicable separate authority and trigger prompt reconciliation under these rules.
+9. Implementation evidence or constraints may trigger governed reconsideration of an affected Engineering Design Record or Engineering Decision.
+10. Implementation evidence does not independently amend, approve, supersede, or replace an Engineering Design Record or Engineering Decision. Any resulting design change must follow this document's ownership, review, decision, and version-control rules before it becomes authoritative.
 
 # Findings and Escalation
 
