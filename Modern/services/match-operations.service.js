@@ -1,6 +1,14 @@
 const db = require("../database/db");
 const repository = require("../repositories/match-operation.repository");
-const { MatchOperation, OperationsError } = require("../engine/operations/domain");
+const {
+  MatchOperation,
+  MatchResult,
+  Confirmation,
+  ConfirmationEvidence,
+  ConfirmedMatchOutcome,
+  MatchOfficialRecord,
+  OperationsError
+} = require("../engine/operations/domain");
 
 function positiveId(value, name) {
   const id = Number(value);
@@ -57,7 +65,42 @@ function recordScore(tournamentId, matchId, data = {}) {
 
 function confirmResult(tournamentId, matchId, data = {}) {
   return mutate(tournamentId, matchId, (match) => match.confirm(data.refereeId),
-    (connection, tid, mid, match) => repository.confirm(tid, mid, match.refereeId, connection));
+    (connection, tid, mid, match) => {
+      const confirmedAt = new Date().toISOString();
+      const evidence = data.evidenceReference
+        ? new ConfirmationEvidence({
+          reference: data.evidenceReference,
+          captureMetadata: data.evidenceMetadata || {}
+        })
+        : null;
+      const matchResult = new MatchResult({
+        matchId: mid,
+        score: { score1: match.score1, score2: match.score2 },
+        details: { tournamentId: tid }
+      });
+      const officialConfirmation = new Confirmation({
+        responsibility: "assigned-referee",
+        confirmedBy: match.refereeId,
+        confirmedAt,
+        evidenceReferences: evidence ? [evidence] : []
+      });
+      const outcome = new ConfirmedMatchOutcome({
+        matchResult,
+        officialConfirmation,
+        evidenceReferences: evidence ? [evidence] : [],
+        confirmedAt
+      });
+      const officialRecord = new MatchOfficialRecord({
+        outcome,
+        provenance: {
+          workflow: "match-operations",
+          operation: "official-confirmation",
+          tournamentId: tid,
+          matchId: mid
+        }
+      });
+      return repository.confirm(tid, mid, match.refereeId, officialRecord, connection);
+    });
 }
 
 module.exports = { assignMatch, acceptRefereeResponsibility, recordScore, confirmResult };

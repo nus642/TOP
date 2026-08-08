@@ -48,14 +48,23 @@ test("API -> service -> domain -> repository completes the assigned Referee resu
   repository.acceptResponsibility = async () => (stored = { ...stored, status: "playing" });
   repository.recordScore = async (_tid, _mid, score1, score2) =>
     (stored = { ...stored, score1, score2, status: "scored" });
-  repository.confirm = async (_tid, _mid, refereeId) =>
-    (stored = { ...stored, status: "confirmed", resultConfirmedBy: refereeId });
+  repository.confirm = async (_tid, _mid, refereeId, officialRecord) =>
+    (stored = {
+      ...stored,
+      status: "confirmed",
+      resultConfirmedBy: refereeId,
+      officialRecord: { recordId: 101, confirmedAt: officialRecord.outcome.confirmedAt }
+    });
 
   const steps = [
     ["/:tournamentId/matches/:matchId/assignment", "put", { refereeId: "referee-7" }, "assigned"],
     ["/:tournamentId/matches/:matchId/referee-responsibility", "post", { refereeId: "referee-7" }, "playing"],
     ["/:tournamentId/matches/:matchId/score", "put", { refereeId: "referee-7", score1: 11, score2: 8 }, "scored"],
-    ["/:tournamentId/matches/:matchId/result-confirmation", "post", { refereeId: "referee-7" }, "confirmed"]
+    ["/:tournamentId/matches/:matchId/result-confirmation", "post", {
+      refereeId: "referee-7",
+      evidenceReference: "scorecard://match/9",
+      evidenceMetadata: { capturedBy: "court-tablet-2" }
+    }, "confirmed"]
   ];
 
   for (const [path, method, body, expectedStatus] of steps) {
@@ -66,6 +75,87 @@ test("API -> service -> domain -> repository completes the assigned Referee resu
   }
   assert.equal(stored.resultConfirmedBy, "referee-7");
   assert.deepEqual([stored.score1, stored.score2], [11, 8]);
+  assert.equal(stored.officialRecord.recordId, 101);
+});
+
+test("official confirmation creates a trusted record and preserves its evidence", async (t) => {
+  const originals = {
+    transaction: db.withTransaction,
+    find: repository.findById,
+    confirm: repository.confirm
+  };
+  t.after(() => {
+    db.withTransaction = originals.transaction;
+    repository.findById = originals.find;
+    repository.confirm = originals.confirm;
+  });
+
+  db.withTransaction = (work) => work({ transaction: true });
+  repository.findById = async () => ({
+    id: 9, tournamentId: 3, refereeId: "referee-7", status: "scored", score1: 11, score2: 8
+  });
+  let persisted;
+  repository.confirm = async (tournamentId, matchId, refereeId, record) => {
+    persisted = record;
+    return {
+      id: matchId,
+      tournamentId,
+      status: "confirmed",
+      officialRecord: { recordId: 501, confirmedBy: refereeId }
+    };
+  };
+
+  const result = await service.confirmResult(3, 9, {
+    refereeId: "referee-7",
+    evidenceReference: "scorecard://match/9",
+    evidenceMetadata: { device: "court-tablet-2", checksum: "sha256:abc" }
+  });
+
+  assert.equal(result.match.officialRecord.recordId, 501);
+  assert.equal(persisted.outcome.officialConfirmation.confirmedBy, "referee-7");
+  assert.equal(persisted.outcome.confirmedAt, persisted.outcome.officialConfirmation.confirmedAt);
+  assert.deepEqual(persisted.outcome.matchResult.score, { score1: 11, score2: 8 });
+  const [evidence] = persisted.outcome.officialConfirmation.evidenceReferences;
+  assert.equal(evidence.reference, "scorecard://match/9");
+  assert.deepEqual(evidence.captureMetadata, { device: "court-tablet-2", checksum: "sha256:abc" });
+  assert.deepEqual(persisted.provenance, {
+    workflow: "match-operations",
+    operation: "official-confirmation",
+    tournamentId: 3,
+    matchId: 9
+  });
+});
+
+test("confirmation history remains attributable", async () => {
+  const connection = {
+    async query(sql, values) {
+      assert.match(sql, /ORDER BY confirmed_at, id/);
+      assert.deepEqual(values, [3, 9]);
+      return [[
+        {
+          id: 501, tournament_id: 3, match_id: 9,
+          result_data: '{"score1":11,"score2":8}', confirmed_at: "2026-08-08T10:00:00.000Z",
+          confirmed_by: "referee-7", evidence_reference: "scorecard://match/9",
+          evidence_metadata: '{"checksum":"sha256:abc"}',
+          provenance: '{"workflow":"match-operations"}'
+        },
+        {
+          id: 502, tournament_id: 3, match_id: 9,
+          result_data: { score1: 11, score2: 8 }, confirmed_at: "2026-08-08T10:05:00.000Z",
+          confirmed_by: "referee-8", evidence_reference: null,
+          evidence_metadata: {}, provenance: { workflow: "match-operations" }
+        }
+      ]];
+    }
+  };
+
+  const history = await repository.findOfficialRecords(3, 9, connection);
+
+  assert.deepEqual(history.map(({ recordId, confirmedBy }) => ({ recordId, confirmedBy })), [
+    { recordId: 501, confirmedBy: "referee-7" },
+    { recordId: 502, confirmedBy: "referee-8" }
+  ]);
+  assert.deepEqual(history[0].evidenceMetadata, { checksum: "sha256:abc" });
 });
 
 test("a different Referee cannot record or confirm an assigned match", async (t) => {

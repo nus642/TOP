@@ -9,6 +9,7 @@ const { CompetitionUpdateIntent } = require("./competition-update-intent");
 const { Confirmation } = require("./confirmation");
 const { ConfirmationEvidence } = require("./confirmation-evidence");
 const { ConfirmedMatchOutcome } = require("./confirmed-match-outcome");
+const { MatchOfficialRecord } = require("./match-official-record");
 const { DrawInput } = require("./draw-input");
 const { DrawInputValidator } = require("./draw-input-validator");
 const { checkReadinessPreparation } = require("./readiness-preparation");
@@ -26,6 +27,7 @@ module.exports = {
   Confirmation,
   ConfirmationEvidence,
   ConfirmedMatchOutcome,
+  MatchOfficialRecord,
   DrawInput,
   DrawInputValidator,
   checkReadinessPreparation,
