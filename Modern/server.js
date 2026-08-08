@@ -6,6 +6,7 @@ const bodyParser = require('body-parser');
 
 const competitionRoutes = require("./api/competition");
 const legacyRoutes = require("./api/legacy");
+const matchOperationsRoutes = require("./api/match-operations");
 
 const competitionEngine = require('./engine/competition');
 const operationsEngine = require('./engine/operations');
@@ -16,6 +17,7 @@ app.use(bodyParser.json());
 
 app.use("/api/competition", competitionRoutes);
 app.use("/api", legacyRoutes);
+app.use("/api/match-operations", matchOperationsRoutes);
 
 // ---------- API 路由 ----------
 

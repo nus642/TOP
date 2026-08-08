@@ -1,0 +1,81 @@
+const { OperationsError } = require("./operations-error");
+
+const STATES = Object.freeze({
+  IDLE: "idle",
+  ASSIGNED: "assigned",
+  PLAYING: "playing",
+  AWAITING_CONFIRMATION: "awaiting_confirmation",
+  CONFIRMED: "confirmed"
+});
+
+function required(value, field) {
+  if (value === undefined || value === null || String(value).trim() === "") {
+    throw new OperationsError("INVALID_MATCH_OPERATION", `${field} is required`);
+  }
+  return value;
+}
+
+class MatchOperation {
+  constructor(record) {
+    if (!record || typeof record !== "object") {
+      throw new OperationsError("INVALID_MATCH_OPERATION", "Match operation record is required");
+    }
+    this.id = required(record.id, "matchId");
+    this.tournamentId = required(record.tournamentId, "tournamentId");
+    this.refereeId = record.refereeId || null;
+    this.status = record.status || STATES.IDLE;
+    this.score1 = record.score1 ?? null;
+    this.score2 = record.score2 ?? null;
+  }
+
+  assign(refereeId) {
+    required(refereeId, "refereeId");
+    if (![STATES.IDLE, "upcoming"].includes(this.status)) {
+      throw new OperationsError("INVALID_OPERATION_STATE", "Only an idle match can be assigned");
+    }
+    this.refereeId = refereeId;
+    this.status = STATES.ASSIGNED;
+    return this;
+  }
+
+  acceptResponsibility(refereeId) {
+    this.assertAssignedReferee(refereeId);
+    if (this.status !== STATES.ASSIGNED) {
+      throw new OperationsError("INVALID_OPERATION_STATE", "Assigned responsibility is not awaiting acceptance");
+    }
+    this.status = STATES.PLAYING;
+    return this;
+  }
+
+  recordScore(refereeId, score1, score2) {
+    this.assertAssignedReferee(refereeId);
+    if (this.status !== STATES.PLAYING) {
+      throw new OperationsError("INVALID_OPERATION_STATE", "Score can only be recorded during assigned execution");
+    }
+    if (![score1, score2].every((score) => Number.isInteger(score) && score >= 0) || score1 === score2) {
+      throw new OperationsError("INVALID_SCORE", "Scores must be non-negative integers and identify a result");
+    }
+    this.score1 = score1;
+    this.score2 = score2;
+    this.status = STATES.AWAITING_CONFIRMATION;
+    return this;
+  }
+
+  confirm(refereeId) {
+    this.assertAssignedReferee(refereeId);
+    if (this.status !== STATES.AWAITING_CONFIRMATION) {
+      throw new OperationsError("INVALID_OPERATION_STATE", "A recorded result is required before confirmation");
+    }
+    this.status = STATES.CONFIRMED;
+    return this;
+  }
+
+  assertAssignedReferee(refereeId) {
+    required(refereeId, "refereeId");
+    if (String(this.refereeId) !== String(refereeId)) {
+      throw new OperationsError("REFEREE_RESPONSIBILITY_MISMATCH", "Only the assigned Referee may perform this match work");
+    }
+  }
+}
+
+module.exports = { MatchOperation, MATCH_OPERATION_STATES: STATES };

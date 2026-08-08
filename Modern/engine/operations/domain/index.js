@@ -12,6 +12,7 @@ const { ConfirmedMatchOutcome } = require("./confirmed-match-outcome");
 const { DrawInput } = require("./draw-input");
 const { DrawInputValidator } = require("./draw-input-validator");
 const { checkReadinessPreparation } = require("./readiness-preparation");
+const { MatchOperation, MATCH_OPERATION_STATES } = require("./match-operation");
 
 module.exports = {
   OperationsError,
@@ -27,5 +28,7 @@ module.exports = {
   ConfirmedMatchOutcome,
   DrawInput,
   DrawInputValidator,
-  checkReadinessPreparation
+  checkReadinessPreparation,
+  MatchOperation,
+  MATCH_OPERATION_STATES
 };
