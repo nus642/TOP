@@ -114,6 +114,22 @@ CREATE TABLE IF NOT EXISTS match_official_records (
     INDEX ix_match_official_records_history (tournament_id, match_id, confirmed_at, id)
 ) DEFAULT CHARSET=utf8mb4;
 
+-- Materialized competition result facts, derived only from confirmed official records.
+CREATE TABLE IF NOT EXISTS competition_standings (
+    competition_id INT NOT NULL,
+    participant_id INT NOT NULL,
+    played INT NOT NULL DEFAULT 0,
+    wins INT NOT NULL DEFAULT 0,
+    losses INT NOT NULL DEFAULT 0,
+    score_for INT NOT NULL DEFAULT 0,
+    score_against INT NOT NULL DEFAULT 0,
+    score_difference INT NOT NULL DEFAULT 0,
+    updated_at TIMESTAMP(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6) ON UPDATE CURRENT_TIMESTAMP(6),
+    PRIMARY KEY (competition_id, participant_id),
+    FOREIGN KEY (competition_id) REFERENCES tournaments(id) ON DELETE CASCADE,
+    FOREIGN KEY (participant_id) REFERENCES players(id) ON DELETE CASCADE
+) DEFAULT CHARSET=utf8mb4;
+
 CREATE TABLE IF NOT EXISTS pairings (
     id INT PRIMARY KEY AUTO_INCREMENT,
     tournament_id INT NOT NULL,
