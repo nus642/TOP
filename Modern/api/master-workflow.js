@@ -1,7 +1,17 @@
 const express = require("express");
 const service = require("../services/master-workflow.service");
+const liveMatchStatusService = require("../services/live-match-status.service");
 
 const router = express.Router();
+
+router.get("/:competitionId/live-status", async (req, res) => {
+  try {
+    res.json(await liveMatchStatusService.getLiveMatchStatus(req.params.competitionId));
+  } catch (error) {
+    const status = error.code === "VALIDATION_ERROR" ? 400 : 500;
+    res.status(status).json({ error: error.message });
+  }
+});
 
 router.post("/:competitionId/matches/:matchId/assign", async (req, res) => {
   try {
