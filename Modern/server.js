@@ -11,6 +11,7 @@ const masterOperationalVisibilityRoutes = require("./api/master-operational-visi
 const masterWorkflowRoutes = require("./api/master-workflow");
 const participantReadinessRoutes = require("./api/participant-readiness");
 const refereeWorkflowRoutes = require("./api/referee-workflow");
+const publicMatchScoreboardRoutes = require("./api/public-match-scoreboard");
 
 const competitionEngine = require('./engine/competition');
 const operationsEngine = require('./engine/operations');
@@ -26,6 +27,7 @@ app.use("/api/master-operations", masterOperationalVisibilityRoutes);
 app.use("/api/master-workflow", masterWorkflowRoutes);
 app.use("/api/participant-readiness", participantReadinessRoutes);
 app.use("/api/referee-workflow", refereeWorkflowRoutes);
+app.use("/api/public/competitions", publicMatchScoreboardRoutes);
 
 // ---------- API 路由 ----------
 
