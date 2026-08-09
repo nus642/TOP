@@ -26,6 +26,17 @@ function readHandler(action) {
   };
 }
 
+async function refereeWorkflowHandler(req, res) {
+  try {
+    const result = await service.getRefereeWorkflow(req.params.tournamentId, req.params.refereeId);
+    res.json(result);
+  } catch (error) {
+    const statuses = { VALIDATION_ERROR: 400, NOT_FOUND: 404 };
+    res.status(statuses[error.code] || 500).json({ error: error.message });
+  }
+}
+
+router.get("/:tournamentId/referees/:refereeId/matches", refereeWorkflowHandler);
 router.put("/:tournamentId/matches/:matchId/assignment", handler("assignMatch"));
 router.post("/:tournamentId/matches/:matchId/referee-responsibility", handler("acceptRefereeResponsibility"));
 router.put("/:tournamentId/matches/:matchId/score", handler("recordScore"));
