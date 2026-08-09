@@ -8,6 +8,7 @@ const competitionRoutes = require("./api/competition");
 const legacyRoutes = require("./api/legacy");
 const matchOperationsRoutes = require("./api/match-operations");
 const masterOperationalVisibilityRoutes = require("./api/master-operational-visibility");
+const masterWorkflowRoutes = require("./api/master-workflow");
 const participantReadinessRoutes = require("./api/participant-readiness");
 const refereeWorkflowRoutes = require("./api/referee-workflow");
 
@@ -22,6 +23,7 @@ app.use("/api/competition", competitionRoutes);
 app.use("/api", legacyRoutes);
 app.use("/api/match-operations", matchOperationsRoutes);
 app.use("/api/master-operations", masterOperationalVisibilityRoutes);
+app.use("/api/master-workflow", masterWorkflowRoutes);
 app.use("/api/participant-readiness", participantReadinessRoutes);
 app.use("/api/referee-workflow", refereeWorkflowRoutes);
 
