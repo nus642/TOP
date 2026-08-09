@@ -4,6 +4,7 @@ const router = express.Router();
 const competitionService = require("../services/competition.service");
 const checkinService = require("../services/checkin.service");
 const teamService = require("../services/team.service");
+const schedulingService = require("../services/scheduling.service");
 
 const DEFAULT_TOURNAMENT_ID = 1;
 
@@ -43,6 +44,11 @@ function sendWriteError(res, err) {
         res.status(404).json({
             error: err.message
         });
+        return;
+    }
+
+    if (err.code === "DUPLICATE_SCHEDULE") {
+        res.status(409).json({ error: err.message });
         return;
     }
 
@@ -285,6 +291,27 @@ router.post("/:competitionId/matches/generate", async (req, res) => {
         );
 
         res.status(201).json(result);
+    } catch (err) {
+        sendWriteError(res, err);
+    }
+});
+
+router.post("/:competitionId/matches/:matchId/schedule", async (req, res) => {
+    try {
+        const result = await schedulingService.scheduleMatch(
+            getScopedCompetitionId(req), req.params.matchId, req.body
+        );
+        res.status(201).json(result);
+    } catch (err) {
+        sendWriteError(res, err);
+    }
+});
+
+router.get("/:competitionId/matches/:matchId/schedule", async (req, res) => {
+    try {
+        res.json(await schedulingService.getMatchSchedule(
+            getScopedCompetitionId(req), req.params.matchId
+        ));
     } catch (err) {
         sendWriteError(res, err);
     }
