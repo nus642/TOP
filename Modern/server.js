@@ -9,6 +9,7 @@ const legacyRoutes = require("./api/legacy");
 const matchOperationsRoutes = require("./api/match-operations");
 const masterOperationalVisibilityRoutes = require("./api/master-operational-visibility");
 const participantReadinessRoutes = require("./api/participant-readiness");
+const refereeWorkflowRoutes = require("./api/referee-workflow");
 
 const competitionEngine = require('./engine/competition');
 const operationsEngine = require('./engine/operations');
@@ -22,6 +23,7 @@ app.use("/api", legacyRoutes);
 app.use("/api/match-operations", matchOperationsRoutes);
 app.use("/api/master-operations", masterOperationalVisibilityRoutes);
 app.use("/api/participant-readiness", participantReadinessRoutes);
+app.use("/api/referee-workflow", refereeWorkflowRoutes);
 
 // ---------- API 路由 ----------
 
