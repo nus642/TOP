@@ -2,9 +2,9 @@ const db = require("../database/db");
 
 
 // Get all players in a tournament
-async function getPlayersByTournament(tournamentId) {
+async function getPlayersByTournament(tournamentId, connection = db) {
 
-    const [rows] = await db.query(
+    const [rows] = await connection.query(
         `
         SELECT *
         FROM players
