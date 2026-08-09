@@ -8,7 +8,8 @@ function handler(action, status = 200) {
     try {
       const result = await service[action](
         req.params.competitionId,
-        req.params.participantId
+        req.params.participantId,
+        req.body
       );
       res.status(status).json(result);
     } catch (error) {

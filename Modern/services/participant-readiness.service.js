@@ -1,6 +1,7 @@
 const db = require("../database/db");
-const playerRepository = require("../repositories/player.repository");
 const readinessRepository = require("../repositories/participant-readiness.repository");
+const tournamentRepository = require("../repositories/tournament.repository");
+const checkinService = require("./checkin.service");
 const { ReadinessState } = require("../engine/readiness");
 
 function parseId(value, label) {
@@ -13,8 +14,8 @@ function parseId(value, label) {
   return id;
 }
 
-function notFound() {
-  const error = new Error("Participant registration not found");
+function competitionNotFound() {
+  const error = new Error("Competition not found");
   error.code = "NOT_FOUND";
   return error;
 }
@@ -29,49 +30,36 @@ function response(competitionId, participantId, row) {
   };
 }
 
-async function requireRegistration(competitionId, participantId, connection) {
-  const registration = await playerRepository.getPlayerByIdForTournament(
-    competitionId,
-    participantId,
-    connection
-  );
-  if (!registration) throw notFound();
-}
-
-async function checkIn(competitionIdValue, participantIdValue) {
+async function checkIn(competitionIdValue, participantIdValue, data = {}) {
   const competitionId = parseId(competitionIdValue, "competition");
   const participantId = parseId(participantIdValue, "participant");
-
-  return db.withTransaction(async (connection) => {
-    await requireRegistration(competitionId, participantId, connection);
-    const row = await readinessRepository.markCheckedIn(
-      competitionId,
-      participantId,
-      new Date(),
-      connection
-    );
-    return response(competitionId, participantId, row);
-  });
+  const result = await checkinService.checkInPlayer(competitionId, participantId, data);
+  return response(competitionId, participantId, result.checkIn);
 }
 
 async function getReadiness(competitionIdValue, participantIdValue) {
   const competitionId = parseId(competitionIdValue, "competition");
   const participantId = parseId(participantIdValue, "participant");
 
-  return db.withTransaction(async (connection) => {
-    await requireRegistration(competitionId, participantId, connection);
-    const row = await readinessRepository.find(competitionId, participantId, connection);
-    return response(competitionId, participantId, row);
-  });
+  const result = await checkinService.getCheckInStatus(competitionId, participantId);
+  return response(competitionId, participantId, result.checkIn);
 }
 
 async function listReadiness(competitionIdValue) {
   const competitionId = parseId(competitionIdValue, "competition");
-  const rows = await readinessRepository.listForCompetition(competitionId);
-  return {
-    competitionId,
-    participants: rows.map((row) => response(competitionId, row.participant_id, row))
-  };
+  return db.withTransaction(async (connection) => {
+    const competition = await tournamentRepository.getTournamentByIdWithConnection(
+      competitionId,
+      connection
+    );
+    if (!competition) throw competitionNotFound();
+
+    const rows = await readinessRepository.listForCompetition(competitionId, connection);
+    return {
+      competitionId,
+      participants: rows.map((row) => response(competitionId, row.participant_id, row))
+    };
+  });
 }
 
 module.exports = { checkIn, getReadiness, listReadiness };
