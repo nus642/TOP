@@ -42,5 +42,6 @@ function generateRoundRobinMatches(participants) {
 }
 
 module.exports = {
-    generateRoundRobinMatches
+    generateRoundRobinMatches,
+    ...require("./results")
 };

@@ -5,6 +5,7 @@ const competitionService = require("../services/competition.service");
 const checkinService = require("../services/checkin.service");
 const teamService = require("../services/team.service");
 const schedulingService = require("../services/scheduling.service");
+const competitionResultService = require("../services/competition-result.service");
 
 const DEFAULT_TOURNAMENT_ID = 1;
 
@@ -291,6 +292,14 @@ router.post("/:competitionId/matches/generate", async (req, res) => {
         );
 
         res.status(201).json(result);
+    } catch (err) {
+        sendWriteError(res, err);
+    }
+});
+
+router.get("/:competitionId/standings", async (req, res) => {
+    try {
+        res.json(await competitionResultService.getStandings(getScopedCompetitionId(req)));
     } catch (err) {
         sendWriteError(res, err);
     }

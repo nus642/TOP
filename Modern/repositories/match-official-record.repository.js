@@ -78,4 +78,32 @@ async function findLatestByMatch(tournamentId, matchId, connection = db) {
   return map(rows[0]);
 }
 
-module.exports = { create, findById, findByMatch, findLatestByMatch };
+// Official records are the confirmation boundary. Mutable match status and scores
+// are deliberately not read; the match join supplies participant identity only.
+async function findLatestConfirmedResults(tournamentId, connection = db) {
+  const [rows] = await connection.query(
+    `SELECT r.match_id, r.score1, r.score2, m.player1_id, m.player2_id
+     FROM match_official_records r
+     JOIN matches m ON m.id = r.match_id AND m.tournament_id = r.tournament_id
+     JOIN (
+       SELECT match_id, MAX(id) AS record_id
+       FROM match_official_records
+       WHERE tournament_id = ?
+       GROUP BY match_id
+     ) latest ON latest.record_id = r.id
+     WHERE r.tournament_id = ?
+       AND m.player1_id IS NOT NULL AND m.player2_id IS NOT NULL
+     ORDER BY r.match_id`,
+    [tournamentId, tournamentId]
+  );
+  return rows.map(row => ({
+    matchId: row.match_id,
+    sideOneId: row.player1_id,
+    sideTwoId: row.player2_id,
+    sideOneScore: row.score1,
+    sideTwoScore: row.score2,
+    confirmed: true
+  }));
+}
+
+module.exports = { create, findById, findByMatch, findLatestByMatch, findLatestConfirmedResults };
