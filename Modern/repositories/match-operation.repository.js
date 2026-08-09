@@ -15,6 +15,31 @@ function map(row) {
   };
 }
 
+function mapRefereeWork(row) {
+  return row && {
+    id: row.id,
+    tournamentId: row.tournament_id,
+    refereeId: row.referee_id,
+    status: row.status,
+    roundNumber: row.round_num,
+    court: row.court,
+    scheduledAt: row.scheduled_at,
+    team1: {
+      name: row.team1_name,
+      playerIds: [row.player1_id, row.player2_id].filter((id) => id !== null)
+    },
+    team2: {
+      name: row.team2_name,
+      playerIds: [row.player3_id, row.player4_id].filter((id) => id !== null)
+    },
+    score1: row.score1,
+    score2: row.score2,
+    assignedAt: row.assigned_at,
+    responsibilityAcceptedAt: row.responsibility_accepted_at,
+    resultConfirmedAt: row.result_confirmed_at
+  };
+}
+
 function json(value) {
   if (value === null || value === undefined) return null;
   return typeof value === "string" ? JSON.parse(value) : value;
@@ -40,6 +65,18 @@ async function findById(tournamentId, matchId, connection = db, lock = false) {
     [tournamentId, matchId]
   );
   return map(rows[0]);
+}
+
+async function findByReferee(tournamentId, refereeId, connection = db) {
+  const [rows] = await connection.query(
+    `SELECT m.*, ms.scheduled_at
+     FROM matches m
+     LEFT JOIN match_schedules ms ON ms.match_id = m.id
+     WHERE m.tournament_id = ? AND m.referee_id = ?
+     ORDER BY ms.scheduled_at IS NULL, ms.scheduled_at, m.round_num, m.id`,
+    [tournamentId, refereeId]
+  );
+  return rows.map(mapRefereeWork);
 }
 
 async function assign(tournamentId, matchId, refereeId, connection = db) {
@@ -115,4 +152,12 @@ async function findOfficialRecords(tournamentId, matchId, connection = db) {
   return rows.map(mapOfficialRecord);
 }
 
-module.exports = { findById, assign, acceptResponsibility, recordScore, confirm, findOfficialRecords };
+module.exports = {
+  findById,
+  findByReferee,
+  assign,
+  acceptResponsibility,
+  recordScore,
+  confirm,
+  findOfficialRecords
+};

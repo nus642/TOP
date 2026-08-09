@@ -21,6 +21,15 @@ function positiveId(value, name) {
   return id;
 }
 
+function requiredRefereeId(value) {
+  if (value === undefined || value === null || String(value).trim() === "") {
+    const error = new Error("Valid referee id is required");
+    error.code = "VALIDATION_ERROR";
+    throw error;
+  }
+  return String(value).trim();
+}
+
 function translate(error) {
   if (!(error instanceof OperationsError)) throw error;
   const translated = new Error(error.message);
@@ -186,10 +195,23 @@ async function getOfficialRecord(tournamentValue, matchValue) {
   };
 }
 
+async function getRefereeWorkflow(tournamentValue, refereeValue) {
+  const tournamentId = positiveId(tournamentValue, "tournament id");
+  const refereeId = requiredRefereeId(refereeValue);
+  const matches = await repository.findByReferee(tournamentId, refereeId);
+
+  return {
+    tournamentId,
+    refereeId,
+    matches
+  };
+}
+
 module.exports = {
   assignMatch,
   acceptRefereeResponsibility,
   recordScore,
   confirmResult,
-  getOfficialRecord
+  getOfficialRecord,
+  getRefereeWorkflow
 };
