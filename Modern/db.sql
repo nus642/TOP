@@ -114,6 +114,29 @@ CREATE TABLE IF NOT EXISTS match_official_records (
     INDEX ix_match_official_records_history (tournament_id, match_id, confirmed_at, id)
 ) DEFAULT CHARSET=utf8mb4;
 
+-- Read-only projection for operational visibility. Every value remains owned by
+-- its source table: lifecycle by tournaments, placement by match_schedules, and
+-- execution/referee state by matches.
+CREATE OR REPLACE VIEW master_operational_match_overview AS
+SELECT
+    m.tournament_id AS competition_id,
+    t.status AS competition_status,
+    m.id AS match_id,
+    m.round_num AS round_number,
+    m.team1_name,
+    m.team2_name,
+    ms.scheduled_at,
+    ms.court_id,
+    m.referee_id,
+    m.status AS operation_status,
+    m.assigned_at,
+    m.responsibility_accepted_at,
+    m.result_confirmed_at
+FROM matches m
+JOIN tournaments t ON t.id = m.tournament_id
+LEFT JOIN match_schedules ms
+    ON ms.tournament_id = m.tournament_id AND ms.match_id = m.id;
+
 -- Materialized competition result facts, derived only from confirmed official records.
 CREATE TABLE IF NOT EXISTS competition_standings (
     competition_id INT NOT NULL,
