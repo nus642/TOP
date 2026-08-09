@@ -79,6 +79,20 @@ CREATE TABLE IF NOT EXISTS matches (
     FOREIGN KEY (tournament_id) REFERENCES tournaments(id) ON DELETE CASCADE
 ) DEFAULT CHARSET=utf8mb4;
 
+-- Scheduling owns these placement facts; match execution remains in matches.
+CREATE TABLE IF NOT EXISTS match_schedules (
+    id BIGINT PRIMARY KEY AUTO_INCREMENT,
+    tournament_id INT NOT NULL,
+    match_id INT NOT NULL,
+    scheduled_at DATETIME(6) NOT NULL,
+    court_id VARCHAR(100) DEFAULT NULL,
+    created_at TIMESTAMP(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
+    FOREIGN KEY (tournament_id) REFERENCES tournaments(id) ON DELETE CASCADE,
+    FOREIGN KEY (match_id) REFERENCES matches(id) ON DELETE CASCADE,
+    UNIQUE KEY uq_match_schedules_match (match_id),
+    INDEX ix_match_schedules_competition_time (tournament_id, scheduled_at)
+) DEFAULT CHARSET=utf8mb4;
+
 -- Append-only trusted records created by official match confirmation. Their
 -- identity and attribution remain independent from the mutable match row.
 CREATE TABLE IF NOT EXISTS match_official_records (
