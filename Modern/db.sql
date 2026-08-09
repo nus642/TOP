@@ -175,6 +175,8 @@ CREATE TABLE IF NOT EXISTS player_opponents (
     PRIMARY KEY (player_id, opponent_id, tournament_id)
 ) DEFAULT CHARSET=utf8mb4;
 
+-- Participant Readiness owns only check-in facts. Player identity and registration
+-- remain referenced from Player Registration's players table.
 CREATE TABLE IF NOT EXISTS player_check_ins (
     id INT PRIMARY KEY AUTO_INCREMENT,
     tournament_id INT NOT NULL,
