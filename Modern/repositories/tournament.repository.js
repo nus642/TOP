@@ -137,6 +137,19 @@ async function updateTournamentName(
 
 }
 
+async function getTournamentByIdForUpdate(tournamentId, connection){
+    const [rows] = await connection.query(
+        `SELECT * FROM tournaments WHERE id = ? FOR UPDATE`,
+        [tournamentId]
+    );
+    return rows[0] || null;
+}
+
+async function updateLifecycleState(id, state, connection = db){
+    await connection.query(`UPDATE tournaments SET status = ? WHERE id = ?`, [state, id]);
+    return getTournamentByIdWithConnection(id, connection);
+}
+
 module.exports = {
 
     getTournamentById,
@@ -144,6 +157,8 @@ module.exports = {
     updateTournament,
     deleteTournament,
     getTournamentByIdWithConnection,
+    getTournamentByIdForUpdate,
+    updateLifecycleState,
     updateTournamentName
 
 };

@@ -3,82 +3,13 @@ const playerRepository = require("../repositories/player.repository");
 const pairingRepository = require("../repositories/pairing.repository");
 const tournamentRepository = require("../repositories/tournament.repository");
 const db = require("../database/db");
-const { generateRoundRobinMatches } = require("../engine/competition");
-
-const COMPETITION_STATUSES = Object.freeze({
-    DRAFT: "draft",
-    REGISTRATION_OPEN: "registration_open",
-    REGISTRATION_CLOSED: "registration_closed",
-    CHECK_IN_OPEN: "check_in_open",
-    READY: "ready",
-    IN_PROGRESS: "in_progress",
-    COMPLETED: "completed",
-    CANCELLED: "cancelled"
-});
-
-const ALLOWED_TRANSITIONS = Object.freeze({
-    [COMPETITION_STATUSES.DRAFT]: [
-        COMPETITION_STATUSES.REGISTRATION_OPEN,
-        COMPETITION_STATUSES.CANCELLED
-    ],
-    [COMPETITION_STATUSES.REGISTRATION_OPEN]: [
-        COMPETITION_STATUSES.REGISTRATION_CLOSED,
-        COMPETITION_STATUSES.CANCELLED
-    ],
-    [COMPETITION_STATUSES.REGISTRATION_CLOSED]: [
-        COMPETITION_STATUSES.CHECK_IN_OPEN,
-        COMPETITION_STATUSES.READY,
-        COMPETITION_STATUSES.CANCELLED
-    ],
-    [COMPETITION_STATUSES.CHECK_IN_OPEN]: [
-        COMPETITION_STATUSES.READY,
-        COMPETITION_STATUSES.CANCELLED
-    ],
-    [COMPETITION_STATUSES.READY]: [
-        COMPETITION_STATUSES.IN_PROGRESS,
-        COMPETITION_STATUSES.CANCELLED
-    ],
-    [COMPETITION_STATUSES.IN_PROGRESS]: [
-        COMPETITION_STATUSES.COMPLETED,
-        COMPETITION_STATUSES.CANCELLED
-    ],
-    [COMPETITION_STATUSES.COMPLETED]: [],
-    [COMPETITION_STATUSES.CANCELLED]: []
-});
-
-function isKnownCompetitionStatus(status) {
-    return Object.prototype.hasOwnProperty.call(ALLOWED_TRANSITIONS, status);
-}
-
-function normalizeCompetitionStatus(status) {
-    if (typeof status !== "string" || status.trim() === "") {
-        throw makeValidationError("Competition status is required");
-    }
-
-    const normalizedStatus = status.trim();
-
-    if (!isKnownCompetitionStatus(normalizedStatus)) {
-        throw makeValidationError(`Unknown competition status: ${normalizedStatus}`);
-    }
-
-    return normalizedStatus;
-}
-
-function validateCompetitionTransition(currentStatus, nextStatus) {
-    const normalizedCurrentStatus = normalizeCompetitionStatus(
-        currentStatus || COMPETITION_STATUSES.DRAFT
-    );
-    const normalizedNextStatus = normalizeCompetitionStatus(nextStatus);
-    const allowedStatuses = ALLOWED_TRANSITIONS[normalizedCurrentStatus];
-
-    if (!allowedStatuses.includes(normalizedNextStatus)) {
-        throw makeValidationError(
-            `Cannot transition competition from ${normalizedCurrentStatus} to ${normalizedNextStatus}`
-        );
-    }
-
-    return normalizedNextStatus;
-}
+const {
+    generateRoundRobinMatches,
+    CompetitionLifecycleState,
+    COMPETITION_LIFECYCLE_STATES,
+    NEXT_STATE,
+    transition
+} = require("../engine/competition");
 
 function makeValidationError(message){
 
@@ -170,9 +101,7 @@ async function createCompetition(data){
         const competition = await tournamentRepository.createTournament({
             name: data.name,
             sport: data.sport,
-            status: data.status
-                ? normalizeCompetitionStatus(data.status)
-                : COMPETITION_STATUSES.DRAFT
+            status: COMPETITION_LIFECYCLE_STATES.DRAFT
         }, connection);
 
         return {
@@ -183,53 +112,33 @@ async function createCompetition(data){
 
 }
 
-async function transitionCompetition(id, nextStatusValue){
-
+async function transitionCompetitionState(id, nextStateValue){
     const competitionId = parseCompetitionId(id);
-    const nextStatus = normalizeCompetitionStatus(nextStatusValue);
 
     return db.withTransaction(async (connection) => {
-
-        const existingCompetition = await tournamentRepository.getTournamentByIdWithConnection(
-            competitionId,
-            connection
+        const existingCompetition = await tournamentRepository.getTournamentByIdForUpdate(
+            competitionId, connection
         );
+        if (!existingCompetition) throw makeNotFoundError("Competition not found");
 
-        if (!existingCompetition) {
-            throw makeNotFoundError("Competition not found");
-        }
-
-        validateCompetitionTransition(
-            existingCompetition.status,
-            nextStatus
+        const nextState = transition(existingCompetition.status, nextStateValue);
+        const competition = await tournamentRepository.updateLifecycleState(
+            competitionId, nextState.value, connection
         );
-
-        const competition = await tournamentRepository.updateTournament(
-            competitionId,
-            {
-                status: nextStatus
-            },
-            connection
-        );
-
-        return {
-            competition
-        };
-
+        return { competition };
     });
-
 }
+
+const transitionCompetition = transitionCompetitionState;
 
 async function updateCompetition(id, data){
 
     const competitionId = parseCompetitionId(id);
     const updates = {};
 
-    for (const field of ["name", "sport", "status"]) {
+    for (const field of ["name", "sport"]) {
         if (data && Object.prototype.hasOwnProperty.call(data, field) && data[field] !== undefined && data[field] !== null) {
-            updates[field] = field === "status"
-                ? normalizeCompetitionStatus(data[field])
-                : data[field];
+            updates[field] = data[field];
         }
     }
 
@@ -806,6 +715,7 @@ module.exports = {
     createCompetition,
     updateCompetition,
     transitionCompetition,
+    transitionCompetitionState,
     registerPlayer,
     withdrawPlayer,
     deleteCompetition,
@@ -819,6 +729,7 @@ module.exports = {
     resetCompetition,
     generateCompetition,
     generateRoundRobin,
-    COMPETITION_STATUSES,
-    ALLOWED_TRANSITIONS
+    COMPETITION_STATUSES: COMPETITION_LIFECYCLE_STATES,
+    ALLOWED_TRANSITIONS: NEXT_STATE,
+    CompetitionLifecycleState
 };
