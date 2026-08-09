@@ -3,6 +3,7 @@ const express = require('express');
 const db = require("./database/db");
 const cors = require('cors');
 const bodyParser = require('body-parser');
+const path = require('node:path');
 
 const competitionRoutes = require("./api/competition");
 const legacyRoutes = require("./api/legacy");
@@ -20,6 +21,7 @@ const operationsEngine = require('./engine/operations');
 const app = express();
 app.use(cors());
 app.use(bodyParser.json());
+app.use("/operator", express.static(path.join(__dirname, "operator")));
 
 app.use("/api/competition", competitionRoutes);
 app.use("/api", legacyRoutes);
