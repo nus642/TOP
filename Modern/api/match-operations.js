@@ -14,9 +14,22 @@ function handler(action) {
   };
 }
 
+function readHandler(action) {
+  return async (req, res) => {
+    try {
+      const result = await service[action](req.params.tournamentId, req.params.matchId);
+      res.json(result);
+    } catch (error) {
+      const statuses = { VALIDATION_ERROR: 400, NOT_FOUND: 404 };
+      res.status(statuses[error.code] || 500).json({ error: error.message });
+    }
+  };
+}
+
 router.put("/:tournamentId/matches/:matchId/assignment", handler("assignMatch"));
 router.post("/:tournamentId/matches/:matchId/referee-responsibility", handler("acceptRefereeResponsibility"));
 router.put("/:tournamentId/matches/:matchId/score", handler("recordScore"));
 router.post("/:tournamentId/matches/:matchId/result-confirmation", handler("confirmResult"));
+router.get("/:tournamentId/matches/:matchId/official-record", readHandler("getOfficialRecord"));
 
 module.exports = router;
