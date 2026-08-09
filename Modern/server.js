@@ -22,6 +22,7 @@ const app = express();
 app.use(cors());
 app.use(bodyParser.json());
 app.use("/operator", express.static(path.join(__dirname, "operator")));
+app.use("/participant", express.static(path.join(__dirname, "participant")));
 
 app.use("/api/competition", competitionRoutes);
 app.use("/api", legacyRoutes);
