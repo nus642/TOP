@@ -79,6 +79,24 @@ CREATE TABLE IF NOT EXISTS matches (
     FOREIGN KEY (tournament_id) REFERENCES tournaments(id) ON DELETE CASCADE
 ) DEFAULT CHARSET=utf8mb4;
 
+-- Append-only trusted records created by official match confirmation. Their
+-- identity and attribution remain independent from the mutable match row.
+CREATE TABLE IF NOT EXISTS match_official_records (
+    id BIGINT PRIMARY KEY AUTO_INCREMENT,
+    tournament_id INT NOT NULL,
+    match_id INT NOT NULL,
+    result_data JSON NOT NULL,
+    confirmed_at TIMESTAMP(6) NOT NULL,
+    confirmed_by VARCHAR(100) NOT NULL,
+    evidence_reference VARCHAR(500) DEFAULT NULL,
+    evidence_metadata JSON NOT NULL,
+    provenance JSON NOT NULL,
+    created_at TIMESTAMP(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
+    FOREIGN KEY (tournament_id) REFERENCES tournaments(id) ON DELETE CASCADE,
+    FOREIGN KEY (match_id) REFERENCES matches(id) ON DELETE CASCADE,
+    INDEX ix_match_official_records_history (tournament_id, match_id, confirmed_at, id)
+) DEFAULT CHARSET=utf8mb4;
+
 CREATE TABLE IF NOT EXISTS pairings (
     id INT PRIMARY KEY AUTO_INCREMENT,
     tournament_id INT NOT NULL,
