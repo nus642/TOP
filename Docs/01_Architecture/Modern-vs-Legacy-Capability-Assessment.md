@@ -1,136 +1,142 @@
 # Modern vs Legacy Capability Assessment
 
-**Assessment date:** 2026-08-09  
-**Repository baseline:** `b95e3d2` (`test: verify modern tournament lifecycle end to end`)  
-**Scope:** Current replacement readiness after the first complete Modern tournament lifecycle
+**Assessment date:** 2026-08-09
 
-## 1. Purpose and assessment rules
+**Repository baseline:** `0519dcd` (`Add competition archive read model`), current main after PR86
 
-This document answers three questions from the repository as it exists today:
+**Scope:** Replacement readiness after completion of the Modern operational backend workflow
 
-1. Which Legacy capabilities Modern can replace now;
-2. Which Legacy capabilities remain unmatched or only partly matched; and
-3. Which existing capability should be migrated next.
+## 1. Executive assessment
 
-This is a capability assessment, not an architecture or implementation plan. It does not add domain concepts, infer capabilities that are not present in code, or treat a passing isolated test as proof of a complete operator-facing replacement.
+Modern has reached **operational capability parity for core tournament execution at the backend level**. A backend consumer can now move a competition through its lifecycle, establish participant readiness, generate and schedule matches, coordinate master and referee work, expose live operational state, confirm official results, calculate standings, publish a scoreboard, and read the completed competition archive.
 
-The readiness terms used below are:
+This is not full Legacy product replacement. Backend capability completeness means that the core business actions and authoritative views exist and are tested. Complete tournament operating product completeness additionally requires people to perform those actions effectively in their roles. Legacy still provides much of that human-facing experience, together with identity and access behavior, communications, specialist team-event workflows, content, and downloads.
 
-| Rating | Meaning in this assessment |
+The assessment therefore reaches two conclusions that must remain distinct:
+
+| Assessment level | Conclusion |
 |---|---|
-| **Replaceable today** | A Modern API/service and persistence path exists, and automated tests cover the relevant behavior. It can replace the stated capability for API consumers, within the listed boundary. |
-| **Partial** | Modern contains a meaningful part of the capability, but a Legacy workflow or material behavior has no Modern equivalent. |
-| **Not available** | No corresponding Modern route/service and durable behavior is present. |
-| **Compatibility only** | Modern serves the existing rapid-scheduler behavior through compatibility routes; this is migration of the old workflow, not coverage by the new lifecycle workflow. |
+| **Modern backend capability completeness** | **Core tournament execution is operationally complete.** The central individual-competition path no longer depends on a missing referee, master, live-status, public-result, archive, or standings backend capability. |
+| **Complete tournament operating product completeness** | **Not complete.** Modern does not yet replace all role-facing Legacy workflows or every peripheral and specialist Legacy capability. |
 
-### 1.1 Evidence boundary
+## 2. Assessment method
 
-The first complete Modern lifecycle is demonstrated by `Modern/test/tournament-lifecycle.integration.test.js`. It creates a competition, registers players, advances lifecycle state, generates round-robin matches, schedules them, assigns a referee, accepts responsibility, records and confirms one result, calculates standings, and completes the competition without calling the Legacy API.
+This document is business-first and capability-driven. It evaluates whether Modern can produce the business outcome, not whether it copies a Legacy page or data structure. It does not prescribe interfaces, identity solutions, future architecture, domains, or persistence changes.
 
-That test uses an in-memory repository harness. It verifies orchestration across Modern services and domain rules, but it is not a browser test, an HTTP test, or a live-MySQL end-to-end test. Only one generated match is executed and confirmed; the remaining generated matches are scheduled but not played. “Complete lifecycle” therefore means that all lifecycle stages are traversable, not that Modern has reproduced the complete Legacy event operation.
+The ratings mean:
 
-The currently shipped Modern browser page is the rapid scheduling/scoring interface. It calls the compatibility-style `/api/competition/schedule`, `/save`, `/match/:id`, and `/reset` endpoints. It does not expose competition creation, lifecycle transitions, registration, check-in, team administration, match assignment and responsibility, official confirmation, or persisted standings from the new Modern APIs.
+| Rating | Meaning |
+|---|---|
+| **Backend-replaceable** | Modern has the business actions and/or authoritative read capability needed to replace this Legacy backend responsibility within the stated scope. A human-facing replacement may still be absent. |
+| **Partially replaceable** | Modern covers a useful part of the Legacy business outcome, but a material backend capability remains outside the Modern path. |
+| **Not replaceable** | The Legacy business capability has no corresponding Modern backend capability. |
+| **Compatibility only** | Modern continues to serve the old rapid-scheduler behavior, but that path is not evidence of replacement by the Modern operational workflow. |
 
-## 2. Legacy capability inventory
+### 2.1 Evidence boundary
 
-The Legacy inventory is derived from the checked-in pages and the actions implemented by `Legacy/data.php`. The inventory records working repository scope; it does not assert production usage or quality.
+The assessment is based on the checked-in Modern services, routes, repositories, and automated tests at the stated baseline. The end-to-end lifecycle test is service-level and uses an in-memory repository harness. The newer operational projections and workflow actions have focused route, service, and repository tests. Together they establish backend capability; they do not establish a complete browser-based product, production deployment readiness, or the usability of a live tournament workflow.
 
-| Legacy capability area | Repository evidence | Material behaviors present in Legacy |
-|---|---|---|
-| Event configuration and access | `master.html`, `data.php` | Read/update event configuration and event code, switch event mode, referee login/password checks, reset an event. |
-| Participant roster and readiness | `players.html`, `checkin.html`, `data.php` | Read/edit/clear rosters, identity-last-four check, waiver text and acceptance lookup, signature check-in, forced bulk check-in, waiver downloads. |
-| Team competition and lineup | `team_import.html`, `team_lineup.html`, `master.html`, `data.php` | Import team events, maintain team codes/members/templates/rooms, submit signed lineups, synchronize team/player identifiers, clear team rooms and radar data. |
-| Draw, schedule, and court coordination | `master.html`, `courts.html`, `zz.html`, `data.php` | Player/team draws, schedule parsing/import, bulk match tasks, task date/court changes, match deletion, full court dashboard, rapid local round-robin/fixed-pair scheduling. |
-| Referee administration | `umpire.html`, `master.html`, `data.php` | Referee roster maintenance, comments, status/court updates, referee messages, performance/history view. |
-| Referee match operation | `referee.html`, `scoreboard.html`, `data.php` | Personal assignment retrieval, responsibility workflow, live score synchronization, match timers and operational prompts, final score/report/signature submission, live scoreboard retrieval. |
-| Master operation | `master.html`, `courts.html`, `data.php` | Cross-court task control, referee and participant visibility, schedule changes, operational notices, team rooms, live match supervision, manual exception handling. |
-| Results and spectator output | `dashboard.html`, `scoreboard.html`, `zz.html`, `data.php` | Live scoreboard, tournament dashboard, notices, broadcast link, rapid-scheduler live rankings and copied results. |
-| Documents and organizer content | `docs.html`, `blog.html`, `data.php` | Publish/read/delete documents and articles; download event and waiver data. |
+The proven core path is:
 
-## 3. Modern capability mapping and replacement readiness
+`competition lifecycle → participant readiness → match generation → scheduling → master assignment → referee responsibility and result actions → live operational status → official record → standings → public scoreboard → competition archive`
 
-### 3.1 Lifecycle path now proven
+## 3. Re-evaluation of all Legacy capabilities
 
-Modern has a coherent API/service path for a narrow individual round-robin lifecycle:
-
-`competition creation → player registration → lifecycle transitions → round-robin generation → match scheduling → referee assignment → responsibility acceptance → score capture → result confirmation → standings → completion`
-
-The lifecycle states available in code are `draft`, `registration_open`, `ready`, `running`, `completed`, and `archived`. Match confirmation creates an append-only official record, and standings are derived from the latest confirmed official records rather than from scheduled or merely scored matches.
-
-### 3.2 Capability map
-
-| Legacy capability | Modern repository capability | Readiness | What Modern can replace today | What remains |
+| Legacy capability area | Modern backend assessment | What is replaceable now | What remains | Gap type |
 |---|---|---|---|---|
-| Event creation/configuration | Competition create, update, delete, read; explicit lifecycle transitions | **Partial** | Basic competition identity (`name`, `sport`) and lifecycle state for API consumers | Legacy event-code workflow, operating mode, access/password behavior, and broader configuration have no Modern equivalent. |
-| Player roster | Register, withdraw, and list players scoped to a competition | **Replaceable today** | Basic participant roster maintenance through Modern APIs | Bulk editing/import, Legacy identity fields, and the operator roster UI remain. Modern registration is deliberately narrower than the Legacy player record. |
-| Waiver and check-in | Accept waiver, check in, and read check-in state with competition/player validation | **Partial** | Durable waiver acceptance and player check-in through Modern APIs; check-in requires an accepted waiver | Legacy waiver text administration, identity-last-four validation, signature capture/view, bulk check-in, exports, and participant-facing check-in UI remain. |
-| Team membership | Team CRUD and team-member add/list/remove | **Partial** | Basic teams and membership through Modern APIs | Team event import, templates, rooms/codes, signed lineup submission, lineup polling, and team-match workflow remain. The existing `team_rooms` table is not exposed by a Modern service/API. |
-| Round-robin match generation | Competition-domain round-robin generation and match persistence | **Replaceable today** | Individual round-robin match creation for registered players through the scoped Modern API | Fixed-pair generation remains on the compatibility flow; team draws, imported schedules, Legacy draw controls, and alternate competition formats remain. |
-| Match scheduling | Persist/read one placement per match with time and optional court | **Partial** | Programmatic placement and lookup of an existing match | No Modern schedule-board workflow, bulk rescheduling, court-state dashboard, task date/court operations, or conflict-aware operational view is present. |
-| Rapid scheduler | Modern browser UI plus migrated generate/save/update/reset/read routes | **Compatibility only** | The checked-in rapid round-robin/fixed-pair schedule and score workflow, including its current browser page | This path does not use the new assignment/confirmation/official-record lifecycle and remains centered on default tournament ID `1` in its UI-facing calls. |
-| Referee assignment and responsibility | Assign match and accept assigned referee responsibility | **Partial** | Per-match assignment and responsibility acceptance through Modern APIs, with identity consistency enforced by the match-operation domain | Referee accounts/login, roster/availability/status, personal task list, messaging, court workflow, and referee UI remain. A referee ID is currently a string on the match, not a managed Modern referee capability. |
-| Score capture and result confirmation | Record score, confirm result, read official record | **Partial** | Ordered API workflow for an assigned referee to accept, score, and confirm a match; durable attributed official record with optional evidence reference | Live point-by-point scoreboard sync, game/timer workflow, signatures/report generation, corrections/operational exceptions, and referee/master UI remain. |
-| Results/standings | Round-robin standings calculated from confirmed official records and persisted | **Partial** | Confirmed-result standings for the individual round-robin result shape covered by tests | No Modern results UI, full event completion validation, team standings, broader ranking/tiebreak behavior, or exports. Calling the standings read endpoint recalculates and replaces the materialized standings. |
-| Trusted match record | Append-only `match_official_records` with attribution, evidence reference/metadata, and provenance | **Partial** | Retrieval of confirmed official records for a match | No event-level archive/read model, archive presentation/export, retention operation, or Legacy signature/report migration is present. Lifecycle state `archived` alone is not an archive capability. |
-| Master control and court dashboard | Individual lifecycle, schedule, and match-operation APIs | **Partial** | The underlying API actions for the narrow lifecycle can be driven by a technical client | There is no Modern master console, cross-match operational overview, court board, exception workflow, or integrated readiness/referee/schedule view. |
-| Live spectator output and communications | Compatibility rapid-scheduler page can poll schedule data | **Partial** | Read-only observation of the compatibility scheduler state | Legacy live scoreboard, full dashboard, event notices, broadcast link, referee messages, and participant-facing communications remain unmatched. |
-| Documents, articles, and downloads | None | **Not available** | Nothing | Legacy organizer document/article management and event/waiver downloads remain Legacy-only. |
+| **Event configuration and access** | **Partially replaceable** | Competition creation, reading, maintenance, deletion, and explicit lifecycle transitions | Legacy event-code and operating-mode behavior, referee login/password behavior, and broader event configuration | **Backend capability** for Legacy-specific configuration; **product/identity** for access behavior |
+| **Participant roster and readiness** | **Backend-replaceable for core readiness** | Registration and withdrawal, waiver acceptance, check-in, participant readiness state, and competition-level readiness visibility | Bulk roster operations, waiver content administration, identity-last-four checks, signature-oriented evidence, downloads, and participant/operator-facing journeys | Primarily **product experience** for usable role workflows; some **backend capability** for the listed specialist administration and exports |
+| **Team competition and lineup** | **Partially replaceable** | Basic team and membership administration | Team-event import, templates, rooms/codes, signed lineup submission and coordination, and team-match operation | **Backend capability** |
+| **Draw and match generation** | **Backend-replaceable for the core individual path** | Individual round-robin generation and persisted matches | Team draws, imported schedules, Legacy draw controls, fixed-pair generation outside the compatibility path, and other competition formats | **Backend capability** outside the core path |
+| **Scheduling and court placement** | **Backend-replaceable for core execution** | Match placement and retrieval with time and court, available to the operational views | Legacy bulk schedule import/edit controls and its human-operated schedule board | Primarily **product experience** for core execution; **backend capability** for specialist bulk/import behavior |
+| **Rapid scheduler** | **Compatibility only** | Existing rapid round-robin/fixed-pair schedule-and-score behavior remains available through the migrated compatibility path | It remains separate from the official Modern operational and result path | **Migration/product consolidation**, not a missing core backend capability |
+| **Referee administration** | **Partially replaceable** | Referee-scoped work visibility and validation of the referee's operational context | Referee identity/accounts, roster administration, availability/status management, comments, messages, and performance/history | **Identity/product experience**, plus **backend capability** for administration and communications |
+| **Referee match operation** | **Backend-replaceable for core execution** | Assigned-work visibility; responsibility acceptance; start, score, and official confirmation actions; access to match context and readiness; official-record creation | Human-facing referee journey, point-by-point/game/timer assistance, prompts, signatures, reports, messages, and exception handling | Primarily **product experience**; specialist reporting/communication remains a **backend capability** gap |
+| **Master operation and court coordination** | **Backend-replaceable for core execution** | Competition-wide operational visibility, readiness/schedule/referee/match status, and master assignment/reassignment/unassignment actions | Human-facing command workflow, notices, manual exception handling, team-room coordination, and other Legacy convenience controls | Primarily **product experience**; communications, team operation, and specialist exceptions remain **backend capability** gaps |
+| **Live match operational status** | **Backend-replaceable** | Competition-level view of unassigned, assigned, active, scored, and confirmed matches with schedule, court, referee, and official-result state | Role-appropriate presentation and operational interaction | **Product experience** |
+| **Results and spectator output** | **Backend-replaceable for the core path** | Official records, confirmed-result round-robin standings, and a public match scoreboard with score, schedule, court, and confirmation state | Tournament dashboard experience, notices, broadcast links, team results, broader ranking/tiebreak cases, and exports | Primarily **product experience** for core output; **backend capability** for communications, team/broader results, and exports |
+| **Competition archive and official records** | **Backend-replaceable for the core path** | Attributed official match records and a completed-competition archive of authoritative competition, match-result, and standings facts | Human-facing archive discovery/presentation, export packages, retention operations, and migration of Legacy signatures/reports | Primarily **product experience**; exports and Legacy artifact continuity remain **backend/migration capability** gaps |
+| **Documents and organizer content** | **Not replaceable** | None | Publishing, reading, and deleting documents/articles, plus related downloads | **Backend capability and product experience**, but outside core tournament execution |
 
-## 4. What Modern can replace today
+## 4. Legacy capabilities now replaceable by the Modern backend
 
-Modern is replacement-ready today for **API-driven execution of the narrow lifecycle that the repository test proves**, specifically:
+Within the core individual tournament execution boundary, Modern can now replace the following Legacy backend responsibilities:
 
-- creating a basic competition and maintaining a basic player roster;
-- advancing a competition through the defined lifecycle states;
-- generating individual round-robin matches;
-- scheduling each match with a time and optional court;
-- assigning a referee identifier, accepting responsibility, recording a final score, and confirming a result in the required order;
-- preserving and reading an attributed official match record; and
-- calculating individual round-robin standings exclusively from confirmed records.
+1. **Competition lifecycle** — establish a competition and move it through its controlled operating states.
+2. **Participant readiness** — register participants, record prerequisite readiness actions, and expose readiness for operations.
+3. **Scheduling and match generation** — generate the supported round-robin contests and place them in time and on courts.
+4. **Match Operations** — assign responsibility, move a match through its operational actions, capture its result, and confirm the outcome.
+5. **Referee operational workflow visibility and actions** — show a referee the relevant assigned work and allow the authorized workflow actions.
+6. **Master operational visibility and assignment actions** — provide the competition-wide operating picture and manage referee assignment, reassignment, and removal.
+7. **Live match operational status** — expose current match state across the competition without treating the operational view as a second authority.
+8. **Public scoreboard** — expose the supported live/public match facts and distinguish an officially confirmed outcome.
+9. **Official records and Result Engine standings** — retain the confirmed record and derive supported round-robin standings from official outcomes.
+10. **Competition archive** — expose a completed competition through its authoritative results and standings rather than treating an `archived` status alone as an archive.
 
-Modern also has independently tested API capabilities for basic team membership and waiver-gated check-in. Those capabilities can replace their narrow data operations, but not the corresponding Legacy user workflows.
+“Replaceable” here is deliberately bounded. It means another product surface or technical consumer no longer needs Legacy to obtain these core actions and facts. It does not mean that tournament staff and participants can stop using every Legacy page today.
 
-The existing rapid scheduler can continue to be served from Modern through its migrated compatibility endpoints and browser page. That is useful current coverage, but it must not be counted as proof that the new Modern lifecycle has replaced Legacy match operation: its direct match update endpoint does not create the confirmed official record used by the new standings path.
+## 5. Remaining gaps, classified
 
-## 5. Current gaps
+### 5.1 Backend capability gaps
 
-### 5.1 Replacement blockers
+The remaining backend gaps are concentrated outside the core individual tournament execution path:
 
-The following gaps prevent Modern from replacing Legacy as the operating application for a complete event today:
+- specialist team-event and signed-lineup operation;
+- imported, fixed-pair, team, and other broader draw/schedule behavior not on the core Modern path;
+- Legacy-specific event configuration and bulk administration;
+- communications such as notices and referee/participant messages;
+- detailed referee administration, performance/history, reports, and signature workflows;
+- broader result variants, downloads, and export packages;
+- document and article publishing; and
+- continuity for Legacy-specific artifacts and historical data.
 
-1. **No operator-facing lifecycle application.** The new lifecycle APIs are not assembled into a Modern organizer, check-in, referee, master, court, or results interface.
-2. **No complete referee capability.** Assignment accepts an opaque referee identifier, while referee roster, login, availability/status, personal tasks, messaging, live scoring, reports, and signatures remain in Legacy.
-3. **No master/court coordination.** Modern can place and mutate one match at a time but cannot provide the cross-match/cross-court situational view that Legacy operators use.
-4. **Readiness is narrower than Legacy.** Modern persists waiver acceptance and check-in, but not configured waiver text, identity verification, signatures, bulk controls, exports, or participant UI.
-5. **Team operation stops at membership.** Team rooms, imports, templates, signed lineups, and team competition operation remain unmatched.
-6. **Competition output is narrow.** Modern standings cover confirmed individual round-robin results, without the Legacy dashboards, live scoreboard, communications, team results, or exports.
-7. **Archive is only a state and match-level record.** Modern can mark a competition `archived` and retain official match records, but has no repository capability for an understandable event-level archive or archive output.
+These gaps are real, so Modern must not be described as having complete parity with every Legacy feature.
 
-### 5.2 Verification limits
+### 5.2 Product experience gaps
 
-- The lifecycle integration test replaces repositories with in-memory functions; it does not prove the entire lifecycle against MySQL.
-- The lifecycle test calls services directly; it does not prove all lifecycle routes as one HTTP workflow.
-- The lifecycle test confirms one of three generated matches before completing the competition. Current lifecycle rules therefore allow completion without all matches being confirmed.
-- Existing API, service, repository, domain, and integration tests establish strong component behavior, but there is no browser-level test of the new lifecycle and no Modern UI for it to exercise.
+For the now-complete core backend workflow, the larger remaining gap is the operating experience:
 
-## 6. Migration priority
+- human-facing organizer, participant, referee, master, court, spectator, and archive workflows;
+- coherent navigation and role-appropriate presentation across the end-to-end tournament journey;
+- operational UX for rapid decisions, bulk work, exceptions, and live coordination;
+- identity and authentication needed to connect a real person to the appropriate responsibilities; and
+- communication surfaces that deliver readiness requests, assignments, changes, notices, and results to people.
 
-Priority is based only on current Legacy operational value and the Modern foundations already present. It identifies **what should migrate next**, not how to implement it.
+Identity/authentication is essential to a complete operating product, but its absence does not undo the business actions and authoritative read models already present in the Modern backend. Likewise, missing human-facing workflows do not imply that another tournament backend domain is needed; they mean the completed capabilities are not yet assembled into a complete product experience.
 
-| Priority | Capability to migrate next | Repository-grounded reason |
+### 5.3 Verification and scope limits
+
+- The service-level lifecycle test is not a browser, full HTTP, or live-database end-to-end test.
+- Focused tests establish the new operational workflow actions and read models independently; the repository does not yet prove a single human journey across all of them.
+- The supported standings path is individual round-robin and is based on officially confirmed results. This does not establish parity for every Legacy format or ranking convention.
+- Backend capability parity for core execution does not establish production operability, accessibility, usability, or staff training readiness.
+
+## 6. Migration priority after backend completion
+
+The previous priority was to complete referee/master/court operational backend capability. That work is now present. Migration priority should therefore shift from creating more core backend concepts to making the completed operational path usable and adoptable, while preserving explicit scope for genuine specialist gaps.
+
+| Priority | Migration focus | Business reason |
 |---|---|---|
-| **1** | Referee match workflow and master/court operational visibility | Modern already has the core assignment → responsibility → score → confirmation APIs, but Legacy still owns the human workflow that drives those actions and the live oversight needed to operate multiple matches. This is the largest gap between the proven lifecycle and an actual tournament replacement. |
-| **2** | Participant readiness workflow | Modern already persists waiver acceptance and check-in, while Legacy still supplies waiver content, identity/signature evidence, participant UI, bulk oversight, and exports. Readiness precedes match operation and is already represented by working Modern services. |
-| **3** | Team lineup and team-event operation | Modern has teams and membership, but the validated Legacy value lies in rooms, templates/import, signed lineup submission, and team match coordination, none of which is replaced by membership CRUD alone. |
-| **4** | Live results, spectator display, and operational notices | Modern has confirmed official records and derived standings, but current event-facing output remains in Legacy. This follows the operational workflow because the output must reflect the confirmed path rather than the compatibility score path. |
-| **5** | Event-level archive and exports | Match official records provide source evidence, but Legacy downloads and other event artifacts remain separate. This is important after operation and output, but it is not the immediate blocker to driving a live event through the Modern lifecycle. |
-| **6** | Documents and articles | These are real Legacy capabilities, but they do not block the tournament lifecycle now proven in Modern and have no current Modern foundation. |
+| **1** | Human-facing core operating workflows | Organizer, participant, referee, and master/court users must be able to carry the completed lifecycle in real tournament conditions. This is now the main barrier to replacing Legacy for core execution. |
+| **2** | Identity, authentication, and responsibility continuity | Real operators must be connected reliably to referee, master, organizer, and participant responsibilities before Legacy access behavior can be retired. |
+| **3** | Operational UX and communication surfaces | Live coordination depends on clear readiness requests, assignments, changes, notices, exception handling, and audience-facing updates—not merely on callable backend actions. |
+| **4** | Archive, official-result, and standings product experience | Completed competitions need an understandable human-facing record and usable outputs built from the now-available authoritative archive and result capabilities. |
+| **5** | Evidence-led migration of specialist Legacy capabilities | Team events, imports, bulk tools, reports, exports, documents, and other non-core features should migrate according to actual operational dependence; their existence must not be confused with a missing core backend workflow. |
 
-## 7. Replacement conclusion
+This ordering is a migration priority, not an implementation proposal. It identifies which Legacy value should be displaced next without prescribing interfaces, authentication design, architecture, domains, or storage.
 
-Modern has crossed an important but narrow threshold: the repository contains a coherent, tested service-level lifecycle from competition creation through confirmed results and completion. It can replace basic API-level administration, individual round-robin generation/scheduling, ordered final-score confirmation, official match records, and confirmed-result standings within that boundary.
+## 7. Conclusion
 
-Modern cannot yet replace Legacy as the complete tournament operating product. Legacy remains required for the participant-facing check-in experience, referee terminal, master and court coordination, team lineup operation, live audience output, communications, exports, and organizer content. The next migration priority is therefore the existing referee/master/court workflow around Modern's already-working match-operation core—not another scheduling or result model.
+Modern backend has reached **operational capability parity for core tournament execution**. Competition lifecycle, readiness, scheduling, generation, match operation, referee and master operational workflows, live status, official records, standings, public scoreboard, and competition archive now form a coherent backend capability set.
+
+Modern has **not** reached complete Legacy product replacement. Remaining Legacy value is primarily in:
+
+- human-facing workflows;
+- identity and authentication;
+- operational UX; and
+- communication surfaces.
+
+Legacy also retains genuine non-core backend value in team operation, specialist formats and bulk controls, reporting/exports, and organizer content. The migration should now prioritize adoption of the completed core backend through real operating experiences, then retire or migrate remaining specialist capabilities according to demonstrated business need.
 
 ---
 
