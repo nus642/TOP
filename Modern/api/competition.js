@@ -278,6 +278,18 @@ router.post("/:competitionId/schedule/generate", async (req, res) => {
     }
 });
 
+router.post("/:competitionId/matches/generate", async (req, res) => {
+    try {
+        const result = await competitionService.generateRoundRobin(
+            getScopedCompetitionId(req)
+        );
+
+        res.status(201).json(result);
+    } catch (err) {
+        sendWriteError(res, err);
+    }
+});
+
 
 router.get("/", async (req, res) => {
     try {

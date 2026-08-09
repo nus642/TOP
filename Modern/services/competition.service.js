@@ -3,6 +3,7 @@ const playerRepository = require("../repositories/player.repository");
 const pairingRepository = require("../repositories/pairing.repository");
 const tournamentRepository = require("../repositories/tournament.repository");
 const db = require("../database/db");
+const { generateRoundRobinMatches } = require("../engine/competition");
 
 const COMPETITION_STATUSES = Object.freeze({
     DRAFT: "draft",
@@ -756,6 +757,50 @@ async function generateCompetition(competitionIdValue, data){
     });
 }
 
+async function generateRoundRobin(competitionIdValue){
+    const tournamentId = parseCompetitionId(competitionIdValue);
+
+    return db.withTransaction(async (connection) => {
+        await requireCompetition(tournamentId, connection);
+
+        const participants = await playerRepository.getPlayersByTournament(
+            tournamentId,
+            connection
+        );
+
+        let generated;
+        try {
+            generated = generateRoundRobinMatches(participants);
+        } catch (error) {
+            throw makeValidationError(error.message);
+        }
+
+        const matches = [];
+        for (const match of generated) {
+            matches.push(await matchRepository.createMatch({
+                tournament_id: tournamentId,
+                round_num: match.roundNumber,
+                court: null,
+                player1_id: match.sideOneId,
+                player2_id: null,
+                player3_id: match.sideTwoId,
+                player4_id: null,
+                team1_name: null,
+                team2_name: null,
+                score1: null,
+                score2: null,
+                status: "idle"
+            }, connection));
+        }
+
+        return {
+            competitionId: tournamentId,
+            format: "round-robin",
+            matches
+        };
+    });
+}
+
 module.exports = {
 
     createCompetition,
@@ -773,6 +818,7 @@ module.exports = {
     updateMatch,
     resetCompetition,
     generateCompetition,
+    generateRoundRobin,
     COMPETITION_STATUSES,
     ALLOWED_TRANSITIONS
 };
