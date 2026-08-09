@@ -1,5 +1,6 @@
 const db = require("../database/db");
 const repository = require("../repositories/match-operation.repository");
+const officialRecordRepository = require("../repositories/match-official-record.repository");
 const {
   MatchOperation,
   MatchResult,
@@ -64,43 +65,131 @@ function recordScore(tournamentId, matchId, data = {}) {
 }
 
 function confirmResult(tournamentId, matchId, data = {}) {
-  return mutate(tournamentId, matchId, (match) => match.confirm(data.refereeId),
-    (connection, tid, mid, match) => {
-      const confirmedAt = new Date().toISOString();
-      const evidence = data.evidenceReference
-        ? new ConfirmationEvidence({
-          reference: data.evidenceReference,
-          captureMetadata: data.evidenceMetadata || {}
-        })
-        : null;
+  const tournamentIdValue = positiveId(tournamentId, "tournament id");
+  const matchIdValue = positiveId(matchId, "match id");
+
+  return db.withTransaction(async (connection) => {
+    const record = await repository.findById(tournamentIdValue, matchIdValue, connection, true);
+    if (!record) {
+      const error = new Error("Match not found");
+      error.code = "NOT_FOUND";
+      throw error;
+    }
+
+    try {
+      const match = new MatchOperation(record);
+      match.confirm(data.refereeId);
+
       const matchResult = new MatchResult({
-        matchId: mid,
-        score: { score1: match.score1, score2: match.score2 },
-        details: { tournamentId: tid }
-      });
-      const officialConfirmation = new Confirmation({
-        responsibility: "assigned-referee",
-        confirmedBy: match.refereeId,
-        confirmedAt,
-        evidenceReferences: evidence ? [evidence] : []
-      });
-      const outcome = new ConfirmedMatchOutcome({
-        matchResult,
-        officialConfirmation,
-        evidenceReferences: evidence ? [evidence] : [],
-        confirmedAt
-      });
-      const officialRecord = new MatchOfficialRecord({
-        outcome,
-        provenance: {
-          workflow: "match-operations",
-          operation: "official-confirmation",
-          tournamentId: tid,
-          matchId: mid
+        matchId: String(match.id),
+        score: [match.score1, match.score2],
+        details: {
+          tournamentId: match.tournamentId,
+          refereeId: match.refereeId
         }
       });
-      return repository.confirm(tid, mid, match.refereeId, officialRecord, connection);
-    });
+
+      const evidenceReferences = [];
+      let evidenceReference = null;
+      let evidenceMetadata = null;
+
+      if (data.evidenceReference) {
+        const evidence = new ConfirmationEvidence({
+          reference: data.evidenceReference,
+          captureMetadata: data.evidenceMetadata || {}
+        });
+        evidenceReferences.push(evidence);
+        evidenceReference = evidence.reference;
+        evidenceMetadata = evidence.captureMetadata;
+      }
+
+      const confirmation = new Confirmation({
+        responsibility: "referee_result_confirmation",
+        confirmedBy: data.refereeId || match.refereeId,
+        details: {
+          matchId: match.id,
+          tournamentId: match.tournamentId
+        },
+        evidenceReferences
+      });
+
+      const outcome = new ConfirmedMatchOutcome({
+        matchResult,
+        officialConfirmation: confirmation,
+        evidenceReferences: evidenceReferences.map(e => ({
+          reference: e.reference,
+          captureMetadata: e.captureMetadata
+        }))
+      });
+
+      const officialRecord = await officialRecordRepository.create({
+        tournamentId: match.tournamentId,
+        matchId: match.id,
+        refereeId: match.refereeId,
+        score1: match.score1,
+        score2: match.score2,
+        confirmedBy: data.refereeId || match.refereeId,
+        confirmedAt: confirmation.confirmedAt,
+        confirmationResponsibility: confirmation.responsibility,
+        evidenceReference: evidenceReference,
+        evidenceMetadata: evidenceMetadata,
+        provenance: {
+          source: "match_operations_workflow",
+          workflowVersion: "1.0",
+          matchOperationState: "confirmed"
+        }
+      }, connection);
+
+      const updatedMatch = await repository.confirm(tournamentIdValue, matchIdValue, match.refereeId, connection);
+
+      return {
+        match: updatedMatch,
+        officialRecord: officialRecord,
+        trustedCompetitionRecord: {
+          matchResult: {
+            matchId: matchResult.matchId,
+            score: matchResult.score,
+            recordedAt: matchResult.recordedAt
+          },
+          officialConfirmation: {
+            responsibility: confirmation.responsibility,
+            confirmedBy: confirmation.confirmedBy,
+            confirmedAt: confirmation.confirmedAt
+          },
+          evidenceReferences: outcome.evidenceReferences,
+          createdAt: outcome.createdAt
+        }
+      };
+    } catch (error) {
+      return translate(error);
+    }
+  });
 }
 
-module.exports = { assignMatch, acceptRefereeResponsibility, recordScore, confirmResult };
+async function getOfficialRecord(tournamentValue, matchValue) {
+  const tournamentId = positiveId(tournamentValue, "tournament id");
+  const matchId = positiveId(matchValue, "match id");
+
+  const records = await officialRecordRepository.findByMatch(tournamentId, matchId);
+  const match = await repository.findById(tournamentId, matchId);
+
+  if (!match) {
+    const error = new Error("Match not found");
+    error.code = "NOT_FOUND";
+    throw error;
+  }
+
+  return {
+    match,
+    officialRecords: records,
+    hasTrustedRecord: records.length > 0
+  };
+}
+
+module.exports = {
+  assignMatch,
+  acceptRefereeResponsibility,
+  recordScore,
+  confirmResult,
+  getOfficialRecord
+};
