@@ -7,7 +7,8 @@
   <link rel="stylesheet" href="styles.css">
 </head>
 <body>
-  <main>
+  <nav id="operator-navigation" class="operator-navigation" aria-label="Authenticated operator navigation"></nav>
+  <main data-authenticated-workspace hidden>
     <header><span class="brand">TOP</span><span class="eyebrow">Participant readiness</span><h1>Ready for your tournament?</h1><p>Check your arrival status and check in through Tournament Operations.</p></header>
     <form id="context-form" class="context">
       <label>Competition ID<input name="competitionId" value="1" inputmode="numeric" required></label>
@@ -17,6 +18,6 @@
     <section id="readiness" aria-live="polite"><div class="empty">Your authoritative readiness status will appear here.</div></section>
     <footer>Check-in status is managed by Tournament Operations.</footer>
   </main>
-  <script src="/operator/identity-context.js"></script><script src="api-client.js"></script><script src="readiness-workflow.js"></script><script src="app.js"></script>
+  <link rel="stylesheet" href="/shell/navigation.css"><script src="/shell/operator-shell.js"></script><script src="/shell/navigation.js"></script><script src="/operator/identity-context.js"></script><script src="api-client.js"></script><script src="readiness-workflow.js"></script><script src="app.js"></script>
 </body>
 </html>
