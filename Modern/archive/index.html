@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Competition archive</title>
+  <link rel="stylesheet" href="/archive/styles.css">
+</head>
+<body>
+  <header>
+    <nav><a class="brand" href="/archive"><span>TOP</span> Archive</a><span>Official records</span></nav>
+    <div class="hero">
+      <div><p class="eyebrow">Competition history</p><h1>The final record.</h1><p class="intro">Completed competitions, final standings, and official results in one enduring view.</p></div>
+      <form id="archive-form"><label for="competition-id">Competition number</label><div><input id="competition-id" name="competitionId" type="number" min="1" required placeholder="e.g. 12"><button type="submit">Open archive</button></div></form>
+    </div>
+  </header>
+  <main>
+    <p id="notice" class="notice" role="status">Enter a competition number to view its archive.</p>
+    <div id="archive-content" hidden>
+      <section id="archive-summary" class="summary" aria-label="Competition summary"></section>
+      <section><p class="eyebrow dark">Final table</p><h2>Standings</h2><div id="standings"></div></section>
+      <section><p class="eyebrow dark">On the record</p><h2>Official results</h2><div id="results"></div></section>
+    </div>
+  </main>
+  <footer>Published from the official competition archive.</footer>
+  <script src="/archive/api-client.js"></script><script src="/archive/archive.js"></script><script src="/archive/app.js"></script>
+</body>
+</html>
