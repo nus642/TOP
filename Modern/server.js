@@ -24,6 +24,7 @@ app.use(bodyParser.json());
 app.use("/operator", express.static(path.join(__dirname, "operator")));
 app.use("/participant", express.static(path.join(__dirname, "participant")));
 app.use("/public", express.static(path.join(__dirname, "public")));
+app.use("/archive", express.static(path.join(__dirname, "archive")));
 
 app.use("/api/competition", competitionRoutes);
 app.use("/api", legacyRoutes);
