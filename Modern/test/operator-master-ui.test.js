@@ -2,6 +2,36 @@ const assert = require("node:assert/strict");
 const test = require("node:test");
 const { createMasterApi } = require("../operator/master-api-client");
 const { createMasterWorkflow } = require("../operator/master-workflow");
+const { createIdentityContext } = require("../operator/identity-context");
+
+test("master workflow maps master identity competition to existing APIs", async () => {
+  const calls = [];
+  const workflow = createMasterWorkflow({
+    api: {
+      matchOverview: async (...args) => { calls.push(["overview", ...args]); return { matches: [] }; },
+      assignReferee: async (...args) => calls.push(["assign", ...args])
+    },
+    view: { loading() {}, busy() {}, error: assert.fail, matches() {} },
+    identityContext: { getCurrentIdentityContext: () => createIdentityContext({
+      actorId: "master-1", actorType: "master", competitionId: "competition-3"
+    }) }
+  });
+
+  await workflow.start();
+  await workflow.assign({ matchId: 9, refereeId: "referee-7" });
+  assert.deepEqual(calls, [
+    ["overview", "competition-3"],
+    ["assign", "competition-3", 9, "referee-7"],
+    ["overview", "competition-3"]
+  ]);
+});
+
+test("master workflow rejects a non-master identity at its boundary", () => {
+  const workflow = createMasterWorkflow({ api: {}, view: {}, identityContext: {
+    getCurrentIdentityContext: () => createIdentityContext({ actorId: "p1", actorType: "participant", competitionId: 3 })
+  } });
+  assert.throws(() => workflow.start(), /master identity context is required/);
+});
 
 test("master API client uses only existing operational workflow APIs", async () => {
   const calls = [];

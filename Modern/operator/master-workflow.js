@@ -3,8 +3,21 @@
   if (typeof module !== "undefined" && module.exports) module.exports = workflow;
   if (typeof window !== "undefined") window.MasterWorkflow = workflow;
 })(function createModule() {
-  function createMasterWorkflow({ api, view }) {
+  function createMasterWorkflow({ api, view, identityContext }) {
     let competitionId;
+
+    function masterCompetition(nextContext) {
+      const identity = nextContext || (identityContext && identityContext.getCurrentIdentityContext());
+      if (identity && typeof identity === "object") {
+        if (identity.actorType === "master" && identity.competitionId !== undefined) {
+          return identity.competitionId;
+        }
+        throw new TypeError("A master identity context is required");
+      }
+      // Retain the pre-identity competition-id convention for non-UI consumers.
+      if (identity !== undefined && identity !== null && identity !== "") return identity;
+      throw new TypeError("A master identity context is required");
+    }
 
     async function refresh() {
       view.loading();
@@ -28,7 +41,7 @@
 
     return {
       start(nextCompetitionId) {
-        competitionId = nextCompetitionId;
+        competitionId = masterCompetition(nextCompetitionId);
         return refresh();
       },
       assign,
