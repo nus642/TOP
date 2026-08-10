@@ -1,3 +1,7 @@
+// X-TOP-* headers are accountability metadata only.
+// They are not trusted identity sources.
+// Backend identity always originates from authenticated session.
+
 (function expose(factory) {
   const accountability = factory();
   if (typeof module !== "undefined" && module.exports) module.exports = accountability;
