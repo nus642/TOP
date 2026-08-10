@@ -20,36 +20,42 @@ const { createSessionRouter, requireActorSession } = require("./api/session");
 const competitionEngine = require('./engine/competition');
 const operationsEngine = require('./engine/operations');
 
-const app = express();
-const actorSessions = createActorSessionStore();
-app.use(cors());
-app.use(bodyParser.json());
-app.use("/shell", express.static(path.join(__dirname, "shell")));
-app.use("/operator", express.static(path.join(__dirname, "operator")));
-app.use("/participant", express.static(path.join(__dirname, "participant")));
-app.use("/public", express.static(path.join(__dirname, "public")));
-app.use("/archive", express.static(path.join(__dirname, "archive")));
+function createApp({ actorSessions = createActorSessionStore() } = {}) {
+  const app = express();
+  app.use(cors());
+  app.use(bodyParser.json());
+  app.use("/shell", express.static(path.join(__dirname, "shell")));
+  app.use("/operator", express.static(path.join(__dirname, "operator")));
+  app.use("/participant", express.static(path.join(__dirname, "participant")));
+  app.use("/public", express.static(path.join(__dirname, "public")));
+  app.use("/archive", express.static(path.join(__dirname, "archive")));
 
-app.use("/api/competition", competitionRoutes);
-app.use("/api/session", createSessionRouter(actorSessions));
-app.use("/api", legacyRoutes);
-app.use("/api/match-operations", requireActorSession(actorSessions), matchOperationsRoutes);
-app.use("/api/master-operations", requireActorSession(actorSessions), masterOperationalVisibilityRoutes);
-app.use("/api/master-workflow", requireActorSession(actorSessions), masterWorkflowRoutes);
-app.use("/api/participant-readiness", requireActorSession(actorSessions), participantReadinessRoutes);
-app.use("/api/referee-workflow", requireActorSession(actorSessions), refereeWorkflowRoutes);
-app.use("/api/public/competitions", publicMatchScoreboardRoutes);
-app.use("/api/public/competitions", competitionArchiveRoutes);
+  app.use("/api/competition", competitionRoutes);
+  app.use("/api/session", createSessionRouter(actorSessions));
+  app.use("/api", legacyRoutes);
+  app.use("/api/match-operations", requireActorSession(actorSessions), matchOperationsRoutes);
+  app.use("/api/master-operations", requireActorSession(actorSessions), masterOperationalVisibilityRoutes);
+  app.use("/api/master-workflow", requireActorSession(actorSessions), masterWorkflowRoutes);
+  app.use("/api/participant-readiness", requireActorSession(actorSessions), participantReadinessRoutes);
+  app.use("/api/referee-workflow", requireActorSession(actorSessions), refereeWorkflowRoutes);
+  app.use("/api/public/competitions", publicMatchScoreboardRoutes);
+  app.use("/api/public/competitions", competitionArchiveRoutes);
+
+  return app;
+}
 
 // ---------- API 路由 ----------
 
 
 // 启动服务
 const PORT = 3000;
-db.initDB().then(() => {
+if (require.main === module) db.initDB().then(() => {
+    const app = createApp();
     app.listen(PORT, '0.0.0.0', () => {
     console.log(`Server running on http://0.0.0.0:${PORT}`);
 });
 }).catch(err => {
     console.error('数据库初始化失败:', err);
 });
+
+module.exports = { createApp };

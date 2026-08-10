@@ -8,7 +8,7 @@ function handler(action, status = 200) {
     try {
       const result = await service[action](
         req.params.competitionId,
-        req.params.participantId ? (req.actor?.actorId ?? req.params.participantId) : undefined,
+        req.params.participantId ? req.actor.actorId : undefined,
         req.body
       );
       res.status(status).json(result);
