@@ -39,6 +39,8 @@ async function refereeWorkflowHandler(req, res) {
 router.get("/:tournamentId/referees/:refereeId/matches", refereeWorkflowHandler);
 router.put("/:tournamentId/matches/:matchId/assignment", handler("assignMatch"));
 router.post("/:tournamentId/matches/:matchId/referee-responsibility", handler("acceptRefereeResponsibility"));
+router.post("/:tournamentId/matches/:matchId/start", handler("startMatch"));
+router.get("/:tournamentId/matches/:matchId/context", readHandler("getMatchOperationContext"));
 router.put("/:tournamentId/matches/:matchId/score", handler("recordScore"));
 router.post("/:tournamentId/matches/:matchId/result-confirmation", handler("confirmResult"));
 router.get("/:tournamentId/matches/:matchId/official-record", readHandler("getOfficialRecord"));

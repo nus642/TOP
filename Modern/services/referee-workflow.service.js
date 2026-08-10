@@ -24,6 +24,12 @@ function recordScore(tournamentId, refereeValue, matchId, data = {}) {
   });
 }
 
+function startMatch(tournamentId, refereeValue, matchId) {
+  return matchOperationsService.startMatch(tournamentId, matchId, {
+    refereeId: refereeId(refereeValue)
+  });
+}
+
 function confirmResult(tournamentId, refereeValue, matchId, data = {}) {
   return matchOperationsService.confirmResult(tournamentId, matchId, {
     ...data,
@@ -31,4 +37,4 @@ function confirmResult(tournamentId, refereeValue, matchId, data = {}) {
   });
 }
 
-module.exports = { acceptMatch, recordScore, confirmResult };
+module.exports = { acceptMatch, startMatch, recordScore, confirmResult };

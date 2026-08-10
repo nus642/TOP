@@ -3,6 +3,7 @@ const test = require("node:test");
 
 const db = require("../database/db");
 const repository = require("../repositories/match-operation.repository");
+const readinessRepository = require("../repositories/participant-readiness.repository");
 const officialRecordRepository = require("../repositories/match-official-record.repository");
 const matchRepository = require("../repositories/match.repository");
 const playerRepository = require("../repositories/player.repository");
@@ -30,6 +31,7 @@ test("API -> service -> domain -> repository completes the assigned Referee resu
     find: repository.findById,
     assign: repository.assign,
     accept: repository.acceptResponsibility,
+    start: repository.start,
     score: repository.recordScore,
     confirm: repository.confirm,
     officialCreate: officialRecordRepository.create,
@@ -40,6 +42,7 @@ test("API -> service -> domain -> repository completes the assigned Referee resu
     repository.findById = originals.find;
     repository.assign = originals.assign;
     repository.acceptResponsibility = originals.accept;
+    repository.start = originals.start;
     repository.recordScore = originals.score;
     repository.confirm = originals.confirm;
     officialRecordRepository.create = originals.officialCreate;
@@ -57,7 +60,15 @@ test("API -> service -> domain -> repository completes the assigned Referee resu
   db.withTransaction = (work) => work(mockConnection);
   repository.findById = async () => ({ ...stored });
   repository.assign = async (_tid, _mid, refereeId) => (stored = { ...stored, refereeId, status: "assigned" });
-  repository.acceptResponsibility = async () => (stored = { ...stored, status: "playing" });
+  repository.acceptResponsibility = async () => (stored = { ...stored, status: "accepted" });
+  repository.start = async () => (stored = { ...stored, status: "playing" });
+  const originalReadiness = readinessRepository.listForCompetition;
+  t.after(() => { readinessRepository.listForCompetition = originalReadiness; });
+  readinessRepository.listForCompetition = async () => [
+    { participant_id: 11, checked_in: 1 },
+    { participant_id: 12, checked_in: 1 }
+  ];
+  stored.participantIds = [11, 12];
   repository.recordScore = async (_tid, _mid, score1, score2) =>
     (stored = { ...stored, score1, score2, status: "scored" });
   repository.confirm = async (_tid, _mid, refereeId) =>
@@ -76,7 +87,8 @@ test("API -> service -> domain -> repository completes the assigned Referee resu
 
   const steps = [
     ["/:tournamentId/matches/:matchId/assignment", "put", { refereeId: "referee-7" }, "assigned"],
-    ["/:tournamentId/matches/:matchId/referee-responsibility", "post", { refereeId: "referee-7" }, "playing"],
+    ["/:tournamentId/matches/:matchId/referee-responsibility", "post", { refereeId: "referee-7" }, "accepted"],
+    ["/:tournamentId/matches/:matchId/start", "post", { refereeId: "referee-7" }, "playing"],
     ["/:tournamentId/matches/:matchId/score", "put", { refereeId: "referee-7", score1: 11, score2: 8 }, "scored"],
     ["/:tournamentId/matches/:matchId/result-confirmation", "post", {
       refereeId: "referee-7",
