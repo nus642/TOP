@@ -12,10 +12,16 @@
       if (page) page.hidden = true;
     },
     ready(context) {
+      const accountability = AccountabilityVisibility.browser.current();
       host.innerHTML = `<a class="operator-nav-brand" href="/shell/">TOP</a>
         <div class="operator-nav-links">${context.workspaces.map(({ workspace, label, href }) =>
           `<a data-workspace="${workspace}"${workspace === context.experience.workspace ? ' class="recommended"' : ""} href="${href}">${label}</a>`).join("")}</div>
-        <div class="operator-nav-identity"><span>${escapeText(context.actor.actorId)}</span><strong>${escapeText(context.experience.responsibility)}</strong></div>`;
+        <dl class="accountability-visibility" aria-label="Current accountability">
+          <div><dt>Operating as</dt><dd>${escapeText(accountability.actorId)}</dd></div>
+          <div><dt>Actor type</dt><dd>${escapeText(accountability.actorType)}</dd></div>
+          <div><dt>Competition</dt><dd>${escapeText(accountability.competitionId || "Not selected")}</dd></div>
+          <div><dt>Responsibility</dt><dd>${escapeText(accountability.responsibility)}</dd></div>
+        </dl>`;
       if (page) page.hidden = false;
       const competitionInput = document.querySelector('[name="competitionId"], [name="tournamentId"]');
       if (competitionInput && context.competitionId) competitionInput.value = context.competitionId;
