@@ -1,4 +1,4 @@
-const api = ParticipantReadinessApi.createParticipantReadinessApi();
+const api = ParticipantReadinessApi.createParticipantReadinessApi({ accountabilityContext: AccountabilityContext.browser });
 const contextForm = document.querySelector("#context-form");
 const readinessPanel = document.querySelector("#readiness");
 const notice = document.querySelector("#notice");

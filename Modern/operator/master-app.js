@@ -1,4 +1,4 @@
-const api = MasterApi.createMasterApi();
+const api = MasterApi.createMasterApi({ accountabilityContext: AccountabilityContext.browser });
 const list = document.querySelector("#matches");
 const notice = document.querySelector("#notice");
 const contextForm = document.querySelector("#context-form");

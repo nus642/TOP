@@ -3,9 +3,13 @@
   if (typeof module !== "undefined" && module.exports) module.exports = api;
   if (typeof window !== "undefined") window.ParticipantReadinessApi = api;
 })(function createModule() {
-  function createParticipantReadinessApi({ fetchImpl = fetch, baseUrl = "/api" } = {}) {
+  function createParticipantReadinessApi({ fetchImpl = fetch, baseUrl = "/api", accountabilityContext } = {}) {
     async function request(path, options) {
-      const response = await fetchImpl(`${baseUrl}${path}`, options);
+      const metadata = accountabilityContext ? accountabilityContext.headers() : {};
+      const requestOptions = accountabilityContext
+        ? { ...options, headers: { ...options?.headers, ...metadata } }
+        : options;
+      const response = await fetchImpl(`${baseUrl}${path}`, requestOptions);
       const body = await response.json().catch(() => ({}));
       if (!response.ok) {
         throw new Error(body.error || "Participant readiness could not complete the request");
