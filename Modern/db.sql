@@ -73,9 +73,10 @@ CREATE TABLE IF NOT EXISTS matches (
     referee_id VARCHAR(100) DEFAULT NULL,
     assigned_at TIMESTAMP NULL DEFAULT NULL,
     responsibility_accepted_at TIMESTAMP NULL DEFAULT NULL,
+    started_at TIMESTAMP NULL DEFAULT NULL,
     result_confirmed_at TIMESTAMP NULL DEFAULT NULL,
     result_confirmed_by VARCHAR(100) DEFAULT NULL,
-    status ENUM('idle','upcoming','assigned','playing','scored','awaiting_confirmation','confirmed','finished') DEFAULT 'idle',
+    status ENUM('idle','upcoming','assigned','accepted','playing','scored','awaiting_confirmation','confirmed','finished') DEFAULT 'idle',
     FOREIGN KEY (tournament_id) REFERENCES tournaments(id) ON DELETE CASCADE
 ) DEFAULT CHARSET=utf8mb4;
 

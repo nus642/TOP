@@ -11,7 +11,10 @@ function map(row) {
     assignedAt: row.assigned_at,
     responsibilityAcceptedAt: row.responsibility_accepted_at,
     resultConfirmedAt: row.result_confirmed_at,
-    resultConfirmedBy: row.result_confirmed_by
+    resultConfirmedBy: row.result_confirmed_by,
+    participantIds: [row.player1_id, row.player2_id, row.player3_id, row.player4_id]
+      .filter((id) => id !== null && id !== undefined),
+    startedAt: row.started_at
   };
 }
 
@@ -90,7 +93,15 @@ async function assign(tournamentId, matchId, refereeId, connection = db) {
 
 async function acceptResponsibility(tournamentId, matchId, connection = db) {
   await connection.query(
-    `UPDATE matches SET responsibility_accepted_at = CURRENT_TIMESTAMP, status = 'playing'
+    `UPDATE matches SET responsibility_accepted_at = CURRENT_TIMESTAMP, status = 'accepted'
+     WHERE tournament_id = ? AND id = ?`, [tournamentId, matchId]
+  );
+  return findById(tournamentId, matchId, connection);
+}
+
+async function start(tournamentId, matchId, connection = db) {
+  await connection.query(
+    `UPDATE matches SET started_at = CURRENT_TIMESTAMP, status = 'playing'
      WHERE tournament_id = ? AND id = ?`, [tournamentId, matchId]
   );
   return findById(tournamentId, matchId, connection);
@@ -157,6 +168,7 @@ module.exports = {
   findByReferee,
   assign,
   acceptResponsibility,
+  start,
   recordScore,
   confirm,
   findOfficialRecords

@@ -1,6 +1,7 @@
 const db = require("../database/db");
 const repository = require("../repositories/match-operation.repository");
 const officialRecordRepository = require("../repositories/match-official-record.repository");
+const readinessRepository = require("../repositories/participant-readiness.repository");
 const {
   MatchOperation,
   MatchResult,
@@ -65,6 +66,59 @@ function assignMatch(tournamentId, matchId, data = {}) {
 function acceptRefereeResponsibility(tournamentId, matchId, data = {}) {
   return mutate(tournamentId, matchId, (match) => match.acceptResponsibility(data.refereeId),
     (connection, tid, mid) => repository.acceptResponsibility(tid, mid, connection));
+}
+
+function readinessForMatch(record, rows) {
+  const byParticipant = new Map(rows.map((row) => [Number(row.participant_id), row]));
+  return record.participantIds.map((participantId) => ({
+    participantId,
+    state: byParticipant.get(Number(participantId))?.checked_in ? "ready" : "not_ready"
+  }));
+}
+
+function startMatch(tournamentValue, matchValue, data = {}) {
+  const tournamentId = positiveId(tournamentValue, "tournament id");
+  const matchId = positiveId(matchValue, "match id");
+  return db.withTransaction(async (connection) => {
+    const record = await repository.findById(tournamentId, matchId, connection, true);
+    if (!record) {
+      const error = new Error("Match not found");
+      error.code = "NOT_FOUND";
+      throw error;
+    }
+    const readiness = readinessForMatch(
+      record,
+      await readinessRepository.listForCompetition(tournamentId, connection)
+    );
+    try {
+      const match = new MatchOperation(record);
+      match.start(data.refereeId, readiness);
+      return { match: await repository.start(tournamentId, matchId, connection), participantReadiness: readiness };
+    } catch (error) {
+      return translate(error);
+    }
+  });
+}
+
+async function getMatchOperationContext(tournamentValue, matchValue) {
+  const tournamentId = positiveId(tournamentValue, "tournament id");
+  const matchId = positiveId(matchValue, "match id");
+  const match = await repository.findById(tournamentId, matchId);
+  if (!match) {
+    const error = new Error("Match not found");
+    error.code = "NOT_FOUND";
+    throw error;
+  }
+  const participantReadiness = readinessForMatch(
+    match,
+    await readinessRepository.listForCompetition(tournamentId)
+  );
+  return {
+    match,
+    participantReadiness,
+    allParticipantsReady: participantReadiness.length > 0 &&
+      participantReadiness.every((participant) => participant.state === "ready")
+  };
 }
 
 function recordScore(tournamentId, matchId, data = {}) {
@@ -210,6 +264,8 @@ async function getRefereeWorkflow(tournamentValue, refereeValue) {
 module.exports = {
   assignMatch,
   acceptRefereeResponsibility,
+  startMatch,
+  getMatchOperationContext,
   recordScore,
   confirmResult,
   getOfficialRecord,

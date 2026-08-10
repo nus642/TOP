@@ -23,6 +23,7 @@ function handler(action) {
 }
 
 router.post("/:tournamentId/referees/:refereeId/matches/:matchId/accept", handler("acceptMatch"));
+router.post("/:tournamentId/referees/:refereeId/matches/:matchId/start", handler("startMatch"));
 router.post("/:tournamentId/referees/:refereeId/matches/:matchId/score", handler("recordScore"));
 router.post("/:tournamentId/referees/:refereeId/matches/:matchId/confirm", handler("confirmResult"));
 

@@ -4,6 +4,7 @@ const STATES = Object.freeze({
   IDLE: "idle",
   UPCOMING: "upcoming",
   ASSIGNED: "assigned", // Referee responsibility is established.
+  ACCEPTED: "accepted", // The assigned Referee acknowledged responsibility.
   PLAYING: "playing", // Match execution is in progress.
   SCORED: "scored", // The score is captured but is not official yet.
   CONFIRMED: "confirmed", // The assigned Referee officially confirmed the result.
@@ -44,6 +45,25 @@ class MatchOperation {
     this.assertAssignedReferee(refereeId);
     if (this.status !== STATES.ASSIGNED) {
       throw new OperationsError("INVALID_OPERATION_STATE", "Assigned responsibility is not awaiting acceptance");
+    }
+    this.status = STATES.ACCEPTED;
+    return this;
+  }
+
+  start(refereeId, participantReadiness) {
+    this.assertAssignedReferee(refereeId);
+    if (this.status !== STATES.ACCEPTED) {
+      throw new OperationsError("INVALID_OPERATION_STATE", "Accepted referee responsibility is required before starting");
+    }
+    if (!Array.isArray(participantReadiness) || participantReadiness.length === 0) {
+      throw new OperationsError("MATCH_PARTICIPANTS_REQUIRED", "Match participants are required before starting");
+    }
+    const blockers = participantReadiness.filter((participant) => participant.state !== "ready");
+    if (blockers.length > 0) {
+      throw new OperationsError(
+        "PARTICIPANTS_NOT_READY",
+        `Participants not ready: ${blockers.map((participant) => participant.participantId).join(", ")}`
+      );
     }
     this.status = STATES.PLAYING;
     return this;
