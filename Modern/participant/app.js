@@ -38,11 +38,11 @@ const view = {
 
 const workflow = ParticipantReadinessWorkflow.createParticipantReadinessWorkflow({ api, view, identityContext: IdentityContext });
 
-contextForm.addEventListener("submit", (event) => {
+contextForm.addEventListener("submit", async (event) => {
   event.preventDefault();
   const form = new FormData(contextForm);
   try {
-    IdentityContext.setCurrentIdentityContext({
+    await IdentityContext.establishFoundationActor({
       actorId: form.get("participantId"),
       actorType: "participant",
       competitionId: form.get("competitionId")

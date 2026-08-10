@@ -58,3 +58,20 @@ test("referee workflow rejects another actor type rather than treating context a
   });
   assert.throws(() => workflow.start(), /referee identity context is required/);
 });
+
+test("identity context hydrates trusted actor while competition remains UI context", async () => {
+  // Reload to isolate the module's intentionally in-memory browser state.
+  delete require.cache[require.resolve("../operator/identity-context")];
+  const identity = require("../operator/identity-context");
+  const context = await identity.hydrateCurrentActor({
+    competitionId: "competition-4",
+    fetchImpl: async () => ({ ok: true, json: async () => ({ actorId: "participant-2", actorType: "participant" }) })
+  });
+  assert.deepEqual(context, { actorId: "participant-2", actorType: "participant", competitionId: "competition-4" });
+  assert.throws(() => identity.setCurrentIdentityContext({
+    actorId: "participant-9", actorType: "participant", competitionId: "competition-5"
+  }), /cannot be replaced/);
+  assert.deepEqual(identity.setCurrentIdentityContext({
+    actorId: "participant-2", actorType: "participant", competitionId: "competition-5"
+  }), { actorId: "participant-2", actorType: "participant", competitionId: "competition-5" });
+});
