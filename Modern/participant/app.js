@@ -36,7 +36,7 @@ const view = {
   }
 };
 
-const workflow = ParticipantReadinessWorkflow.createParticipantReadinessWorkflow({ api, view });
+const workflow = ParticipantReadinessWorkflow.createParticipantReadinessWorkflow({ api, view, accountabilityFlow: WorkflowAccountability.browser });
 
 contextForm.addEventListener("submit", async (event) => {
   event.preventDefault();

@@ -30,3 +30,15 @@ The architectural separation is:
 Authentication adds no roles beyond referee, master, and participant and introduces
 no permission model. In particular, a session does not imply match assignment,
 participant readiness, or master assignment authority.
+
+## Workflow accountability
+
+An authenticated workflow captures the current actor, actor type, and competition
+when the operator opens it. Before a referee, master, or participant mutation is
+sent, the UI verifies that this accountability snapshot still matches the current
+session responsibility context. If navigation or context selection changed in the
+meantime, the operator must reopen the workflow instead of acting from stale UI.
+
+This is client-side workflow continuity, not authorization. It creates no audit
+record, account, role grant, or permission decision. The existing backend services
+and domains remain the sole authority for whether an operation is valid.
