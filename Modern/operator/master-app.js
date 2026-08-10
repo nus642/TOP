@@ -50,11 +50,7 @@ contextForm.addEventListener("submit", async (event) => {
   event.preventDefault();
   const values = new FormData(contextForm);
   try {
-    await IdentityContext.establishFoundationActor({
-      actorId: values.get("masterId"),
-      actorType: "master",
-      competitionId: values.get("competitionId")
-    });
+    await IdentityContext.hydrateCurrentActor({ competitionId: values.get("competitionId") });
     workflow.start();
   } catch (error) { view.error(error.message); }
 });

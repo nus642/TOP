@@ -12,9 +12,7 @@ test("master workflow maps master identity competition to existing APIs", async 
       assignReferee: async (...args) => calls.push(["assign", ...args])
     },
     view: { loading() {}, busy() {}, error: assert.fail, matches() {} },
-    identityContext: { getCurrentIdentityContext: () => createIdentityContext({
-      actorId: "master-1", actorType: "master", competitionId: "competition-3"
-    }) }
+    identityContext: { getCurrentIdentityContext: () => createIdentityContext({ trustedActor: { actorId: "master-1", actorType: "master" }, competitionId: "competition-3" }) }
   });
 
   await workflow.start();
@@ -28,7 +26,7 @@ test("master workflow maps master identity competition to existing APIs", async 
 
 test("master workflow rejects a non-master identity at its boundary", () => {
   const workflow = createMasterWorkflow({ api: {}, view: {}, identityContext: {
-    getCurrentIdentityContext: () => createIdentityContext({ actorId: "p1", actorType: "participant", competitionId: 3 })
+    getCurrentIdentityContext: () => createIdentityContext({ trustedActor: { actorId: "p1", actorType: "participant" }, competitionId: 3  })
   } });
   assert.throws(() => workflow.start(), /master identity context is required/);
 });

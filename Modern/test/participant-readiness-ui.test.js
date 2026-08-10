@@ -12,9 +12,7 @@ test("participant workflow maps identity actorId to participantId for existing r
       checkIn: async (...args) => calls.push(["check-in", ...args])
     },
     view: { loading() {}, busy() {}, error: assert.fail, readiness() {} },
-    identityContext: { getCurrentIdentityContext: () => createIdentityContext({
-      actorId: "participant-8", actorType: "participant", competitionId: "competition-3"
-    }) }
+    identityContext: { getCurrentIdentityContext: () => createIdentityContext({ trustedActor: { actorId: "participant-8", actorType: "participant" }, competitionId: "competition-3" }) }
   });
 
   await workflow.start();
@@ -28,7 +26,7 @@ test("participant workflow maps identity actorId to participantId for existing r
 
 test("participant workflow rejects a non-participant identity at its boundary", () => {
   const workflow = createParticipantReadinessWorkflow({ api: {}, view: {}, identityContext: {
-    getCurrentIdentityContext: () => createIdentityContext({ actorId: "m1", actorType: "master", competitionId: 3 })
+    getCurrentIdentityContext: () => createIdentityContext({ trustedActor: { actorId: "m1", actorType: "master" }, competitionId: 3  })
   } });
   assert.throws(() => workflow.start(), /participant identity context is required/);
 });

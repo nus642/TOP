@@ -8,8 +8,8 @@
 
     function participantContext(nextContext) {
       const identity = nextContext || (identityContext && identityContext.getCurrentIdentityContext());
-      if (identity && identity.actorType === "participant" && identity.competitionId !== undefined) {
-        return { competitionId: identity.competitionId, participantId: identity.actorId };
+      if (identity && identity.trustedActor?.actorType === "participant" && identity.competitionId !== undefined) {
+        return { competitionId: identity.competitionId, participantId: identity.trustedActor.actorId };
       }
       // Retain the pre-identity calling convention for non-UI consumers.
       if (identity && !identity.actorType && identity.competitionId !== undefined && identity.participantId !== undefined) {
