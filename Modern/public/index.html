@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Match scoreboard</title>
+  <link rel="stylesheet" href="/public/styles.css">
+</head>
+<body>
+  <header class="hero">
+    <nav><a class="brand" href="/public"><span>TOP</span> Matchday</a><span class="live-label">Public scoreboard</span></nav>
+    <div class="hero-content">
+      <div><p class="kicker">Courtside coverage</p><h1 id="competition-label">Find a competition</h1><p class="intro">Schedules, scores, and confirmed results—straight from tournament operations.</p></div>
+      <form id="competition-form">
+        <label for="competition-id">Competition number</label>
+        <div class="form-row"><input id="competition-id" name="competitionId" type="number" min="1" required placeholder="e.g. 12"><button type="submit">View matches</button></div>
+      </form>
+    </div>
+  </header>
+  <main>
+    <div class="scoreboard-heading"><div><p class="section-label">Match center</p><p id="notice" class="notice" role="status">Enter a competition number to see its matches.</p></div><button id="refresh" class="refresh" type="button">↻ Refresh</button></div>
+    <section id="matches" class="matches" aria-live="polite"><div class="empty"><strong>Ready when you are.</strong><p>Choose a competition above to open its public scoreboard.</p></div></section>
+  </main>
+  <footer>Scores and match status are provided by tournament operations.</footer>
+  <script src="/public/api-client.js"></script><script src="/public/scoreboard.js"></script><script src="/public/app.js"></script>
+</body>
+</html>
