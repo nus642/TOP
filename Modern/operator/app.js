@@ -40,11 +40,18 @@ const view = {
   }
 };
 
-const workflow = RefereeWorkflow.createRefereeWorkflow({ api, view });
+const workflow = RefereeWorkflow.createRefereeWorkflow({ api, view, identityContext: IdentityContext });
 form.addEventListener("submit", (event) => {
   event.preventDefault();
   const values = new FormData(form);
-  workflow.start({ tournamentId: values.get("tournamentId"), refereeId: values.get("refereeId") });
+  try {
+    IdentityContext.setCurrentIdentityContext({
+      actorId: values.get("refereeId"),
+      actorType: "referee",
+      competitionId: values.get("tournamentId")
+    });
+    workflow.start();
+  } catch (error) { view.error(error.message); }
 });
 list.addEventListener("click", (event) => {
   const button = event.target.closest("button[data-action]");

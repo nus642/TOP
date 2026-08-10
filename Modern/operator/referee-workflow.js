@@ -3,8 +3,18 @@
   if (typeof module !== "undefined" && module.exports) module.exports = workflow;
   if (typeof window !== "undefined") window.RefereeWorkflow = workflow;
 })(function createModule() {
-  function createRefereeWorkflow({ api, view }) {
+  function createRefereeWorkflow({ api, view, identityContext }) {
     let context;
+
+    function refereeContext(nextContext) {
+      const identity = nextContext || (identityContext && identityContext.getCurrentIdentityContext());
+      if (identity && identity.actorType === "referee") {
+        return { tournamentId: identity.competitionId, refereeId: identity.actorId };
+      }
+      // Retain the pre-identity calling convention for non-UI consumers.
+      if (identity && identity.tournamentId && identity.refereeId) return identity;
+      throw new TypeError("A referee identity context is required");
+    }
 
     async function refresh() {
       view.loading();
@@ -25,7 +35,7 @@
     }
 
     return {
-      start(nextContext) { context = nextContext; return refresh(); },
+      start(nextContext) { context = refereeContext(nextContext); return refresh(); },
       run
     };
   }
