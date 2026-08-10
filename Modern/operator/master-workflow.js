@@ -3,8 +3,9 @@
   if (typeof module !== "undefined" && module.exports) module.exports = workflow;
   if (typeof window !== "undefined") window.MasterWorkflow = workflow;
 })(function createModule() {
-  function createMasterWorkflow({ api, view, identityContext }) {
+  function createMasterWorkflow({ api, view, identityContext, accountabilityFlow }) {
     let competitionId;
+    let accountability;
 
     function masterCompetition(nextContext) {
       const identity = nextContext || (identityContext && identityContext.getCurrentIdentityContext());
@@ -33,6 +34,7 @@
     async function assign({ matchId, refereeId }) {
       view.busy(matchId);
       try {
+        if (accountabilityFlow) accountabilityFlow.verify(accountability);
         await api.assignReferee(competitionId, matchId, refereeId);
         await refresh();
       } catch (error) {
@@ -43,6 +45,7 @@
     return {
       start(nextCompetitionId) {
         competitionId = masterCompetition(nextCompetitionId);
+        if (accountabilityFlow) accountability = accountabilityFlow.begin({ actorType: "master", competitionId });
         return refresh();
       },
       assign,

@@ -3,8 +3,9 @@
   if (typeof module !== "undefined" && module.exports) module.exports = workflow;
   if (typeof window !== "undefined") window.ParticipantReadinessWorkflow = workflow;
 })(function createModule() {
-  function createParticipantReadinessWorkflow({ api, view, identityContext }) {
+  function createParticipantReadinessWorkflow({ api, view, identityContext, accountabilityFlow }) {
     let context;
+    let accountability;
 
     function participantContext(nextContext) {
       const identity = nextContext || (identityContext && identityContext.getCurrentIdentityContext());
@@ -31,6 +32,7 @@
     async function checkIn() {
       view.busy();
       try {
+        if (accountabilityFlow) accountabilityFlow.verify(accountability);
         await api.checkIn(context.competitionId, context.participantId);
         await refresh();
       } catch (error) {
@@ -41,6 +43,7 @@
     return {
       start(nextContext) {
         context = participantContext(nextContext);
+        if (accountabilityFlow) accountability = accountabilityFlow.begin({ actorType: "participant", competitionId: context.competitionId });
         return refresh();
       },
       checkIn,

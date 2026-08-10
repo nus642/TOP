@@ -45,7 +45,7 @@ const view = {
   }
 };
 
-const workflow = MasterWorkflow.createMasterWorkflow({ api, view });
+const workflow = MasterWorkflow.createMasterWorkflow({ api, view, accountabilityFlow: WorkflowAccountability.browser });
 contextForm.addEventListener("submit", async (event) => {
   event.preventDefault();
   try {

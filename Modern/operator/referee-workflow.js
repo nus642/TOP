@@ -3,8 +3,9 @@
   if (typeof module !== "undefined" && module.exports) module.exports = workflow;
   if (typeof window !== "undefined") window.RefereeWorkflow = workflow;
 })(function createModule() {
-  function createRefereeWorkflow({ api, view, identityContext }) {
+  function createRefereeWorkflow({ api, view, identityContext, accountabilityFlow }) {
     let context;
+    let accountability;
 
     function refereeContext(nextContext) {
       const identity = nextContext || (identityContext && identityContext.getCurrentIdentityContext());
@@ -28,6 +29,7 @@
     async function run(action) {
       view.busy(action.matchId);
       try {
+        if (accountabilityFlow) accountabilityFlow.verify(accountability);
         if (action.type === "accept") await api.accept(context.tournamentId, context.refereeId, action.matchId);
         if (action.type === "score") await api.recordScore(context.tournamentId, context.refereeId, action.matchId, action.score);
         if (action.type === "confirm") await api.confirm(context.tournamentId, context.refereeId, action.matchId);
@@ -36,7 +38,11 @@
     }
 
     return {
-      start(nextContext) { context = refereeContext(nextContext); return refresh(); },
+      start(nextContext) {
+        context = refereeContext(nextContext);
+        if (accountabilityFlow) accountability = accountabilityFlow.begin({ actorType: "referee", competitionId: context.tournamentId });
+        return refresh();
+      },
       run
     };
   }

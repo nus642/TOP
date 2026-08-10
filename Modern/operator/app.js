@@ -40,7 +40,7 @@ const view = {
   }
 };
 
-const workflow = RefereeWorkflow.createRefereeWorkflow({ api, view });
+const workflow = RefereeWorkflow.createRefereeWorkflow({ api, view, accountabilityFlow: WorkflowAccountability.browser });
 form.addEventListener("submit", async (event) => {
   event.preventDefault();
   try {
