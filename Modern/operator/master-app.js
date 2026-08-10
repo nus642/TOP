@@ -45,10 +45,18 @@ const view = {
   }
 };
 
-const workflow = MasterWorkflow.createMasterWorkflow({ api, view });
+const workflow = MasterWorkflow.createMasterWorkflow({ api, view, identityContext: IdentityContext });
 contextForm.addEventListener("submit", (event) => {
   event.preventDefault();
-  workflow.start(new FormData(contextForm).get("competitionId"));
+  const values = new FormData(contextForm);
+  try {
+    IdentityContext.setCurrentIdentityContext({
+      actorId: values.get("masterId"),
+      actorType: "master",
+      competitionId: values.get("competitionId")
+    });
+    workflow.start();
+  } catch (error) { view.error(error.message); }
 });
 list.addEventListener("submit", (event) => {
   if (!event.target.matches(".assignment-form")) return;

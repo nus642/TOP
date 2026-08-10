@@ -2,6 +2,36 @@ const assert = require("node:assert/strict");
 const test = require("node:test");
 const { createParticipantReadinessApi } = require("../participant/api-client");
 const { createParticipantReadinessWorkflow } = require("../participant/readiness-workflow");
+const { createIdentityContext } = require("../operator/identity-context");
+
+test("participant workflow maps identity actorId to participantId for existing readiness APIs", async () => {
+  const calls = [];
+  const workflow = createParticipantReadinessWorkflow({
+    api: {
+      readiness: async (...args) => { calls.push(["readiness", ...args]); return { state: "not_checked_in" }; },
+      checkIn: async (...args) => calls.push(["check-in", ...args])
+    },
+    view: { loading() {}, busy() {}, error: assert.fail, readiness() {} },
+    identityContext: { getCurrentIdentityContext: () => createIdentityContext({
+      actorId: "participant-8", actorType: "participant", competitionId: "competition-3"
+    }) }
+  });
+
+  await workflow.start();
+  await workflow.checkIn();
+  assert.deepEqual(calls, [
+    ["readiness", "competition-3", "participant-8"],
+    ["check-in", "competition-3", "participant-8"],
+    ["readiness", "competition-3", "participant-8"]
+  ]);
+});
+
+test("participant workflow rejects a non-participant identity at its boundary", () => {
+  const workflow = createParticipantReadinessWorkflow({ api: {}, view: {}, identityContext: {
+    getCurrentIdentityContext: () => createIdentityContext({ actorId: "m1", actorType: "master", competitionId: 3 })
+  } });
+  assert.throws(() => workflow.start(), /participant identity context is required/);
+});
 
 test("participant API client uses only existing readiness endpoints", async () => {
   const calls = [];

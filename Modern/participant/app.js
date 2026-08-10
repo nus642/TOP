@@ -36,15 +36,19 @@ const view = {
   }
 };
 
-const workflow = ParticipantReadinessWorkflow.createParticipantReadinessWorkflow({ api, view });
+const workflow = ParticipantReadinessWorkflow.createParticipantReadinessWorkflow({ api, view, identityContext: IdentityContext });
 
 contextForm.addEventListener("submit", (event) => {
   event.preventDefault();
   const form = new FormData(contextForm);
-  workflow.start({
-    competitionId: form.get("competitionId"),
-    participantId: form.get("participantId")
-  });
+  try {
+    IdentityContext.setCurrentIdentityContext({
+      actorId: form.get("participantId"),
+      actorType: "participant",
+      competitionId: form.get("competitionId")
+    });
+    workflow.start();
+  } catch (error) { view.error(error.message); }
 });
 
 readinessPanel.addEventListener("click", (event) => {
