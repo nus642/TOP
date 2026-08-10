@@ -1,4 +1,4 @@
-const api = RefereeApi.createRefereeApi();
+const api = RefereeApi.createRefereeApi({ accountabilityContext: AccountabilityContext.browser });
 const list = document.querySelector("#matches");
 const notice = document.querySelector("#notice");
 const form = document.querySelector("#context-form");

@@ -3,9 +3,13 @@
   if (typeof module !== "undefined" && module.exports) module.exports = api;
   if (typeof window !== "undefined") window.RefereeApi = api;
 })(function createModule() {
-  function createRefereeApi({ fetchImpl = fetch, baseUrl = "/api" } = {}) {
+  function createRefereeApi({ fetchImpl = fetch, baseUrl = "/api", accountabilityContext } = {}) {
     async function request(path, options) {
-      const response = await fetchImpl(`${baseUrl}${path}`, options);
+      const metadata = accountabilityContext ? accountabilityContext.headers() : {};
+      const requestOptions = accountabilityContext
+        ? { ...options, headers: { ...options?.headers, ...metadata } }
+        : options;
+      const response = await fetchImpl(`${baseUrl}${path}`, requestOptions);
       const body = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(body.error || "Match Operations could not complete the request");
       return body;
