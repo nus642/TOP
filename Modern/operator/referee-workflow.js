@@ -8,8 +8,9 @@
 
     function refereeContext(nextContext) {
       const identity = nextContext || (identityContext && identityContext.getCurrentIdentityContext());
-      if (identity && identity.trustedActor?.actorType === "referee") {
-        return { tournamentId: identity.competitionId, refereeId: identity.trustedActor.actorId };
+      const actor = identity?.actor || identity?.trustedActor;
+      if (identity && actor?.actorType === "referee") {
+        return { tournamentId: identity.competitionId, refereeId: actor.actorId };
       }
       // Retain the pre-identity calling convention for non-UI consumers.
       if (identity && identity.tournamentId && identity.refereeId) return identity;
