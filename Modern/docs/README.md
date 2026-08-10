@@ -21,6 +21,11 @@ Sessions are held in one process-local `Map`. They disappear on restart and do n
 work across multiple application instances. This is intentionally unsuitable for
 production deployment.
 
+The [production identity integration boundary](production-identity-integration.md)
+defines how a future verified external identity is linked to this existing actor
+session contract. It supplies ports only: no provider, protocol, account model, or
+production endpoint is implemented.
+
 The architectural separation is:
 
 * **Session identity = WHO** is making the request.
