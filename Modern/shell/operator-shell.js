@@ -2,10 +2,13 @@
   const responsibility = typeof module !== "undefined" && module.exports
     ? require("./responsibility-context")
     : window.ResponsibilityContext;
-  const shell = factory(responsibility);
+  const experience = typeof module !== "undefined" && module.exports
+    ? require("./operator-experience")
+    : window.OperatorExperience;
+  const shell = factory(responsibility, experience);
   if (typeof module !== "undefined" && module.exports) module.exports = shell;
   if (typeof window !== "undefined") window.OperatorShell = shell;
-})(function createModule(ResponsibilityContext) {
+})(function createModule(ResponsibilityContext, OperatorExperience) {
   const COMPETITION_KEY = ResponsibilityContext.COMPETITION_KEY;
   const LANDINGS = Object.freeze({
     referee: "/operator/",
@@ -44,7 +47,7 @@
 
     function render() {
       const { actor, competitionId } = context;
-      view.ready({ actor, competitionId, responsibility: context, landing: landingFor(actor.actorType, competitionId), workspaces: workspaceLinks(competitionId) });
+      view.ready({ actor, competitionId, responsibility: context, experience: OperatorExperience.forActor(actor), landing: landingFor(actor.actorType, competitionId), workspaces: workspaceLinks(competitionId) });
     }
 
     return Object.freeze({

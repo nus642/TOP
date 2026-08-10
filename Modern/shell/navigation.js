@@ -14,8 +14,8 @@
     ready(context) {
       host.innerHTML = `<a class="operator-nav-brand" href="/shell/">TOP</a>
         <div class="operator-nav-links">${context.workspaces.map(({ workspace, label, href }) =>
-          `<a data-workspace="${workspace}" href="${href}">${label}</a>`).join("")}</div>
-        <div class="operator-nav-identity"><span>${escapeText(context.actor.actorId)}</span><strong>${escapeText(context.actor.actorType)}</strong></div>`;
+          `<a data-workspace="${workspace}"${workspace === context.experience.workspace ? ' class="recommended"' : ""} href="${href}">${label}</a>`).join("")}</div>
+        <div class="operator-nav-identity"><span>${escapeText(context.actor.actorId)}</span><strong>${escapeText(context.experience.responsibility)}</strong></div>`;
       if (page) page.hidden = false;
       const competitionInput = document.querySelector('[name="competitionId"], [name="tournamentId"]');
       if (competitionInput && context.competitionId) competitionInput.value = context.competitionId;
