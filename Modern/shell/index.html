@@ -1,0 +1,18 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>TOP · Operator entry</title><link rel="stylesheet" href="styles.css">
+</head>
+<body><main>
+  <header><span class="brand">TOP</span><span class="eyebrow">Tournament Operations</span><h1>Your operator workspace</h1><p>One authenticated entry point to the tools for your session.</p></header>
+  <p id="status" class="status" role="status">Confirming your authenticated session…</p>
+  <section id="authenticated-content" hidden>
+    <div class="identity"><span class="eyebrow">Signed in as</span><strong id="actor-id"></strong><span id="actor-type" class="type"></span></div>
+    <label>Competition context<input id="competition-id" autocomplete="off" placeholder="Enter competition ID"></label>
+    <p class="hint">You choose the competition. Your identity and workspace come from the authenticated session.</p>
+    <a id="workspace-link" class="action" href="#">Open workspace</a>
+  </section>
+  <footer>Actions remain governed by Tournament Operations backend authority.</footer>
+</main><script src="operator-shell.js"></script><script src="app.js"></script></body>
+</html>

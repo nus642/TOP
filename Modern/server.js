@@ -24,6 +24,7 @@ const app = express();
 const actorSessions = createActorSessionStore();
 app.use(cors());
 app.use(bodyParser.json());
+app.use("/shell", express.static(path.join(__dirname, "shell")));
 app.use("/operator", express.static(path.join(__dirname, "operator")));
 app.use("/participant", express.static(path.join(__dirname, "participant")));
 app.use("/public", express.static(path.join(__dirname, "public")));
