@@ -2,7 +2,7 @@ const assert = require("node:assert/strict");
 const fs = require("node:fs");
 const path = require("node:path");
 const test = require("node:test");
-const { createAccountabilityVisibility } = require("../shell/accountability-visibility");
+const { createAccountabilityVisibility, render } = require("../shell/accountability-visibility");
 const OperatorExperience = require("../shell/operator-experience");
 
 function visibility(state) {
@@ -63,4 +63,21 @@ test("all authenticated workflow pages load accountability visibility", () => {
     assert.match(html, /accountability-visibility\.js/);
     assert.equal(html.indexOf("accountability-context.js") < html.indexOf("accountability-visibility.js"), true);
   }
+});
+
+test("shell landing page renders the shared accountability visibility presentation", () => {
+  const html = fs.readFileSync(path.join(__dirname, "..", "shell", "index.html"), "utf8");
+  const app = fs.readFileSync(path.join(__dirname, "..", "shell", "app.js"), "utf8");
+  assert.match(html, /id="accountability"/);
+  assert.equal(html.indexOf("responsibility-context.js") < html.indexOf("accountability-context.js"), true);
+  assert.equal(html.indexOf("accountability-context.js") < html.indexOf("accountability-visibility.js"), true);
+  assert.match(app, /AccountabilityVisibility\.browser\.current\(\)/);
+  assert.match(app, /AccountabilityVisibility\.render/);
+});
+
+test("shared renderer displays every accountability field and escapes identity text", () => {
+  const markup = render({ actorId: "<actor>", actorType: "master", competitionId: "competition-4", responsibility: "Tournament oversight" });
+  assert.match(markup, /&lt;actor&gt;/);
+  for (const label of ["Operating as", "Actor type", "Competition", "Responsibility"]) assert.match(markup, new RegExp(label));
+  assert.doesNotMatch(markup, /<actor>/);
 });

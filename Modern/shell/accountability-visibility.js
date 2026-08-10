@@ -36,5 +36,19 @@
     return Object.freeze({ current });
   }
 
-  return { createAccountabilityVisibility };
+  function escapeText(value) {
+    return String(value ?? "").replace(/[&<>'"]/g, character => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", "'": "&#39;", '"': "&quot;" })[character]);
+  }
+
+  function render(accountability) {
+    if (!accountability) throw new TypeError("accountability visibility is required");
+    return `<dl class="accountability-visibility" aria-label="Current accountability">
+      <div><dt>Operating as</dt><dd>${escapeText(accountability.actorId)}</dd></div>
+      <div><dt>Actor type</dt><dd>${escapeText(accountability.actorType)}</dd></div>
+      <div><dt>Competition</dt><dd>${escapeText(accountability.competitionId || "Not selected")}</dd></div>
+      <div><dt>Responsibility</dt><dd>${escapeText(accountability.responsibility)}</dd></div>
+    </dl>`;
+  }
+
+  return { createAccountabilityVisibility, render };
 });
