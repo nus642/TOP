@@ -14,11 +14,14 @@ const participantReadinessRoutes = require("./api/participant-readiness");
 const refereeWorkflowRoutes = require("./api/referee-workflow");
 const publicMatchScoreboardRoutes = require("./api/public-match-scoreboard");
 const competitionArchiveRoutes = require("./api/competition-archive");
+const { createActorSessionStore } = require("./session/actor-session");
+const { createSessionRouter, requireActorSession } = require("./api/session");
 
 const competitionEngine = require('./engine/competition');
 const operationsEngine = require('./engine/operations');
 
 const app = express();
+const actorSessions = createActorSessionStore();
 app.use(cors());
 app.use(bodyParser.json());
 app.use("/operator", express.static(path.join(__dirname, "operator")));
@@ -27,12 +30,13 @@ app.use("/public", express.static(path.join(__dirname, "public")));
 app.use("/archive", express.static(path.join(__dirname, "archive")));
 
 app.use("/api/competition", competitionRoutes);
+app.use("/api/session", createSessionRouter(actorSessions));
 app.use("/api", legacyRoutes);
-app.use("/api/match-operations", matchOperationsRoutes);
+app.use("/api/match-operations", requireActorSession(actorSessions), matchOperationsRoutes);
 app.use("/api/master-operations", masterOperationalVisibilityRoutes);
-app.use("/api/master-workflow", masterWorkflowRoutes);
-app.use("/api/participant-readiness", participantReadinessRoutes);
-app.use("/api/referee-workflow", refereeWorkflowRoutes);
+app.use("/api/master-workflow", requireActorSession(actorSessions), masterWorkflowRoutes);
+app.use("/api/participant-readiness", requireActorSession(actorSessions), participantReadinessRoutes);
+app.use("/api/referee-workflow", requireActorSession(actorSessions), refereeWorkflowRoutes);
 app.use("/api/public/competitions", publicMatchScoreboardRoutes);
 app.use("/api/public/competitions", competitionArchiveRoutes);
 

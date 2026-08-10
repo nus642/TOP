@@ -46,11 +46,11 @@ const view = {
 };
 
 const workflow = MasterWorkflow.createMasterWorkflow({ api, view, identityContext: IdentityContext });
-contextForm.addEventListener("submit", (event) => {
+contextForm.addEventListener("submit", async (event) => {
   event.preventDefault();
   const values = new FormData(contextForm);
   try {
-    IdentityContext.setCurrentIdentityContext({
+    await IdentityContext.establishFoundationActor({
       actorId: values.get("masterId"),
       actorType: "master",
       competitionId: values.get("competitionId")

@@ -10,7 +10,7 @@ function handler(action) {
     try {
       const result = await service[action](
         req.params.tournamentId,
-        req.params.refereeId,
+        req.actor?.actorId ?? req.params.refereeId,
         req.params.matchId,
         req.body
       );

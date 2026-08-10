@@ -41,11 +41,11 @@ const view = {
 };
 
 const workflow = RefereeWorkflow.createRefereeWorkflow({ api, view, identityContext: IdentityContext });
-form.addEventListener("submit", (event) => {
+form.addEventListener("submit", async (event) => {
   event.preventDefault();
   const values = new FormData(form);
   try {
-    IdentityContext.setCurrentIdentityContext({
+    await IdentityContext.establishFoundationActor({
       actorId: values.get("refereeId"),
       actorType: "referee",
       competitionId: values.get("tournamentId")
