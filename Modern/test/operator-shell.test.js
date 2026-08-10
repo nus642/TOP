@@ -1,6 +1,6 @@
 const assert = require("node:assert/strict");
 const test = require("node:test");
-const { COMPETITION_KEY, createOperatorShell, landingFor } = require("../shell/operator-shell");
+const { COMPETITION_KEY, createOperatorShell, landingFor, workspaceLinks } = require("../shell/operator-shell");
 
 function memoryStorage(initial = {}) {
   const values = new Map(Object.entries(initial));
@@ -27,6 +27,14 @@ test("actor types select only their existing experience landing page", () => {
   assert.equal(landingFor("participant", 3), "/participant/?competitionId=3");
 });
 
+test("navigation generates every existing workspace link without making permission decisions", () => {
+  assert.deepEqual(workspaceLinks("competition/3").map(({ workspace, href }) => [workspace, href]), [
+    ["referee", "/operator/?competitionId=competition%2F3"],
+    ["master", "/operator/master.html?competitionId=competition%2F3"],
+    ["participant", "/participant/?competitionId=competition%2F3"]
+  ]);
+});
+
 test("missing session is shown and does not render an operator context", async () => {
   const { shell, states } = harness({ ok: false, json: async () => ({ error: "Authenticated actor session required" }) });
   await assert.rejects(shell.hydrate(), /Authenticated actor session required/);
@@ -48,4 +56,12 @@ test("user-selected competition context is preserved without changing identity",
   shell.selectCompetition("competition-4");
   assert.equal(storage.getItem(COMPETITION_KEY), "competition-4");
   assert.deepEqual(states.at(-1)[1].actor, { actorId: "master-1", actorType: "master" });
+  assert.equal(states.at(-1)[1].workspaces.every(link => link.href.endsWith("competitionId=competition-4")), true);
+});
+
+test("shell exposes no UI operation that can switch the authenticated actor", async () => {
+  const { shell } = harness({ ok: true, json: async () => ({ actorId: "participant-9", actorType: "participant" }) });
+  await shell.hydrate();
+  assert.deepEqual(Object.keys(shell).sort(), ["hydrate", "selectCompetition"]);
+  assert.equal("selectActor" in shell, false);
 });

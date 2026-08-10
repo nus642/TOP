@@ -9,12 +9,27 @@
     master: "/operator/master.html",
     participant: "/participant/"
   });
+  const WORKSPACE_LABELS = Object.freeze({
+    referee: "Referee · Match Operations",
+    master: "Master · Master Workflow",
+    participant: "Participant · Readiness"
+  });
 
   function landingFor(actorType, competitionId) {
     const pathname = LANDINGS[actorType];
     if (!pathname) throw new Error(`Unsupported authenticated actor type: ${actorType || "unknown"}`);
     if (competitionId === undefined || competitionId === null || String(competitionId).trim() === "") return pathname;
     return `${pathname}?competitionId=${encodeURIComponent(String(competitionId).trim())}`;
+  }
+
+  function workspaceLinks(competitionId) {
+    return Object.entries(LANDINGS).map(([workspace, pathname]) => Object.freeze({
+      workspace,
+      label: WORKSPACE_LABELS[workspace],
+      href: competitionId === undefined || competitionId === null || String(competitionId).trim() === ""
+        ? pathname
+        : `${pathname}?competitionId=${encodeURIComponent(String(competitionId).trim())}`
+    }));
   }
 
   function createOperatorShell({ fetchImpl = fetch, storage, view } = {}) {
@@ -24,7 +39,7 @@
     let competitionId = storage.getItem(COMPETITION_KEY) || "";
 
     function render() {
-      view.ready({ actor, competitionId, landing: landingFor(actor.actorType, competitionId) });
+      view.ready({ actor, competitionId, landing: landingFor(actor.actorType, competitionId), workspaces: workspaceLinks(competitionId) });
     }
 
     return Object.freeze({
@@ -50,5 +65,5 @@
     });
   }
 
-  return { COMPETITION_KEY, LANDINGS, createOperatorShell, landingFor };
+  return { COMPETITION_KEY, LANDINGS, WORKSPACE_LABELS, createOperatorShell, landingFor, workspaceLinks };
 });
