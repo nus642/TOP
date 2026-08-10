@@ -45,13 +45,11 @@ const view = {
   }
 };
 
-const workflow = MasterWorkflow.createMasterWorkflow({ api, view, identityContext: IdentityContext });
+const workflow = MasterWorkflow.createMasterWorkflow({ api, view });
 contextForm.addEventListener("submit", async (event) => {
   event.preventDefault();
-  const values = new FormData(contextForm);
   try {
-    await IdentityContext.hydrateCurrentActor({ competitionId: values.get("competitionId") });
-    workflow.start();
+    await workflow.start(ResponsibilityContext.browser.current());
   } catch (error) { view.error(error.message); }
 });
 list.addEventListener("submit", (event) => {

@@ -40,13 +40,11 @@ const view = {
   }
 };
 
-const workflow = RefereeWorkflow.createRefereeWorkflow({ api, view, identityContext: IdentityContext });
+const workflow = RefereeWorkflow.createRefereeWorkflow({ api, view });
 form.addEventListener("submit", async (event) => {
   event.preventDefault();
-  const values = new FormData(form);
   try {
-    await IdentityContext.hydrateCurrentActor({ competitionId: values.get("tournamentId") });
-    workflow.start();
+    await workflow.start(ResponsibilityContext.browser.current());
   } catch (error) { view.error(error.message); }
 });
 list.addEventListener("click", (event) => {

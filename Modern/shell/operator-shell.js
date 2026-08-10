@@ -1,9 +1,12 @@
 (function expose(factory) {
-  const shell = factory();
+  const responsibility = typeof module !== "undefined" && module.exports
+    ? require("./responsibility-context")
+    : window.ResponsibilityContext;
+  const shell = factory(responsibility);
   if (typeof module !== "undefined" && module.exports) module.exports = shell;
   if (typeof window !== "undefined") window.OperatorShell = shell;
-})(function createModule() {
-  const COMPETITION_KEY = "top.operator.competitionId";
+})(function createModule(ResponsibilityContext) {
+  const COMPETITION_KEY = ResponsibilityContext.COMPETITION_KEY;
   const LANDINGS = Object.freeze({
     referee: "/operator/",
     master: "/operator/master.html",
@@ -32,35 +35,29 @@
     }));
   }
 
-  function createOperatorShell({ fetchImpl = fetch, storage, view } = {}) {
+  function createOperatorShell({ fetchImpl = fetch, storage, view, responsibilityContext } = {}) {
     if (!storage) throw new TypeError("competition storage is required");
     if (!view) throw new TypeError("shell view is required");
-    let actor;
-    let competitionId = storage.getItem(COMPETITION_KEY) || "";
+    let context;
+    const responsibility = responsibilityContext || ResponsibilityContext.browser
+      || ResponsibilityContext.createResponsibilityContext({ fetchImpl, storage });
 
     function render() {
-      view.ready({ actor, competitionId, landing: landingFor(actor.actorType, competitionId), workspaces: workspaceLinks(competitionId) });
+      const { actor, competitionId } = context;
+      view.ready({ actor, competitionId, responsibility: context, landing: landingFor(actor.actorType, competitionId), workspaces: workspaceLinks(competitionId) });
     }
 
     return Object.freeze({
       async hydrate() {
         view.loading();
-        const response = await fetchImpl("/api/session/me", { credentials: "same-origin" });
-        const body = await response.json().catch(() => ({}));
-        if (!response.ok) {
-          const error = new Error(body.error || "Authenticated actor session required");
-          view.error(error.message);
-          throw error;
-        }
-        actor = Object.freeze({ actorId: body.actorId, actorType: body.actorType });
+        try { context = await responsibility.hydrate(); }
+        catch (error) { view.error(error.message); throw error; }
         try { render(); } catch (error) { view.error(error.message); throw error; }
-        return actor;
+        return context.actor;
       },
       selectCompetition(value) {
-        competitionId = String(value ?? "").trim();
-        if (competitionId) storage.setItem(COMPETITION_KEY, competitionId);
-        else storage.removeItem(COMPETITION_KEY);
-        if (actor) render();
+        context = responsibility.selectCompetition(value);
+        if (context) render();
       }
     });
   }

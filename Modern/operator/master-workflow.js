@@ -9,7 +9,8 @@
     function masterCompetition(nextContext) {
       const identity = nextContext || (identityContext && identityContext.getCurrentIdentityContext());
       if (identity && typeof identity === "object") {
-        if (identity.trustedActor?.actorType === "master" && identity.competitionId !== undefined) {
+        const actor = identity.actor || identity.trustedActor;
+        if (actor?.actorType === "master" && identity.competitionId !== undefined) {
           return identity.competitionId;
         }
         throw new TypeError("A master identity context is required");
