@@ -28,7 +28,7 @@ function readHandler(action) {
 
 async function refereeWorkflowHandler(req, res) {
   try {
-    const result = await service.getRefereeWorkflow(req.params.tournamentId, req.actor?.actorId ?? req.params.refereeId);
+    const result = await service.getRefereeWorkflow(req.params.tournamentId, req.actor.actorId);
     res.json(result);
   } catch (error) {
     const statuses = { VALIDATION_ERROR: 400, NOT_FOUND: 404 };

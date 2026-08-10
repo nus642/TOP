@@ -124,7 +124,7 @@ test("check-in API forwards waiver input to the existing workflow", async () => 
   const res = createResponse();
   const body = { acceptWaiver: true, waiverVersion: "v2" };
 
-  await handler({ params: { competitionId: "3", participantId: "8" }, body }, res);
+  await handler({ params: { competitionId: "3", participantId: "8" }, actor: { actorId: "8" }, body }, res);
   assert.deepEqual(res.payload, { args: ["3", "8", body], state: "ready" });
 });
 
@@ -139,7 +139,7 @@ test("readiness API maps existing waiver validation failures to HTTP 400", async
   };
   const res = createResponse();
 
-  await handler({ params: { competitionId: "3", participantId: "8" }, body: {} }, res);
+  await handler({ params: { competitionId: "3", participantId: "8" }, actor: { actorId: "8" }, body: {} }, res);
   assert.equal(res.statusCode, 400);
   assert.deepEqual(res.payload, { error: "Accepted waiver is required before check-in" });
 });

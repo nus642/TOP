@@ -29,11 +29,16 @@ function requireActorSession(store) {
     const current = store.resolve(readCookie(req.headers.cookie));
     if (!current) return res.status(401).json({ error: "Authenticated actor session required" });
     req.actor = current;
-    // Actor identifiers in legacy workflow URLs are routing data, never trusted identity.
-    if (req.params.refereeId && req.params.refereeId !== current.actorId) {
+    // This middleware runs before the mounted router has populated req.params, so
+    // compare identity-bearing legacy URL segments at the session boundary.
+    const match = req.path.match(/\/(?:referees|participants)\/([^/]+)(?:\/|$)/);
+    let routedActorId;
+    try {
+      routedActorId = match && decodeURIComponent(match[1]);
+    } catch {
       return res.status(401).json({ error: "Workflow actor does not match authenticated session" });
     }
-    if (req.params.participantId && req.params.participantId !== current.actorId) {
+    if (routedActorId && routedActorId !== current.actorId) {
       return res.status(401).json({ error: "Workflow actor does not match authenticated session" });
     }
     next();

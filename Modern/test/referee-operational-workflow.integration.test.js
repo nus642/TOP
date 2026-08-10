@@ -69,7 +69,8 @@ test("API exposes only the referee's existing match-operation records", async (t
 
   const res = response();
   await route("/:tournamentId/referees/:refereeId/matches", "get")({
-    params: { tournamentId: "3", refereeId: "referee-7" }
+    params: { tournamentId: "3", refereeId: "referee-7" },
+    actor: { actorId: "referee-7", actorType: "referee" }
   }, res);
 
   assert.equal(res.statusCode, 200);
