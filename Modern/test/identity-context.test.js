@@ -9,17 +9,20 @@ const {
 const { createRefereeWorkflow } = require("../operator/referee-workflow");
 
 test("identity context validates and freezes the minimal human actor context", () => {
-  const context = createIdentityContext({ actorId: " referee-7 ", actorType: "referee", competitionId: 3 });
-  assert.deepEqual(context, { actorId: "referee-7", actorType: "referee", competitionId: 3 });
+  const context = createIdentityContext({ trustedActor: { actorId: " referee-7 ", actorType: "referee" }, competitionId: 3  });
+  assert.deepEqual(context, { trustedActor: { actorId: "referee-7", actorType: "referee" }, competitionId: 3 });
   assert.equal(Object.isFrozen(context), true);
   assert.deepEqual(ACTOR_TYPES, ["referee", "master", "participant"]);
-  assert.throws(() => createIdentityContext({ actorType: "referee" }), /actorId is required/);
-  assert.throws(() => createIdentityContext({ actorId: "r7" }), /actorType is required/);
-  assert.throws(() => createIdentityContext({ actorId: "r7", actorType: "admin" }), /Unsupported actorType/);
+  assert.throws(() => createIdentityContext({ trustedActor: { actorType: "referee" } }), /actorId is required/);
+  assert.throws(() => createIdentityContext({ trustedActor: { actorId: "r7" } }), /actorType is required/);
+  assert.throws(() => createIdentityContext({ trustedActor: { actorId: "r7", actorType: "admin"  } }), /Unsupported actorType/);
 });
 
-test("in-memory context access returns a validated value without persistence or authority", () => {
-  const context = setCurrentIdentityContext({ actorId: "r7", actorType: "referee", competitionId: "3" });
+test("in-memory context access returns a validated value without persistence or authority", async () => {
+  const context = await require("../operator/identity-context").hydrateCurrentActor({
+    competitionId: "3",
+    fetchImpl: async () => ({ ok: true, json: async () => ({ actorId: "r7", actorType: "referee" }) })
+  });
   assert.strictEqual(getCurrentIdentityContext(), context);
   assert.equal("permissions" in context, false);
   assert.equal("token" in context, false);
@@ -28,9 +31,7 @@ test("in-memory context access returns a validated value without persistence or 
 test("referee workflow consumes actor identity and still delegates every decision to existing APIs", async () => {
   const calls = [];
   const identityContext = {
-    getCurrentIdentityContext: () => createIdentityContext({
-      actorId: "referee-7", actorType: "referee", competitionId: 3
-    })
+    getCurrentIdentityContext: () => createIdentityContext({ trustedActor: { actorId: "referee-7", actorType: "referee" }, competitionId: 3 })
   };
   const api = {
     assignedMatches: async (...args) => { calls.push(["list", ...args]); return { matches: [] }; },
@@ -54,7 +55,7 @@ test("referee workflow consumes actor identity and still delegates every decisio
 test("referee workflow rejects another actor type rather than treating context as authority", async () => {
   const workflow = createRefereeWorkflow({
     api: {}, view: {},
-    identityContext: { getCurrentIdentityContext: () => createIdentityContext({ actorId: "m1", actorType: "master" }) }
+    identityContext: { getCurrentIdentityContext: () => createIdentityContext({ trustedActor: { actorId: "m1", actorType: "master"  } }) }
   });
   assert.throws(() => workflow.start(), /referee identity context is required/);
 });
@@ -67,11 +68,21 @@ test("identity context hydrates trusted actor while competition remains UI conte
     competitionId: "competition-4",
     fetchImpl: async () => ({ ok: true, json: async () => ({ actorId: "participant-2", actorType: "participant" }) })
   });
-  assert.deepEqual(context, { actorId: "participant-2", actorType: "participant", competitionId: "competition-4" });
+  assert.deepEqual(context, { trustedActor: { actorId: "participant-2", actorType: "participant" }, competitionId: "competition-4" });
   assert.throws(() => identity.setCurrentIdentityContext({
-    actorId: "participant-9", actorType: "participant", competitionId: "competition-5"
+    trustedActor: { actorId: "participant-9", actorType: "participant" }, competitionId: "competition-5"
   }), /cannot be replaced/);
   assert.deepEqual(identity.setCurrentIdentityContext({
-    actorId: "participant-2", actorType: "participant", competitionId: "competition-5"
-  }), { actorId: "participant-2", actorType: "participant", competitionId: "competition-5" });
+    trustedActor: { actorId: "participant-2", actorType: "participant" }, competitionId: "competition-5"
+  }), { trustedActor: { actorId: "participant-2", actorType: "participant" }, competitionId: "competition-5" });
+});
+
+test("missing authenticated session is surfaced without creating identity", async () => {
+  delete require.cache[require.resolve("../operator/identity-context")];
+  const identity = require("../operator/identity-context");
+  await assert.rejects(identity.hydrateCurrentActor({
+    competitionId: 3,
+    fetchImpl: async () => ({ ok: false, json: async () => ({ error: "Authenticated actor session required" }) })
+  }), /Authenticated actor session required/);
+  assert.equal(identity.getCurrentIdentityContext(), undefined);
 });

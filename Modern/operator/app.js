@@ -45,11 +45,7 @@ form.addEventListener("submit", async (event) => {
   event.preventDefault();
   const values = new FormData(form);
   try {
-    await IdentityContext.establishFoundationActor({
-      actorId: values.get("refereeId"),
-      actorType: "referee",
-      competitionId: values.get("tournamentId")
-    });
+    await IdentityContext.hydrateCurrentActor({ competitionId: values.get("tournamentId") });
     workflow.start();
   } catch (error) { view.error(error.message); }
 });

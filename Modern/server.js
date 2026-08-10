@@ -33,7 +33,7 @@ app.use("/api/competition", competitionRoutes);
 app.use("/api/session", createSessionRouter(actorSessions));
 app.use("/api", legacyRoutes);
 app.use("/api/match-operations", requireActorSession(actorSessions), matchOperationsRoutes);
-app.use("/api/master-operations", masterOperationalVisibilityRoutes);
+app.use("/api/master-operations", requireActorSession(actorSessions), masterOperationalVisibilityRoutes);
 app.use("/api/master-workflow", requireActorSession(actorSessions), masterWorkflowRoutes);
 app.use("/api/participant-readiness", requireActorSession(actorSessions), participantReadinessRoutes);
 app.use("/api/referee-workflow", requireActorSession(actorSessions), refereeWorkflowRoutes);
