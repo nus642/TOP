@@ -36,19 +36,16 @@ test("referee workflow consumes actor identity and still delegates every decisio
   const api = {
     assignedMatches: async (...args) => { calls.push(["list", ...args]); return { matches: [] }; },
     accept: async (...args) => calls.push(["accept", ...args]),
-    recordScore: async (...args) => calls.push(["score", ...args]),
-    confirm: async (...args) => calls.push(["confirm", ...args])
+    recordScore: async (...args) => calls.push(["score", ...args])
   };
   const view = { loading() {}, busy() {}, error: assert.fail, matches() {} };
   const workflow = createRefereeWorkflow({ api, view, identityContext });
   await workflow.start();
   await workflow.run({ type: "accept", matchId: 9 });
   await workflow.run({ type: "score", matchId: 9, score: { score1: 11, score2: 8 } });
-  await workflow.run({ type: "confirm", matchId: 9 });
   assert.deepEqual(calls, [
     ["list", 3, "referee-7"], ["accept", 3, "referee-7", 9], ["list", 3, "referee-7"],
-    ["score", 3, "referee-7", 9, { score1: 11, score2: 8 }], ["list", 3, "referee-7"],
-    ["confirm", 3, "referee-7", 9], ["list", 3, "referee-7"]
+    ["score", 3, "referee-7", 9, { score1: 11, score2: 8 }], ["list", 3, "referee-7"]
   ]);
 });
 

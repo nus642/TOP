@@ -162,7 +162,7 @@ test("Modern services complete a round-robin tournament lifecycle without the Le
         refereeId: "referee-7", score1: 11, score2: 8
     });
     const confirmation = await matchOperationsService.confirmResult(competition.id, match.id, {
-        refereeId: "referee-7", evidenceReference: "scorecard://modern/1"
+        actorId: "master-1", actorType: "master", evidenceReference: "scorecard://modern/1"
     });
     const result = await resultService.getStandings(competition.id);
     await competitionService.transitionCompetitionState(competition.id, "completed");
@@ -170,7 +170,7 @@ test("Modern services complete a round-robin tournament lifecycle without the Le
     assert.equal(state.competition.status, "completed");
     assert.equal(state.schedules.length, generated.matches.length);
     assert.equal(confirmation.match.status, "confirmed");
-    assert.equal(confirmation.officialRecord.confirmedBy, "referee-7");
+    assert.equal(confirmation.officialRecord.confirmedBy, "master-1");
     assert.deepEqual(result.standings.map(({ played, wins, losses }) => ({ played, wins, losses })), [
         { played: 1, wins: 1, losses: 0 },
         { played: 1, wins: 0, losses: 1 }
@@ -202,6 +202,6 @@ test("standings exclude scheduled and scored matches until official confirmation
     });
 
     assert.deepEqual((await resultService.getStandings(competition.id)).standings, []);
-    await matchOperationsService.confirmResult(competition.id, match.id, { refereeId: "referee-2" });
+    await matchOperationsService.confirmResult(competition.id, match.id, { actorId: "master-1", actorType: "master" });
     assert.equal((await resultService.getStandings(competition.id)).standings.length, 2);
 });

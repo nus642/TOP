@@ -32,11 +32,6 @@
         return request(`/referee-workflow/${scope(tournamentId, refereeId)}/matches/${encodeURIComponent(matchId)}/score`, {
           method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(score)
         });
-      },
-      confirm(tournamentId, refereeId, matchId) {
-        return request(`/referee-workflow/${scope(tournamentId, refereeId)}/matches/${encodeURIComponent(matchId)}/confirm`, {
-          method: "POST", headers: { "Content-Type": "application/json" }, body: "{}"
-        });
       }
     };
   }

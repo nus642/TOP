@@ -32,4 +32,10 @@ function assignReferee(competitionValue, matchValue, data = {}) {
   });
 }
 
-module.exports = { assignReferee };
+function confirmResult(competitionValue, matchValue, actor) {
+  const competitionId = positiveId(competitionValue, "competition id");
+  const matchId = positiveId(matchValue, "match id");
+  return matchOperationsService.confirmResult(competitionId, matchId, actor);
+}
+
+module.exports = { assignReferee, confirmResult };

@@ -14,12 +14,15 @@ function matchCard(match) {
   const referee = match.referee || {};
   const team1 = escapeHtml(match.sides?.one || "Side one");
   const team2 = escapeHtml(match.sides?.two || "Side two");
+  const action = match.operationStatus === "scored"
+    ? `<button type="button" data-action="confirm-result">Confirm submitted result</button>`
+    : `<form class="assignment-form"><label>Referee ID<input name="refereeId" value="${escapeHtml(referee.refereeId || "")}" required></label><button>Assign referee</button></form>`;
 
   return `<article class="match" data-match-id="${escapeHtml(match.matchId)}">
     <header><div><span class="eyebrow">Round ${escapeHtml(match.roundNumber || "—")}</span><h2>${team1} <span>vs</span> ${team2}</h2></div><span class="status">${escapeHtml(match.operationStatus)}</span></header>
     <div class="meta"><span>⌖ ${escapeHtml(schedule.courtId || "Court pending")}</span><span>◷ ${schedule.scheduledAt ? escapeHtml(new Date(schedule.scheduledAt).toLocaleString()) : "Time pending"}</span></div>
     <p class="assignment">Assigned referee: <strong>${escapeHtml(referee.refereeId || "Unassigned")}</strong></p>
-    <form class="assignment-form"><label>Referee ID<input name="refereeId" value="${escapeHtml(referee.refereeId || "")}" required></label><button>Assign referee</button></form>
+    ${action}
   </article>`;
 }
 
@@ -59,4 +62,8 @@ list.addEventListener("submit", (event) => {
     matchId: event.target.closest(".match").dataset.matchId,
     refereeId: new FormData(event.target).get("refereeId")
   });
+});
+list.addEventListener("click", (event) => {
+  const button = event.target.closest('button[data-action="confirm-result"]');
+  if (button) workflow.confirm(button.closest(".match").dataset.matchId);
 });

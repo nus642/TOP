@@ -30,6 +30,11 @@
             body: JSON.stringify({ refereeId })
           }
         );
+      },
+      confirmResult(competitionId, matchId) {
+        return request(`/master-workflow/${encodeURIComponent(competitionId)}/matches/${encodeURIComponent(matchId)}/confirm-result`, {
+          method: "POST", headers: { "Content-Type": "application/json" }, body: "{}"
+        });
       }
     };
   }

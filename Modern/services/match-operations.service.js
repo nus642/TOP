@@ -127,7 +127,14 @@ function recordScore(tournamentId, matchId, data = {}) {
     (connection, tid, mid, match) => repository.recordScore(tid, mid, match.score1, match.score2, connection));
 }
 
-function confirmResult(tournamentId, matchId, data = {}) {
+function submitResult(tournamentId, matchId, actor, data = {}) {
+  return mutate(tournamentId, matchId,
+    (match) => match.submitResult(actor, data.score1, data.score2),
+    (connection, tid, mid, match) => repository.recordScore(tid, mid, match.score1, match.score2, connection));
+}
+
+function confirmResult(tournamentId, matchId, actor = {}) {
+  const data = actor;
   const tournamentIdValue = positiveId(tournamentId, "tournament id");
   const matchIdValue = positiveId(matchId, "match id");
 
@@ -141,7 +148,7 @@ function confirmResult(tournamentId, matchId, data = {}) {
 
     try {
       const match = new MatchOperation(record);
-      match.confirm(data.refereeId);
+      match.confirmResult(actor);
 
       const matchResult = new MatchResult({
         matchId: String(match.id),
@@ -168,7 +175,7 @@ function confirmResult(tournamentId, matchId, data = {}) {
 
       const confirmation = new Confirmation({
         responsibility: "referee_result_confirmation",
-        confirmedBy: data.refereeId || match.refereeId,
+        confirmedBy: actor.actorId,
         details: {
           matchId: match.id,
           tournamentId: match.tournamentId
@@ -191,7 +198,7 @@ function confirmResult(tournamentId, matchId, data = {}) {
         refereeId: match.refereeId,
         score1: match.score1,
         score2: match.score2,
-        confirmedBy: data.refereeId || match.refereeId,
+        confirmedBy: actor.actorId,
         confirmedAt: confirmation.confirmedAt,
         confirmationResponsibility: confirmation.responsibility,
         evidenceReference: evidenceReference,
@@ -203,7 +210,7 @@ function confirmResult(tournamentId, matchId, data = {}) {
         }
       }, connection);
 
-      const updatedMatch = await repository.confirm(tournamentIdValue, matchIdValue, match.refereeId, connection);
+      const updatedMatch = await repository.confirm(tournamentIdValue, matchIdValue, actor.actorId, { outcome, provenance: { source: "match_operations_workflow", workflowVersion: "1.0", matchOperationState: "confirmed" } }, connection);
 
       return {
         match: updatedMatch,
@@ -267,6 +274,7 @@ module.exports = {
   startMatch,
   getMatchOperationContext,
   recordScore,
+  submitResult,
   confirmResult,
   getOfficialRecord,
   getRefereeWorkflow

@@ -32,7 +32,6 @@
         if (accountabilityFlow) accountabilityFlow.verify(accountability);
         if (action.type === "accept") await api.accept(context.tournamentId, context.refereeId, action.matchId);
         if (action.type === "score") await api.recordScore(context.tournamentId, context.refereeId, action.matchId, action.score);
-        if (action.type === "confirm") await api.confirm(context.tournamentId, context.refereeId, action.matchId);
         await refresh();
       } catch (error) { view.error(error.message); }
     }

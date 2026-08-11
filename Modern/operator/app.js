@@ -17,7 +17,7 @@ function matchCard(match) {
   const actions = {
     assigned: `<button data-action="accept">Accept responsibility</button>`,
     playing: `<form class="score-form"><label>${team1}<input name="score1" type="number" min="0" required></label><label>${team2}<input name="score2" type="number" min="0" required></label><button>Record score</button></form>`,
-    scored: `<button data-action="confirm" class="confirm">Confirm result</button>`,
+    scored: `<p class="muted">Result submitted — awaiting Master confirmation</p>`,
     confirmed: `<p class="complete">Result confirmed with Match Operations</p>`
   }[match.status] || `<p class="muted">Awaiting Match Operations</p>`;
 
