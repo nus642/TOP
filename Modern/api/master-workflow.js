@@ -27,4 +27,17 @@ router.post("/:competitionId/matches/:matchId/assign", async (req, res) => {
   }
 });
 
+router.post("/:competitionId/matches/:matchId/confirm-result", async (req, res) => {
+  try {
+    res.json(await service.confirmResult(
+      req.params.competitionId,
+      req.params.matchId,
+      req.actor
+    ));
+  } catch (error) {
+    const statuses = { VALIDATION_ERROR: 400, NOT_FOUND: 404 };
+    res.status(statuses[error.code] || 500).json({ error: error.message });
+  }
+});
+
 module.exports = router;

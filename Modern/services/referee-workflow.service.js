@@ -18,10 +18,10 @@ function acceptMatch(tournamentId, refereeValue, matchId) {
 }
 
 function recordScore(tournamentId, refereeValue, matchId, data = {}) {
-  return matchOperationsService.recordScore(tournamentId, matchId, {
-    ...data,
-    refereeId: refereeId(refereeValue)
-  });
+  const actorId = refereeId(refereeValue);
+  return matchOperationsService.submitResult(
+    tournamentId, matchId, { actorId, actorType: "referee" }, data
+  );
 }
 
 function startMatch(tournamentId, refereeValue, matchId) {
@@ -30,11 +30,4 @@ function startMatch(tournamentId, refereeValue, matchId) {
   });
 }
 
-function confirmResult(tournamentId, refereeValue, matchId, data = {}) {
-  return matchOperationsService.confirmResult(tournamentId, matchId, {
-    ...data,
-    refereeId: refereeId(refereeValue)
-  });
-}
-
-module.exports = { acceptMatch, startMatch, recordScore, confirmResult };
+module.exports = { acceptMatch, startMatch, recordScore };

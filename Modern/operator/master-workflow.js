@@ -42,6 +42,17 @@
       }
     }
 
+    async function confirm(matchId) {
+      view.busy(matchId);
+      try {
+        if (accountabilityFlow) accountabilityFlow.verify(accountability);
+        await api.confirmResult(competitionId, matchId);
+        await refresh();
+      } catch (error) {
+        view.error(error.message);
+      }
+    }
+
     return {
       start(nextCompetitionId) {
         competitionId = masterCompetition(nextCompetitionId);
@@ -49,6 +60,7 @@
         return refresh();
       },
       assign,
+      confirm,
       refresh
     };
   }

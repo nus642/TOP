@@ -69,8 +69,9 @@ class MatchOperation {
     return this;
   }
 
-  recordScore(refereeId, score1, score2) {
-    this.assertAssignedReferee(refereeId);
+  submitResult(actor, score1, score2) {
+    this.assertActor(actor, "referee");
+    this.assertAssignedReferee(actor.actorId);
     if (this.status !== STATES.PLAYING) {
       throw new OperationsError("INVALID_OPERATION_STATE", "Score can only be recorded during assigned execution");
     }
@@ -84,13 +85,33 @@ class MatchOperation {
     return this;
   }
 
-  confirm(refereeId) {
-    this.assertAssignedReferee(refereeId);
+  confirmResult(actor) {
+    this.assertActor(actor, "master");
     if (this.status !== STATES.SCORED) {
       throw new OperationsError("INVALID_OPERATION_STATE", "A recorded result is required before confirmation");
     }
     this.status = STATES.CONFIRMED;
     return this;
+  }
+
+  // Compatibility for callers that record an in-progress score directly in the
+  // domain. New workflow boundaries use submitResult with authenticated context.
+  recordScore(refereeId, score1, score2) {
+    return this.submitResult({ actorId: refereeId, actorType: "referee" }, score1, score2);
+  }
+
+  confirm(actorId) {
+    return this.confirmResult({ actorId, actorType: "master" });
+  }
+
+  assertActor(actor, expectedType) {
+    if (!actor || actor.actorType !== expectedType ||
+        actor.actorId === undefined || actor.actorId === null || String(actor.actorId).trim() === "") {
+      throw new OperationsError(
+        "INVALID_OPERATION_ACTOR",
+        `Only a ${expectedType} may perform this match operation`
+      );
+    }
   }
 
   assertAssignedReferee(refereeId) {

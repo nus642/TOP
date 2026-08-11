@@ -91,7 +91,7 @@ test("API -> service -> domain -> repository completes the assigned Referee resu
     ["/:tournamentId/matches/:matchId/start", "post", { refereeId: "referee-7" }, "playing"],
     ["/:tournamentId/matches/:matchId/score", "put", { refereeId: "referee-7", score1: 11, score2: 8 }, "scored"],
     ["/:tournamentId/matches/:matchId/result-confirmation", "post", {
-      refereeId: "referee-7",
+      actorId: "master-1", actorType: "master",
       evidenceReference: "scorecard://match/9",
       evidenceMetadata: { capturedBy: "court-tablet-2" }
     }, "confirmed"]
@@ -108,7 +108,7 @@ test("API -> service -> domain -> repository completes the assigned Referee resu
     }
   }
 
-  assert.equal(stored.resultConfirmedBy, "referee-7");
+  assert.equal(stored.resultConfirmedBy, "master-1");
   assert.deepEqual([stored.score1, stored.score2], [11, 8]);
   assert.equal(stored.officialRecord.recordId, 101);
 
@@ -117,7 +117,7 @@ test("API -> service -> domain -> repository completes the assigned Referee resu
   assert.equal(confirmPayload.officialRecord.refereeId, "referee-7");
   assert.equal(confirmPayload.officialRecord.score1, 11);
   assert.equal(confirmPayload.officialRecord.score2, 8);
-  assert.equal(confirmPayload.officialRecord.confirmedBy, "referee-7");
+  assert.equal(confirmPayload.officialRecord.confirmedBy, "master-1");
   assert.equal(confirmPayload.officialRecord.evidenceReference, "scorecard://match/9");
   assert.equal(confirmPayload.officialRecord.confirmationResponsibility, "referee_result_confirmation");
 
@@ -127,7 +127,7 @@ test("API -> service -> domain -> repository completes the assigned Referee resu
   assert.equal(tcr.matchResult.matchId, "9");
   assert.deepEqual(tcr.matchResult.score, [11, 8]);
   assert.equal(tcr.officialConfirmation.responsibility, "referee_result_confirmation");
-  assert.equal(tcr.officialConfirmation.confirmedBy, "referee-7");
+  assert.equal(tcr.officialConfirmation.confirmedBy, "master-1");
   assert.ok(tcr.evidenceReferences.length > 0, "Evidence references must be present");
   assert.equal(tcr.evidenceReferences[0].reference, "scorecard://match/9");
 });
@@ -168,7 +168,7 @@ test("official confirmation creates a trusted record and preserves its evidence"
   };
 
   const result = await service.confirmResult(3, 9, {
-    refereeId: "referee-7",
+    actorId: "master-1", actorType: "master",
     evidenceReference: "scorecard://match/9",
     evidenceMetadata: { device: "court-tablet-2", checksum: "sha256:abc" }
   });
@@ -178,7 +178,7 @@ test("official confirmation creates a trusted record and preserves its evidence"
   assert.equal(result.officialRecord.refereeId, "referee-7");
   assert.equal(result.officialRecord.score1, 11);
   assert.equal(result.officialRecord.score2, 8);
-  assert.equal(result.officialRecord.confirmedBy, "referee-7");
+  assert.equal(result.officialRecord.confirmedBy, "master-1");
   assert.equal(result.officialRecord.evidenceReference, "scorecard://match/9");
   assert.deepEqual(result.officialRecord.evidenceMetadata, { device: "court-tablet-2", checksum: "sha256:abc" });
   assert.equal(result.officialRecord.confirmationResponsibility, "referee_result_confirmation");
@@ -307,7 +307,7 @@ test("confirmation without evidence still creates trusted record", async (t) => 
     return createdRecord;
   };
 
-  const result = await service.confirmResult(3, 10, { refereeId: "referee-5" });
+  const result = await service.confirmResult(3, 10, { actorId: "master-1", actorType: "master" });
 
   assert.ok(result.officialRecord, "Official record must be created");
   assert.equal(result.officialRecord.refereeId, "referee-5");
@@ -345,7 +345,7 @@ test("confirmation preserves evidence metadata", async (t) => {
   };
 
   const result = await service.confirmResult(3, 11, {
-    refereeId: "referee-6",
+    actorId: "master-1", actorType: "master",
     evidenceReference: "digital-scorecard-11",
     evidenceMetadata: { source: "referee_app", version: "2.1" }
   });
