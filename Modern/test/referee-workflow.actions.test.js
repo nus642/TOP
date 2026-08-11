@@ -73,12 +73,14 @@ test("referee action API exposes accept and score submission entry points", asyn
     const res = response();
     await route(path)({
       params: { tournamentId: "3", refereeId: "referee-7", matchId: "9" },
-      actor: { actorId: "referee-7" },
+      actor: { actorId: "referee-7", actorType: "referee" },
       body
     }, res);
     assert.equal(res.statusCode, 200);
   }
-  assert.deepEqual(calls, paths.map(([, body]) => ["3", "referee-7", "9", body]));
+  assert.deepEqual(calls, paths.map(([, body]) => [
+    "3", { actorId: "referee-7", actorType: "referee" }, "9", body
+  ]));
 });
 
 test("referee workflow API maps delegated errors", async (t) => {

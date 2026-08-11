@@ -5,14 +5,14 @@ const router = express.Router();
 
 // This module provides referee operational access while Match Operations
 // remains the authority for match execution.
-function handler(action) {
+function handler(action, operationData = () => ({})) {
   return async (req, res) => {
     try {
       const result = await service[action](
         req.params.tournamentId,
-        req.actor.actorId,
+        req.actor,
         req.params.matchId,
-        req.body
+        operationData(req)
       );
       res.json(result);
     } catch (error) {
@@ -24,6 +24,9 @@ function handler(action) {
 
 router.post("/:tournamentId/referees/:refereeId/matches/:matchId/accept", handler("acceptMatch"));
 router.post("/:tournamentId/referees/:refereeId/matches/:matchId/start", handler("startMatch"));
-router.post("/:tournamentId/referees/:refereeId/matches/:matchId/score", handler("recordScore"));
+router.post("/:tournamentId/referees/:refereeId/matches/:matchId/score", handler(
+  "recordScore",
+  (req) => ({ score1: req.body.score1, score2: req.body.score2 })
+));
 
 module.exports = router;

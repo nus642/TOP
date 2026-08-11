@@ -18,7 +18,7 @@ router.post("/:competitionId/matches/:matchId/assign", async (req, res) => {
     const result = await service.assignReferee(
       req.params.competitionId,
       req.params.matchId,
-      req.body
+      { refereeId: req.body.refereeId }
     );
     res.json(result);
   } catch (error) {

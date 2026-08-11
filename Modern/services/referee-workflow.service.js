@@ -11,22 +11,29 @@ function refereeId(value) {
   return String(value).trim();
 }
 
+function refereeActor(value) {
+  if (!value || typeof value !== "object") return { actorId: refereeId(value), actorType: "referee" };
+  return value;
+}
+
 function acceptMatch(tournamentId, refereeValue, matchId) {
+  const actor = refereeActor(refereeValue);
   return matchOperationsService.acceptRefereeResponsibility(tournamentId, matchId, {
-    refereeId: refereeId(refereeValue)
+    refereeId: refereeId(actor.actorId)
   });
 }
 
 function recordScore(tournamentId, refereeValue, matchId, data = {}) {
-  const actorId = refereeId(refereeValue);
+  const actor = refereeActor(refereeValue);
   return matchOperationsService.submitResult(
-    tournamentId, matchId, { actorId, actorType: "referee" }, data
+    tournamentId, matchId, actor, data
   );
 }
 
 function startMatch(tournamentId, refereeValue, matchId) {
+  const actor = refereeActor(refereeValue);
   return matchOperationsService.startMatch(tournamentId, matchId, {
-    refereeId: refereeId(refereeValue)
+    refereeId: refereeId(actor.actorId)
   });
 }
 

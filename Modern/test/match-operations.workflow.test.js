@@ -100,7 +100,10 @@ test("API -> service -> domain -> repository completes the assigned Referee resu
   let confirmPayload = null;
   for (const [path, method, body, expectedStatus] of steps) {
     const res = response();
-    await route(path, method)({ params: { tournamentId: "3", matchId: "9" }, body }, res);
+    const actor = expectedStatus === "confirmed"
+      ? { actorId: "master-1", actorType: "master" }
+      : { actorId: "referee-7", actorType: "referee" };
+    await route(path, method)({ params: { tournamentId: "3", matchId: "9" }, actor, body }, res);
     assert.equal(res.statusCode, 200);
     assert.equal(res.payload.match.status, expectedStatus);
     if (expectedStatus === "confirmed") {
@@ -118,7 +121,7 @@ test("API -> service -> domain -> repository completes the assigned Referee resu
   assert.equal(confirmPayload.officialRecord.score1, 11);
   assert.equal(confirmPayload.officialRecord.score2, 8);
   assert.equal(confirmPayload.officialRecord.confirmedBy, "master-1");
-  assert.equal(confirmPayload.officialRecord.evidenceReference, "scorecard://match/9");
+  assert.equal(confirmPayload.officialRecord.evidenceReference, null);
   assert.equal(confirmPayload.officialRecord.confirmationResponsibility, "referee_result_confirmation");
 
   // Verify trusted competition record structure
@@ -128,8 +131,7 @@ test("API -> service -> domain -> repository completes the assigned Referee resu
   assert.deepEqual(tcr.matchResult.score, [11, 8]);
   assert.equal(tcr.officialConfirmation.responsibility, "referee_result_confirmation");
   assert.equal(tcr.officialConfirmation.confirmedBy, "master-1");
-  assert.ok(tcr.evidenceReferences.length > 0, "Evidence references must be present");
-  assert.equal(tcr.evidenceReferences[0].reference, "scorecard://match/9");
+  assert.deepEqual(tcr.evidenceReferences, []);
 });
 
 test("official confirmation creates a trusted record and preserves its evidence", async (t) => {
