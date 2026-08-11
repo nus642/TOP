@@ -1,19 +1,19 @@
 <!doctype html>
-<html lang="en">
+<html lang="zh-CN">
 <head>
   <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-  <title>TOP · Operator entry</title><link rel="stylesheet" href="styles.css">
+  <title>TOP · 操作入口</title><link rel="stylesheet" href="styles.css">
 </head>
 <body><main>
-  <header><span class="brand">TOP</span><span class="eyebrow">Tournament Operations</span><h1>Your operator workspace</h1><p>One authenticated entry point to the tools for your session.</p></header>
-  <p id="status" class="status" role="status">Confirming your authenticated session…</p>
+  <header><span class="brand">TOP</span><span class="eyebrow">赛事运行</span><h1>赛事操作工作台</h1><p>登录后，从统一入口进入您本场赛事所需的工具。</p></header>
+  <p id="status" class="status" role="status">正在确认登录身份…</p>
   <section id="authenticated-content" hidden>
     <div id="accountability" class="landing-accountability"></div>
-    <div class="experience" aria-labelledby="experience-title"><span class="eyebrow">Your focus</span><h2 id="experience-title"></h2><p id="experience-summary"></p></div>
-    <label>Competition context<input id="competition-id" autocomplete="off" placeholder="Enter competition ID"></label>
-    <p class="hint">You choose the competition. Your identity and workspace come from the authenticated session.</p>
-    <nav id="workspace-links" class="workspace-links" aria-label="Operator workspaces"></nav>
+    <div class="experience" aria-labelledby="experience-title"><span class="eyebrow">当前任务</span><h2 id="experience-title"></h2><p id="experience-summary"></p></div>
+    <label>比赛范围<input id="competition-id" autocomplete="off" placeholder="输入比赛 ID"></label>
+    <p class="hint">请选择比赛。您的身份和工作台由当前登录信息确定。</p>
+    <nav id="workspace-links" class="workspace-links" aria-label="操作工作台"></nav>
   </section>
-  <footer>Actions remain governed by Tournament Operations backend authority.</footer>
+  <footer>所有操作由赛事系统规则管理</footer>
 </main><link rel="stylesheet" href="navigation.css"><script src="responsibility-context.js"></script><script src="accountability-context.js"></script><script src="operator-experience.js"></script><script src="accountability-visibility.js"></script><script src="operator-shell.js"></script><script src="app.js"></script></body>
 </html>

@@ -42,11 +42,11 @@
 
   function render(accountability) {
     if (!accountability) throw new TypeError("accountability visibility is required");
-    return `<dl class="accountability-visibility" aria-label="Current accountability">
-      <div><dt>Operating as</dt><dd>${escapeText(accountability.actorId)}</dd></div>
-      <div><dt>Actor type</dt><dd>${escapeText(accountability.actorType)}</dd></div>
-      <div><dt>Competition</dt><dd>${escapeText(accountability.competitionId || "Not selected")}</dd></div>
-      <div><dt>Responsibility</dt><dd>${escapeText(accountability.responsibility)}</dd></div>
+    return `<dl class="accountability-visibility" aria-label="当前操作责任">
+      <div><dt>当前身份</dt><dd>${escapeText(accountability.actorId)}</dd></div>
+      <div><dt>角色</dt><dd>${escapeText(accountability.actorType)}</dd></div>
+      <div><dt>比赛</dt><dd>${escapeText(accountability.competitionId || "未选择")}</dd></div>
+      <div><dt>职责</dt><dd>${escapeText(accountability.responsibility)}</dd></div>
     </dl>`;
   }
 

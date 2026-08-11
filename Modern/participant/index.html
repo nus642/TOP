@@ -1,23 +1,23 @@
 <!doctype html>
-<html lang="en">
+<html lang="zh-CN">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
-  <title>TOP · Participant readiness</title>
+  <title>TOP · 选手签到准备</title>
   <link rel="stylesheet" href="styles.css">
 </head>
 <body>
-  <nav id="operator-navigation" class="operator-navigation" aria-label="Authenticated operator navigation"></nav>
+  <nav id="operator-navigation" class="operator-navigation" aria-label="已登录操作导航"></nav>
   <main data-authenticated-workspace hidden>
-    <header><span class="brand">TOP</span><span class="eyebrow">Participant readiness</span><h1>Ready for your tournament?</h1><p>Check your arrival status and check in through Tournament Operations.</p></header>
+    <header><span class="brand">TOP</span><span class="eyebrow">选手签到准备</span><h1>准备好参赛了吗？</h1><p>查看到场状态，并通过赛事系统签到。</p></header>
     <form id="context-form" class="context">
-      <label>Competition ID<input name="competitionId" value="1" inputmode="numeric" required></label>
-      <button>View readiness</button>
+      <label>比赛 ID<input name="competitionId" value="1" inputmode="numeric" required></label>
+      <button>查看准备状态</button>
     </form>
-    <p id="notice" class="notice">Enter your tournament details to view readiness.</p>
-    <section id="readiness" aria-live="polite"><div class="empty">Your authoritative readiness status will appear here.</div></section>
-    <footer>Check-in status is managed by Tournament Operations.</footer>
+    <p id="notice" class="notice">请输入比赛信息以查看准备状态。</p>
+    <section id="readiness" aria-live="polite"><div class="empty">赛事系统记录的准备状态将显示在这里。</div></section>
+    <footer>签到状态由赛事系统管理。</footer>
   </main>
-  <link rel="stylesheet" href="/shell/navigation.css"><script src="/shell/responsibility-context.js"></script><script src="/shell/accountability-context.js"></script><script src="/shell/workflow-accountability.js"></script><script src="/shell/operator-experience.js"></script><script src="/shell/accountability-visibility.js"></script><script src="/shell/operator-shell.js"></script><script src="/shell/navigation.js"></script><script src="api-client.js"></script><script src="readiness-workflow.js"></script><script src="app.js"></script>
+  <link rel="stylesheet" href="/shell/navigation.css"><script src="/shell/ui-text.js"></script><script src="/shell/responsibility-context.js"></script><script src="/shell/accountability-context.js"></script><script src="/shell/workflow-accountability.js"></script><script src="/shell/operator-experience.js"></script><script src="/shell/accountability-visibility.js"></script><script src="/shell/operator-shell.js"></script><script src="/shell/navigation.js"></script><script src="api-client.js"></script><script src="readiness-workflow.js"></script><script src="app.js"></script>
 </body>
 </html>

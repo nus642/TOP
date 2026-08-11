@@ -20,7 +20,7 @@ test("accountability display derives identity and context from established conte
     actorId: "referee-7",
     actorType: "referee",
     competitionId: "competition-3",
-    responsibility: "Assigned match execution and confirmation"
+    responsibility: "已分配比赛的执行与确认"
   });
 });
 
@@ -47,7 +47,7 @@ test("competition context can change while authenticated identity remains visibl
     actorId: "participant-8",
     actorType: "participant",
     competitionId: "competition-4",
-    responsibility: "Participant-supplied readiness facts"
+    responsibility: "选手提交的准备状态"
   });
 });
 
@@ -78,6 +78,6 @@ test("shell landing page renders the shared accountability visibility presentati
 test("shared renderer displays every accountability field and escapes identity text", () => {
   const markup = render({ actorId: "<actor>", actorType: "master", competitionId: "competition-4", responsibility: "Tournament oversight" });
   assert.match(markup, /&lt;actor&gt;/);
-  for (const label of ["Operating as", "Actor type", "Competition", "Responsibility"]) assert.match(markup, new RegExp(label));
+  for (const label of ["当前身份", "角色", "比赛", "职责"]) assert.match(markup, new RegExp(label));
   assert.doesNotMatch(markup, /<actor>/);
 });

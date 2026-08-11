@@ -8,7 +8,7 @@
 
   const view = {
     loading() {
-      host.innerHTML = '<span class="operator-nav-status">Confirming session…</span>';
+      host.innerHTML = '<span class="operator-nav-status">正在确认登录身份…</span>';
       if (page) page.hidden = true;
     },
     ready(context) {
