@@ -12,27 +12,27 @@ function escapeHtml(value) {
 function matchCard(match) {
   const schedule = match.schedule || {};
   const referee = match.referee || {};
-  const team1 = escapeHtml(match.sides?.one || "Side one");
-  const team2 = escapeHtml(match.sides?.two || "Side two");
+  const team1 = escapeHtml(match.sides?.one || "一方");
+  const team2 = escapeHtml(match.sides?.two || "另一方");
   const action = match.operationStatus === "scored"
-    ? `<button type="button" data-action="confirm-result">Confirm submitted result</button>`
-    : `<form class="assignment-form"><label>Referee ID<input name="refereeId" value="${escapeHtml(referee.refereeId || "")}" required></label><button>Assign referee</button></form>`;
+    ? `<button type="button" data-action="confirm-result">确认已提交赛果</button>`
+    : `<form class="assignment-form"><label>裁判 ID<input name="refereeId" value="${escapeHtml(referee.refereeId || "")}" required></label><button>分配裁判</button></form>`;
 
   return `<article class="match" data-match-id="${escapeHtml(match.matchId)}">
-    <header><div><span class="eyebrow">Round ${escapeHtml(match.roundNumber || "—")}</span><h2>${team1} <span>vs</span> ${team2}</h2></div><span class="status">${escapeHtml(match.operationStatus)}</span></header>
-    <div class="meta"><span>⌖ ${escapeHtml(schedule.courtId || "Court pending")}</span><span>◷ ${schedule.scheduledAt ? escapeHtml(new Date(schedule.scheduledAt).toLocaleString()) : "Time pending"}</span></div>
-    <p class="assignment">Assigned referee: <strong>${escapeHtml(referee.refereeId || "Unassigned")}</strong></p>
+    <header><div><span class="eyebrow">第 ${escapeHtml(match.roundNumber || "—")} 轮</span><h2>${team1} <span>对</span> ${team2}</h2></div><span class="status">${escapeHtml(UiText.statusLabel(match.operationStatus))}</span></header>
+    <div class="meta"><span>⌖ ${escapeHtml(schedule.courtId || "场地待定")}</span><span>◷ ${schedule.scheduledAt ? escapeHtml(new Date(schedule.scheduledAt).toLocaleString("zh-CN")) : "时间待定"}</span></div>
+    <p class="assignment">已分配裁判： <strong>${escapeHtml(referee.refereeId || "未分配")}</strong></p>
     ${action}
   </article>`;
 }
 
 const view = {
   loading() {
-    notice.textContent = "Refreshing operational state…";
+    notice.textContent = "正在刷新运行状态…";
     notice.className = "notice";
   },
   busy(matchId) {
-    notice.textContent = `Assigning referee for match ${matchId}…`;
+    notice.textContent = `正在更新比赛 ${matchId}…`;
     notice.className = "notice";
   },
   error(message) {
@@ -40,11 +40,11 @@ const view = {
     notice.className = "notice error";
   },
   matches(matches) {
-    notice.textContent = `${matches.length} operational match${matches.length === 1 ? "" : "es"}`;
+    notice.textContent = `运行视图中共有 ${matches.length} 场比赛`;
     notice.className = "notice";
     list.innerHTML = matches.length
       ? matches.map(matchCard).join("")
-      : `<div class="empty"><strong>No matches found.</strong><p>Match Operations has no matches in this competition.</p></div>`;
+      : `<div class="empty"><strong>未找到比赛。</strong><p>比赛操作中没有该比赛的对局。</p></div>`;
   }
 };
 

@@ -11,7 +11,7 @@
         : options;
       const response = await fetchImpl(`${baseUrl}${path}`, requestOptions);
       const body = await response.json().catch(() => ({}));
-      if (!response.ok) throw new Error(body.error || "Match Operations could not complete the request");
+      if (!response.ok) throw new Error(body.error || "比赛操作无法完成该请求");
       return body;
     }
 

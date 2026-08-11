@@ -12,7 +12,7 @@
       const response = await fetchImpl(`${baseUrl}${path}`, requestOptions);
       const body = await response.json().catch(() => ({}));
       if (!response.ok) {
-        throw new Error(body.error || "Participant readiness could not complete the request");
+        throw new Error(body.error || "选手准备状态操作无法完成该请求");
       }
       return body;
     }

@@ -16,9 +16,9 @@
     participant: "/participant/"
   });
   const WORKSPACE_LABELS = Object.freeze({
-    referee: "Referee · Match Operations",
-    master: "Master · Master Workflow",
-    participant: "Participant · Readiness"
+    referee: "裁判 • 比赛操作",
+    master: "主控 • 赛事管理",
+    participant: "选手 • 签到准备"
   });
 
   function landingFor(actorType, competitionId) {

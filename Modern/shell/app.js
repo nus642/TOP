@@ -7,16 +7,16 @@ const experienceTitle = document.querySelector("#experience-title");
 const experienceSummary = document.querySelector("#experience-summary");
 
 const view = {
-  loading() { status.textContent = "Confirming your authenticated session…"; },
+  loading() { status.textContent = "正在确认登录身份…"; },
   ready(context) {
     accountability.innerHTML = AccountabilityVisibility.render(AccountabilityVisibility.browser.current());
     experienceTitle.textContent = context.experience.title;
     experienceSummary.textContent = context.experience.summary;
     competition.value = context.competitionId;
     workspaceLinks.innerHTML = context.workspaces.map(({ workspace, label, href }) =>
-      `<a class="action${workspace === context.experience.workspace ? " current" : ""}" href="${href}">${label}${workspace === context.experience.workspace ? "<small>Recommended for your responsibility</small>" : ""}</a>`
+      `<a class="action${workspace === context.experience.workspace ? " current" : ""}" href="${href}">${label}${workspace === context.experience.workspace ? "<small>根据您的职责推荐</small>" : ""}</a>`
     ).join("");
-    status.textContent = "Authenticated session ready";
+    status.textContent = "已登录，身份确认完成";
     content.hidden = false;
   },
   error(message) {
