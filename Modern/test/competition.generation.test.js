@@ -96,6 +96,8 @@ test("generated matches enter the unchanged Match Operations lifecycle", async (
     tournamentRepository.getTournamentByIdWithConnection = async () => ({ id: 7 });
     playerRepository.getPlayersByTournament = async () => [{ id: 11 }, { id: 12 }, { id: 13 }];
     matchRepository.createMatch = async (match) => {
+        assert.notEqual(match.court, null, "matches.court must satisfy the persistence constraint");
+        assert.equal(match.court, "", "unscheduled matches must not claim a court assignment");
         const created = { id: nextId++, tournamentId: match.tournament_id, refereeId: null, ...match };
         stored.set(created.id, created);
         return created;
@@ -120,6 +122,7 @@ test("generated matches enter the unchanged Match Operations lifecycle", async (
     const generation = await competitionService.generateRoundRobin(7);
     assert.equal(generation.matches.length, 3);
     assert.ok(generation.matches.every((match) => match.status === "idle"));
+    assert.ok(generation.matches.every((match) => match.court === ""));
 
     const matchId = generation.matches[0].id;
     await matchOperationsService.assignMatch(7, matchId, { refereeId: "referee-4" });

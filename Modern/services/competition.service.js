@@ -689,7 +689,7 @@ async function generateRoundRobin(competitionIdValue){
             matches.push(await matchRepository.createMatch({
                 tournament_id: tournamentId,
                 round_num: match.roundNumber,
-                court: null,
+                court: "",
                 player1_id: match.sideOneId,
                 player2_id: null,
                 player3_id: match.sideTwoId,
