@@ -76,3 +76,6 @@ Deploy-WechatCloud/测试文档xls/
 Legacy/*-saved.zip
 Modern/*-saved.zip
 Modern/zz-*.zip
+
+# Local rehearsal database backups
+rehearsal-backups/
