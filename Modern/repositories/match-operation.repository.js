@@ -115,43 +115,12 @@ async function recordScore(tournamentId, matchId, score1, score2, connection = d
   return findById(tournamentId, matchId, connection);
 }
 
-async function confirm(tournamentId, matchId, refereeId, officialRecord, connection = db) {
-  const outcome = officialRecord.outcome;
-  const evidence = outcome.officialConfirmation.evidenceReferences[0] || null;
-  const [result] = await connection.query(
-    `INSERT INTO match_official_records
-       (tournament_id, match_id, result_data, confirmed_at, confirmed_by,
-        evidence_reference, evidence_metadata, provenance)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-    [
-      tournamentId,
-      matchId,
-      JSON.stringify(outcome.matchResult.score),
-      new Date(outcome.confirmedAt),
-      refereeId,
-      evidence?.reference || null,
-      JSON.stringify(evidence?.captureMetadata || {}),
-      JSON.stringify(officialRecord.provenance)
-    ]
-  );
+async function confirm(tournamentId, matchId, confirmedBy, connection = db) {
   await connection.query(
     `UPDATE matches SET result_confirmed_at = CURRENT_TIMESTAMP, result_confirmed_by = ?, status = 'confirmed'
-     WHERE tournament_id = ? AND id = ?`, [refereeId, tournamentId, matchId]
+     WHERE tournament_id = ? AND id = ?`, [confirmedBy, tournamentId, matchId]
   );
-  return {
-    ...(await findById(tournamentId, matchId, connection)),
-    officialRecord: {
-      recordId: result.insertId,
-      tournamentId,
-      matchId,
-      score: outcome.matchResult.score,
-      confirmedAt: outcome.confirmedAt,
-      confirmedBy: refereeId,
-      evidenceReference: evidence?.reference || null,
-      evidenceMetadata: evidence?.captureMetadata || {},
-      provenance: officialRecord.provenance
-    }
-  };
+  return findById(tournamentId, matchId, connection);
 }
 
 async function findOfficialRecords(tournamentId, matchId, connection = db) {
