@@ -15,6 +15,17 @@ test("archive API client uses the existing public archive endpoint", async () =>
   assert.deepEqual(calls, [["/api/public/competitions/summer%2F7/archive", undefined]]);
 });
 
+test("archive UI replaces backend English errors with safe Chinese messages", async () => {
+  const api = createCompetitionArchiveApi({ fetchImpl: async () => ({
+    ok: false, status: 400, json: async () => ({ error: "Invalid competition id" })
+  }) });
+  await assert.rejects(api.archive("bad"), (error) => {
+    assert.equal(error.message, "比赛编号无效，请检查后重试。");
+    assert.doesNotMatch(error.message, /Invalid competition id/);
+    return true;
+  });
+});
+
 test("archive workflow loads and renders the backend projection", async () => {
   const snapshot = { competitionId: 7, competitionStatus: "completed", standings: [{ participantId: 3, wins: 4, losses: 1, scoreDifference: 9 }], matches: [{ matchId: 12, roundNumber: 3, status: "confirmed", score: { sideOne: 11, sideTwo: 8 }, confirmed: true }] };
   const loaded = [];

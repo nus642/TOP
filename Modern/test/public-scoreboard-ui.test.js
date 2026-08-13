@@ -15,6 +15,17 @@ test("public UI API client targets the existing scoreboard endpoint", async () =
   assert.deepEqual(calls, [["/api/public/competitions/summer%2F7/matches", undefined]]);
 });
 
+test("public UI replaces backend English errors with safe Chinese messages", async () => {
+  const api = createPublicScoreboardApi({ fetchImpl: async () => ({
+    ok: false, status: 404, json: async () => ({ error: "Competition not found" })
+  }) });
+  await assert.rejects(api.matches(404), (error) => {
+    assert.equal(error.message, "未找到该比赛。");
+    assert.doesNotMatch(error.message, /Competition not found/);
+    return true;
+  });
+});
+
 test("workflow loads and renders the backend scoreboard snapshot", async () => {
   const snapshot = { competitionId: 7, matches: [{ matchId: 4, roundNumber: 2, courtId: "court-1", scheduledAt: "2026-08-09T10:00:00Z", status: "playing", score: { sideOne: 11, sideTwo: 9 }, confirmed: true }] };
   const calls = [];
@@ -41,6 +52,24 @@ test("public scoreboard presents all static user-visible copy in Simplified Chin
 test("renderer never displays internal operational fields", () => {
   const html = renderScoreboard({ matches: [{ matchId: 4, status: "playing", score: {}, confirmed: false, refereeId: "secret-referee", assignedAt: "secret-time", responsibilityState: "secret-state", evidenceReference: "secret-evidence" }] });
   assert.doesNotMatch(html, /secret-|referee|evidence|responsibility|assigned/i);
+});
+
+test("idle and upcoming statuses render in Chinese without changing confirmation meaning", () => {
+  const html = renderScoreboard({ matches: [
+    { matchId: 1, status: "idle", score: {}, confirmed: false },
+    { matchId: 2, status: "upcoming", score: {}, confirmed: true }
+  ] });
+  assert.match(html, /等待中/);
+  assert.match(html, /即将开始/);
+  assert.match(html, /等待确认/);
+  assert.match(html, /赛果已确认/);
+  assert.doesNotMatch(html, />idle<|>upcoming</);
+});
+
+test("unknown public status values fall back without exposing internal English", () => {
+  const html = renderScoreboard({ matches: [{ matchId: 3, status: "internal_delayed", score: {}, confirmed: false }] });
+  assert.match(html, /状态待定/);
+  assert.doesNotMatch(html, /internal_delayed/);
 });
 
 test("public UI introduces no persistence or backend authority", () => {

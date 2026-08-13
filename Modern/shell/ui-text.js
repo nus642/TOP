@@ -10,6 +10,8 @@
   });
 
   const statusLabels = Object.freeze({
+    idle: "等待中",
+    upcoming: "即将开始",
     assigned: "已分配",
     accepted: "已接受",
     playing: "比赛中",
@@ -25,5 +27,19 @@
     return statusLabels[status] || status;
   }
 
-  return Object.freeze({ actorLabels, statusLabels, actorLabel, statusLabel });
+  const identityErrorPatterns = [
+    /authenticated actor session required/i,
+    /(?:master|referee|participant) identity context is required/i,
+    /unsupported authenticated actor type/i,
+    /accountability (?:context does not match|changed)/i
+  ];
+
+  function userFacingError(error) {
+    const message = String(error?.message ?? error ?? "");
+    return identityErrorPatterns.some((pattern) => pattern.test(message))
+      ? "登录状态已失效，请重新进入赛事工作台。"
+      : message;
+  }
+
+  return Object.freeze({ actorLabels, statusLabels, actorLabel, statusLabel, userFacingError });
 });

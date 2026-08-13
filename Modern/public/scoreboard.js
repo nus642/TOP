@@ -9,11 +9,11 @@
     })[character]);
   }
 
-  const statusLabels = Object.freeze({ assigned: "已分配", accepted: "已接受", playing: "比赛中", scored: "已录入比分", confirmed: "已确认" });
+  const statusLabels = Object.freeze({ idle: "等待中", upcoming: "即将开始", assigned: "已分配", accepted: "已接受", playing: "比赛中", scored: "已录入比分", confirmed: "已确认" });
 
   function label(value, fallback) {
     if (value === null || value === undefined || value === "") return fallback;
-    return statusLabels[value] || String(value);
+    return statusLabels[value] || fallback;
   }
 
   function scheduledTime(value) {
@@ -35,10 +35,11 @@
   }
 
   function renderMatch(match) {
+    const status = Object.hasOwn(statusLabels, match.status) ? match.status : "unknown";
     return `<article class="match-card">
       <header class="match-header">
         <div><span class="eyebrow">第 ${escapeHtml(match.roundNumber ?? "—")} 轮</span><h2>比赛 ${escapeHtml(match.matchId)}</h2></div>
-        <span class="status status-${escapeHtml(match.status || "unknown")}">${escapeHtml(label(match.status, "状态待定"))}</span>
+        <span class="status status-${status}">${escapeHtml(label(match.status, "状态待定"))}</span>
       </header>
       <dl class="match-details">
         <div><dt>场地</dt><dd>${escapeHtml(courtLabel(match.courtId))}</dd></div>

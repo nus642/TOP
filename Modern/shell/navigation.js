@@ -22,7 +22,7 @@
       if (competitionInput && context.competitionId) competitionInput.value = context.competitionId;
     },
     error(message) {
-      host.innerHTML = `<span class="operator-nav-error">${escapeText(message)}</span>`;
+      host.innerHTML = `<span class="operator-nav-error">${escapeText(UiText.userFacingError(message))}</span>`;
       if (page) page.hidden = true;
     }
   };

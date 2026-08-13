@@ -36,7 +36,7 @@ const view = {
     notice.className = "notice";
   },
   error(message) {
-    notice.textContent = message;
+    notice.textContent = UiText.userFacingError(message);
     notice.className = "notice error";
   },
   matches(matches) {
