@@ -20,7 +20,7 @@ const view = {
     content.hidden = false;
   },
   error(message) {
-    status.textContent = message;
+    status.textContent = UiText.userFacingError(message);
     status.classList.add("error");
     content.hidden = true;
   }
