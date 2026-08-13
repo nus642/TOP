@@ -10,7 +10,7 @@
           `${baseUrl}/competitions/${encodeURIComponent(competitionId)}/matches`
         );
         const body = await response.json().catch(() => ({}));
-        if (!response.ok) throw new Error(body.error || "The scoreboard could not be loaded");
+        if (!response.ok) throw new Error(body.error || "无法加载记分牌");
         return body;
       }
     };

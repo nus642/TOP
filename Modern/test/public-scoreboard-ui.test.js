@@ -25,10 +25,17 @@ test("workflow loads and renders the backend scoreboard snapshot", async () => {
   });
   await workflow.load(7);
   assert.deepEqual(calls, [7]);
-  assert.match(rendered[0], /Round 2/);
-  assert.match(rendered[0], /Court 1/);
+  assert.match(rendered[0], /第 2 轮/);
+  assert.match(rendered[0], /场地 1/);
   assert.match(rendered[0], /11[\s\S]*9/);
-  assert.match(rendered[0], /Result confirmed/);
+  assert.match(rendered[0], /赛果已确认/);
+});
+
+test("public scoreboard presents all static user-visible copy in Simplified Chinese", () => {
+  const html = fs.readFileSync(path.join(__dirname, "..", "public", "index.html"), "utf8");
+  assert.match(html, /<html lang="zh-CN">/);
+  assert.match(html, /公开记分牌/);
+  assert.doesNotMatch(html, />\s*(Match scoreboard|Public scoreboard|View matches|Refresh)\b/);
 });
 
 test("renderer never displays internal operational fields", () => {

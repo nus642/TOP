@@ -6,7 +6,7 @@ const content = document.querySelector("#archive-content");
 
 const view = {
   loading(competitionId) {
-    notice.textContent = `Opening competition ${competitionId}…`;
+    notice.textContent = `正在打开比赛 ${competitionId}…`;
     notice.className = "notice";
     content.setAttribute("aria-busy", "true");
   },
@@ -20,7 +20,7 @@ const view = {
     document.querySelector("#archive-summary").innerHTML = rendered.summary;
     document.querySelector("#standings").innerHTML = rendered.standings;
     document.querySelector("#results").innerHTML = rendered.results;
-    notice.textContent = "Official competition record";
+    notice.textContent = "官方赛事记录";
     notice.className = "notice";
     content.hidden = false;
     content.removeAttribute("aria-busy");

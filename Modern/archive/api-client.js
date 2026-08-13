@@ -10,7 +10,7 @@
           `${baseUrl}/competitions/${encodeURIComponent(competitionId)}/archive`
         );
         const body = await response.json().catch(() => ({}));
-        if (!response.ok) throw new Error(body.error || "The competition archive could not be loaded");
+        if (!response.ok) throw new Error(body.error || "无法加载赛事档案");
         return body;
       }
     };

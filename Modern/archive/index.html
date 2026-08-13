@@ -1,28 +1,28 @@
 <!doctype html>
-<html lang="en">
+<html lang="zh-CN">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Competition archive</title>
+  <title>赛事档案</title>
   <link rel="stylesheet" href="/archive/styles.css">
 </head>
 <body>
   <header>
-    <nav><a class="brand" href="/archive"><span>TOP</span> Archive</a><span>Official records</span></nav>
+    <nav><a class="brand" href="/archive"><span>TOP</span> 赛事档案</a><span>官方记录</span></nav>
     <div class="hero">
-      <div><p class="eyebrow">Competition history</p><h1>The final record.</h1><p class="intro">Completed competitions, final standings, and official results in one enduring view.</p></div>
-      <form id="archive-form"><label for="competition-id">Competition number</label><div><input id="competition-id" name="competitionId" type="number" min="1" required placeholder="e.g. 12"><button type="submit">Open archive</button></div></form>
+      <div><p class="eyebrow">赛事历史</p><h1>查看最终记录。</h1><p class="intro">集中查看已结束赛事、最终排名和官方赛果。</p></div>
+      <form id="archive-form"><label for="competition-id">比赛编号</label><div><input id="competition-id" name="competitionId" type="number" min="1" required placeholder="例如：12"><button type="submit">打开档案</button></div></form>
     </div>
   </header>
   <main>
-    <p id="notice" class="notice" role="status">Enter a competition number to view its archive.</p>
+    <p id="notice" class="notice" role="status">输入比赛编号以查看赛事档案。</p>
     <div id="archive-content" hidden>
-      <section id="archive-summary" class="summary" aria-label="Competition summary"></section>
-      <section><p class="eyebrow dark">Final table</p><h2>Standings</h2><div id="standings"></div></section>
-      <section><p class="eyebrow dark">On the record</p><h2>Official results</h2><div id="results"></div></section>
+      <section id="archive-summary" class="summary" aria-label="比赛概况"></section>
+      <section><p class="eyebrow dark">最终榜单</p><h2>排名</h2><div id="standings"></div></section>
+      <section><p class="eyebrow dark">正式记录</p><h2>官方赛果</h2><div id="results"></div></section>
     </div>
   </main>
-  <footer>Published from the official competition archive.</footer>
+  <footer>内容发布自官方赛事档案。</footer>
   <script src="/archive/api-client.js"></script><script src="/archive/archive.js"></script><script src="/archive/app.js"></script>
 </body>
 </html>

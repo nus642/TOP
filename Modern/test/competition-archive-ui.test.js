@@ -24,9 +24,16 @@ test("archive workflow loads and renders the backend projection", async () => {
   });
   await workflow.load(7);
   assert.equal(loaded[0], 7);
-  assert.match(loaded[1].summary, /Competition 7[\s\S]*Completed/);
-  assert.match(loaded[1].standings, /Participant 3[\s\S]*4[\s\S]*1[\s\S]*\+9/);
-  assert.match(loaded[1].results, /Match 12[\s\S]*11[\s\S]*8/);
+  assert.match(loaded[1].summary, /比赛 7[\s\S]*已结束/);
+  assert.match(loaded[1].standings, /选手 3[\s\S]*4[\s\S]*1[\s\S]*\+9/);
+  assert.match(loaded[1].results, /比赛 12[\s\S]*11[\s\S]*8/);
+});
+
+test("archive presents all static user-visible copy in Simplified Chinese", () => {
+  const html = fs.readFileSync(path.join(__dirname, "..", "archive", "index.html"), "utf8");
+  assert.match(html, /<html lang="zh-CN">/);
+  assert.match(html, /赛事档案/);
+  assert.doesNotMatch(html, />\s*(Competition|Official|Standings|Open archive|Final table)\b/);
 });
 
 test("archive renderer does not display internal fields", () => {
