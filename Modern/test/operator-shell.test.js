@@ -1,6 +1,7 @@
 const assert = require("node:assert/strict");
 const test = require("node:test");
 const { COMPETITION_KEY, createOperatorShell, landingFor, workspaceLinks } = require("../shell/operator-shell");
+const { userFacingError } = require("../shell/ui-text");
 
 function memoryStorage(initial = {}) {
   const values = new Map(Object.entries(initial));
@@ -39,6 +40,7 @@ test("missing session is shown and does not render an operator context", async (
   const { shell, states } = harness({ ok: false, json: async () => ({ error: "Authenticated actor session required" }) });
   await assert.rejects(shell.hydrate(), /Authenticated actor session required/);
   assert.deepEqual(states.at(-1), ["error", "Authenticated actor session required"]);
+  assert.equal(userFacingError(states.at(-1)[1]), "登录状态已失效，请重新进入赛事工作台。");
   assert.equal(states.some(([state]) => state === "ready"), false);
 });
 

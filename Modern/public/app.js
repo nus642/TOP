@@ -7,8 +7,8 @@ const matches = document.querySelector("#matches");
 
 const view = {
   loading(competitionId) {
-    competitionLabel.textContent = `Competition ${competitionId}`;
-    notice.textContent = "Loading the latest match information…";
+    competitionLabel.textContent = `比赛 ${competitionId}`;
+    notice.textContent = "正在加载最新比赛信息…";
     notice.className = "notice";
     matches.setAttribute("aria-busy", "true");
   },
@@ -18,8 +18,8 @@ const view = {
     matches.removeAttribute("aria-busy");
   },
   scoreboard(data) {
-    competitionLabel.textContent = `Competition ${data.competitionId}`;
-    notice.textContent = `${data.matches.length} ${data.matches.length === 1 ? "match" : "matches"} · Updated just now`;
+    competitionLabel.textContent = `比赛 ${data.competitionId}`;
+    notice.textContent = `共 ${data.matches.length} 场比赛 · 刚刚更新`;
     notice.className = "notice";
     matches.innerHTML = PublicScoreboard.renderScoreboard(data);
     matches.removeAttribute("aria-busy");

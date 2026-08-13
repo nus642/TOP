@@ -32,7 +32,7 @@ function matchCard(match) {
 const view = {
   loading() { notice.textContent = "正在加载比赛任务…"; notice.className = "notice"; },
   busy(matchId) { notice.textContent = `正在更新比赛 ${matchId}…`; notice.className = "notice"; },
-  error(message) { notice.textContent = message; notice.className = "notice error"; },
+  error(message) { notice.textContent = UiText.userFacingError(message); notice.className = "notice error"; },
   matches(matches) {
     notice.textContent = `已加载 ${matches.length} 场已分配比赛。`;
     notice.className = "notice";
