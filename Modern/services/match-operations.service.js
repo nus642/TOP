@@ -210,7 +210,12 @@ function confirmResult(tournamentId, matchId, actor = {}) {
         }
       }, connection);
 
-      const updatedMatch = await repository.confirm(tournamentIdValue, matchIdValue, actor.actorId, { outcome, provenance: { source: "match_operations_workflow", workflowVersion: "1.0", matchOperationState: "confirmed" } }, connection);
+      const updatedMatch = await repository.confirm(
+        tournamentIdValue,
+        matchIdValue,
+        actor.actorId,
+        connection
+      );
 
       return {
         match: updatedMatch,

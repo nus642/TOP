@@ -39,7 +39,7 @@ async function create(record, connection = db) {
       record.score1,
       record.score2,
       record.confirmedBy,
-      record.confirmedAt,
+      new Date(record.confirmedAt),
       record.confirmationResponsibility || "referee_result_confirmation",
       record.evidenceReference || null,
       record.evidenceMetadata ? JSON.stringify(record.evidenceMetadata) : null,
