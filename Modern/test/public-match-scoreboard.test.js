@@ -4,6 +4,7 @@ const path = require("node:path");
 const test = require("node:test");
 
 const repository = require("../repositories/public-match-scoreboard.repository");
+const tournamentRepository = require("../repositories/tournament.repository");
 const service = require("../services/public-match-scoreboard.service");
 const router = require("../api/public-match-scoreboard");
 
@@ -51,7 +52,12 @@ test("repository reads authoritative scoreboard facts in spectator order", async
 
 test("service maps scores, schedule, court, and official confirmation to the public model", async (t) => {
   const original = repository.findByCompetitionId;
-  t.after(() => { repository.findByCompetitionId = original; });
+  const originalTournament = tournamentRepository.getTournamentById;
+  t.after(() => {
+    repository.findByCompetitionId = original;
+    tournamentRepository.getTournamentById = originalTournament;
+  });
+  tournamentRepository.getTournamentById = async () => ({ id: 2, status: "running" });
   repository.findByCompetitionId = async () => [{
     competition_id: 2,
     competition_status: "running",
@@ -106,6 +112,15 @@ test("public endpoint returns matches and maps invalid ids to 400", async (t) =>
   const invalid = response();
   await handler({ params: { competitionId: "bad" } }, invalid);
   assert.equal(invalid.statusCode, 400);
+
+  service.getPublicMatches = async () => {
+    const error = new Error("Competition not found");
+    error.code = "NOT_FOUND";
+    throw error;
+  };
+  const unavailable = response();
+  await handler({ params: { competitionId: "3" } }, unavailable);
+  assert.equal(unavailable.statusCode, 404);
 });
 
 test("public scoreboard introduces no persistence or workflow authority", () => {

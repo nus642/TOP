@@ -51,7 +51,10 @@ test("generated matches receive persisted schedules once and still enter Match O
     };
     let persistedSchedule = null;
     let operation = generatedMatch;
-    db.withTransaction = (work) => work({ transaction: true });
+    db.withTransaction = (work) => work({
+        transaction: true,
+        query: async () => [[{ id: 7, status: "running" }]]
+    });
     scheduleRepository.findMatch = async (competitionId, matchId) => (
         competitionId === 7 && matchId === generatedMatch.id ? { id: matchId } : null
     );

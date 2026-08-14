@@ -55,7 +55,10 @@ test("operation context projects authoritative readiness and gates explicit star
     id: 9, tournamentId: 3, refereeId: "referee-7", status: "accepted",
     participantIds: [11, 12]
   };
-  db.withTransaction = (work) => work({ transaction: true });
+  db.withTransaction = (work) => work({
+    transaction: true,
+    query: async () => [[{ id: 3, status: "running" }]]
+  });
   matchRepository.findById = async () => ({ ...record });
   readinessRepository.listForCompetition = async () => [
     { participant_id: 11, checked_in: 1 },

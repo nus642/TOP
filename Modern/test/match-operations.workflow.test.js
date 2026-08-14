@@ -55,7 +55,7 @@ test("API -> service -> domain -> repository completes the assigned Referee resu
 
   const mockConnection = {
     transaction: true,
-    query: async () => [{ insertId: nextRecordId++ }]
+    query: async () => [[{ id: 3, status: "running" }]]
   };
   db.withTransaction = (work) => work(mockConnection);
   repository.findById = async () => ({ ...stored });
@@ -148,7 +148,7 @@ test("official confirmation creates a trusted record and preserves its evidence"
     officialRecordRepository.create = originals.officialCreate;
   });
 
-  const mockConnection = { transaction: true, query: async () => [{ insertId: 501 }] };
+  const mockConnection = { transaction: true, query: async () => [[{ id: 3, status: "running" }]] };
   db.withTransaction = (work) => work(mockConnection);
   repository.findById = async () => ({
     id: 9, tournamentId: 3, refereeId: "referee-7", status: "scored", score1: 11, score2: 8
@@ -222,7 +222,7 @@ test("confirmation history remains attributable", async () => {
 test("a different Referee cannot record or confirm an assigned match", async (t) => {
   const originals = { transaction: db.withTransaction, find: repository.findById };
   t.after(() => { db.withTransaction = originals.transaction; repository.findById = originals.find; });
-  db.withTransaction = (work) => work({});
+  db.withTransaction = (work) => work({ query: async () => [[{ id: 3, status: "running" }]] });
   repository.findById = async () => ({
     id: 9, tournamentId: 3, refereeId: "referee-7", status: "playing", score1: null, score2: null
   });
@@ -271,7 +271,10 @@ test("official confirmation remains compatible with the existing finished lifecy
   assert.equal(match.status, "confirmed");
 
   const writes = [];
-  db.withTransaction = (work) => work({ transaction: true });
+  db.withTransaction = (work) => work({
+    transaction: true,
+    query: async () => [[{ id: 3, status: "running" }]]
+  });
   matchRepository.updateMatchScore = async (...args) => {
     writes.push(args.slice(0, 5));
     return { affectedRows: 1 };
@@ -297,7 +300,7 @@ test("confirmation without evidence still creates trusted record", async (t) => 
     officialRecordRepository.create = originals.officialCreate;
   });
 
-  db.withTransaction = (work) => work({});
+  db.withTransaction = (work) => work({ query: async () => [[{ id: 3, status: "running" }]] });
   repository.findById = async () => ({
     id: 10, tournamentId: 3, refereeId: "referee-5", status: "scored", score1: 6, score2: 11
   });
@@ -334,7 +337,7 @@ test("confirmation preserves evidence metadata", async (t) => {
     officialRecordRepository.create = originals.officialCreate;
   });
 
-  db.withTransaction = (work) => work({});
+  db.withTransaction = (work) => work({ query: async () => [[{ id: 3, status: "running" }]] });
   repository.findById = async () => ({
     id: 11, tournamentId: 3, refereeId: "referee-6", status: "scored", score1: 11, score2: 3
   });

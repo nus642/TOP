@@ -1,4 +1,5 @@
 const repository = require("../repositories/competition-archive.repository");
+const { assertCompetitionLifecycleEligible } = require("./competition-lifecycle-eligibility");
 
 function validationError(message) {
   const error = new Error(message);
@@ -13,6 +14,16 @@ async function getCompetitionArchive(value) {
   }
 
   const projection = await repository.findByCompetitionId(competitionId);
+  if (!projection.competition) {
+    const error = new Error("Competition not found");
+    error.code = "NOT_FOUND";
+    throw error;
+  }
+  assertCompetitionLifecycleEligible(
+    projection.competition.competition_status,
+    "competitionArchive",
+    { notFound: true }
+  );
   return {
     competitionId,
     competitionStatus: projection.competition?.competition_status ?? null,

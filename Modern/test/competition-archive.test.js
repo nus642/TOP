@@ -105,6 +105,15 @@ test("public archive endpoint returns the projection and maps invalid ids to 400
   const invalid = response();
   await handler({ params: { competitionId: "bad" } }, invalid);
   assert.equal(invalid.statusCode, 400);
+
+  service.getCompetitionArchive = async () => {
+    const error = new Error("Competition not found");
+    error.code = "NOT_FOUND";
+    throw error;
+  };
+  const unavailable = response();
+  await handler({ params: { competitionId: "3" } }, unavailable);
+  assert.equal(unavailable.statusCode, 404);
 });
 
 test("competition archive introduces no persistence authority", () => {
