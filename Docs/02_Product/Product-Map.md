@@ -1,18 +1,46 @@
 # TOP Product Map
 
-## Current Product Engineering Boundary
+## Current Delivered Boundary
 
-The current M1 boundary is defined in
-[M1 Match Operation Loop Boundary](M1-Match-Operation-Loop-Boundary.md). It scopes one
-professional match from participant readiness through an attributable trusted public
-result without introducing new identity, authorization, persistence, service, or
-platform layers.
+M1 is complete and frozen at tag
+`m1-rehearsal-passed-2026-08-14`.
 
-Version: 1.0
+[M1 Match Operation Loop Boundary](M1-Match-Operation-Loop-Boundary.md) defines one
+professional match from participant readiness through referee assignment,
+responsibility acceptance, explicit start, score recording, result confirmation,
+attributable Trusted Competition Record creation, and trusted public/archive
+visibility.
 
-Status: Draft
+M1 delivery evidence includes the complete Modern test suite, real-DB rehearsal, and
+the frozen main commit referenced by the release tag.
 
-Last Update: 2026-07-08
+## Approved Next Product Boundary
+
+[M2 Tournament Coordination Loop Boundary](M2-Tournament-Coordination-Loop-Boundary.md)
+is the Canon-approved Product Boundary entering Engineering Readiness.
+
+M2 extends TOP from one safe match-operation loop to the minimum live-tournament
+coordination loop needed by a Master operating multiple matches and Courts. Its
+selected exception is a temporarily constrained Court affecting expected or active
+Match work.
+
+The required minimum recovery course is:
+
+> Court constrained → affected Match explicitly interrupted or waiting → Master
+> coordinates deferment → Court becomes available → Referee explicitly resumes Match
+> execution → significant chronology remains attributable
+
+Alternative-Court reassignment is conditional on Engineering Readiness confirming an
+authoritative Scheduling reassignment contract.
+
+M2 remains unimplemented and does not authorize Engineering Design, implementation
+issues, or a Milestone until Engineering Readiness passes.
+
+Version: 1.1
+
+Status: Product Map — M1 delivered; M2 Canon-approved, Engineering Readiness pending
+
+Last Update: 2026-08-14
 
 Author:
 Paul Wu + ChatGPT
