@@ -2,6 +2,8 @@ const db = require("../database/db");
 const repository = require("../repositories/match-operation.repository");
 const officialRecordRepository = require("../repositories/match-official-record.repository");
 const readinessRepository = require("../repositories/participant-readiness.repository");
+const tournamentRepository = require("../repositories/tournament.repository");
+const { assertCompetitionLifecycleEligible } = require("./competition-lifecycle-eligibility");
 const {
   MatchOperation,
   MatchResult,
@@ -38,10 +40,22 @@ function translate(error) {
   throw translated;
 }
 
-async function mutate(tournamentValue, matchValue, operation, persist) {
+async function authoritativeTournament(tournamentId, connection) {
+  const tournament = await tournamentRepository.getTournamentByIdForUpdate(tournamentId, connection);
+  if (!tournament) {
+    const error = new Error("Competition not found");
+    error.code = "NOT_FOUND";
+    throw error;
+  }
+  return tournament;
+}
+
+async function mutate(tournamentValue, matchValue, capability, operation, persist) {
   const tournamentId = positiveId(tournamentValue, "tournament id");
   const matchId = positiveId(matchValue, "match id");
   return db.withTransaction(async (connection) => {
+    const tournament = await authoritativeTournament(tournamentId, connection);
+    assertCompetitionLifecycleEligible(tournament.status, capability);
     const record = await repository.findById(tournamentId, matchId, connection, true);
     if (!record) {
       const error = new Error("Match not found");
@@ -59,12 +73,12 @@ async function mutate(tournamentValue, matchValue, operation, persist) {
 }
 
 function assignMatch(tournamentId, matchId, data = {}) {
-  return mutate(tournamentId, matchId, (match) => match.assign(data.refereeId),
+  return mutate(tournamentId, matchId, "refereeAssignment", (match) => match.assign(data.refereeId),
     (connection, tid, mid, match) => repository.assign(tid, mid, match.refereeId, connection));
 }
 
 function acceptRefereeResponsibility(tournamentId, matchId, data = {}) {
-  return mutate(tournamentId, matchId, (match) => match.acceptResponsibility(data.refereeId),
+  return mutate(tournamentId, matchId, "responsibilityAcceptance", (match) => match.acceptResponsibility(data.refereeId),
     (connection, tid, mid) => repository.acceptResponsibility(tid, mid, connection));
 }
 
@@ -80,6 +94,8 @@ function startMatch(tournamentValue, matchValue, data = {}) {
   const tournamentId = positiveId(tournamentValue, "tournament id");
   const matchId = positiveId(matchValue, "match id");
   return db.withTransaction(async (connection) => {
+    const tournament = await authoritativeTournament(tournamentId, connection);
+    assertCompetitionLifecycleEligible(tournament.status, "matchStart");
     const record = await repository.findById(tournamentId, matchId, connection, true);
     if (!record) {
       const error = new Error("Match not found");
@@ -122,13 +138,13 @@ async function getMatchOperationContext(tournamentValue, matchValue) {
 }
 
 function recordScore(tournamentId, matchId, data = {}) {
-  return mutate(tournamentId, matchId,
+  return mutate(tournamentId, matchId, "scoreSubmission",
     (match) => match.recordScore(data.refereeId, data.score1, data.score2),
     (connection, tid, mid, match) => repository.recordScore(tid, mid, match.score1, match.score2, connection));
 }
 
 function submitResult(tournamentId, matchId, actor, data = {}) {
-  return mutate(tournamentId, matchId,
+  return mutate(tournamentId, matchId, "scoreSubmission",
     (match) => match.submitResult(actor, data.score1, data.score2),
     (connection, tid, mid, match) => repository.recordScore(tid, mid, match.score1, match.score2, connection));
 }
@@ -139,6 +155,8 @@ function confirmResult(tournamentId, matchId, actor = {}) {
   const matchIdValue = positiveId(matchId, "match id");
 
   return db.withTransaction(async (connection) => {
+    const tournament = await authoritativeTournament(tournamentIdValue, connection);
+    assertCompetitionLifecycleEligible(tournament.status, "resultConfirmation");
     const record = await repository.findById(tournamentIdValue, matchIdValue, connection, true);
     if (!record) {
       const error = new Error("Match not found");
@@ -192,6 +210,9 @@ function confirmResult(tournamentId, matchId, actor = {}) {
         }))
       });
 
+      // Keep this guard adjacent to the irreversible trusted-record write as well
+      // as at the mutation boundary. The tournament row remains locked throughout.
+      assertCompetitionLifecycleEligible(tournament.status, "resultConfirmation");
       const officialRecord = await officialRecordRepository.create({
         tournamentId: match.tournamentId,
         matchId: match.id,

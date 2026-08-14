@@ -7,7 +7,7 @@ router.get("/:competitionId/matches", async (req, res) => {
   try {
     res.json(await service.getPublicMatches(req.params.competitionId));
   } catch (error) {
-    const status = error.code === "VALIDATION_ERROR" ? 400 : 500;
+    const status = error.code === "VALIDATION_ERROR" ? 400 : error.code === "NOT_FOUND" ? 404 : 500;
     res.status(status).json({ error: error.message });
   }
 });

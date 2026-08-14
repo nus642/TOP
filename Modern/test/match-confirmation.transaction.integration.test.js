@@ -20,6 +20,10 @@ function transactionalHarness(initialState, { failMatchUpdate = false } = {}) {
       const pending = cloneState(committed);
       const connection = {
         async query(sql, values) {
+          if (sql.includes("FROM tournaments")) {
+            assert.match(sql, /FOR UPDATE/);
+            return [[{ id: 2, status: "running" }]];
+          }
           if (sql.startsWith("SELECT * FROM matches")) {
             const match = pending.match;
             return [[{

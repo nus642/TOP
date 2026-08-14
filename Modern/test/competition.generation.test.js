@@ -89,7 +89,7 @@ test("generated matches enter the unchanged Match Operations lifecycle", async (
         operationsRepository.recordScore = originals.score;
     });
 
-    const connection = { transaction: true };
+    const connection = { transaction: true, query: async () => [[{ id: 7, status: "running" }]] };
     const stored = new Map();
     let nextId = 1;
     db.withTransaction = (work) => work(connection);

@@ -1,4 +1,6 @@
 const repository = require("../repositories/public-match-scoreboard.repository");
+const tournamentRepository = require("../repositories/tournament.repository");
+const { assertCompetitionLifecycleEligible } = require("./competition-lifecycle-eligibility");
 
 function validationError(message) {
   const error = new Error(message);
@@ -32,6 +34,13 @@ async function getPublicMatches(value) {
     throw validationError("Valid competition id is required");
   }
 
+  const tournament = await tournamentRepository.getTournamentById(competitionId);
+  if (!tournament) {
+    const error = new Error("Competition not found");
+    error.code = "NOT_FOUND";
+    throw error;
+  }
+  assertCompetitionLifecycleEligible(tournament.status, "publicScoreboard", { notFound: true });
   const rows = await repository.findByCompetitionId(competitionId);
   return { competitionId, matches: rows.map(toPublicMatch) };
 }
