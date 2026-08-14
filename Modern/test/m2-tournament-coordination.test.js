@@ -121,3 +121,18 @@ test("the combined projection identifies the correct next responsible actor", as
   projection = await liveStatusRepository.findByCompetitionId(4, connection);
   assert.equal(projection.courts[0].nextResponsibleActor, "referee");
 });
+
+test("M2 operator UI exposes the bounded Master and Referee recovery course", () => {
+  const master = fs.readFileSync(path.join(__dirname, "..", "operator", "master-app.js"), "utf8");
+  const referee = fs.readFileSync(path.join(__dirname, "..", "operator", "app.js"), "utf8");
+  const masterHtml = fs.readFileSync(path.join(__dirname, "..", "operator", "master.html"), "utf8");
+  assert.match(masterHtml, /场地协调/);
+  assert.match(master, /提交可追溯报告/);
+  assert.match(master, /记录延后协调/);
+  assert.match(master, /等待裁判明确中断/);
+  assert.match(referee, /data-action="start"/);
+  assert.match(referee, /data-action="interrupt"/);
+  assert.match(referee, /data-action="resume"/);
+  assert.match(referee, /等待主控报告场地恢复/);
+  assert.doesNotMatch(master + referee, /reassign|重新分配场地/i);
+});

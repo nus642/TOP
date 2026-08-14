@@ -25,7 +25,7 @@ function mapRefereeWork(row) {
     refereeId: row.referee_id,
     status: row.status,
     roundNumber: row.round_num,
-    court: row.court,
+    court: row.court_id || row.court,
     scheduledAt: row.scheduled_at,
     team1: {
       name: row.team1_name,
@@ -39,7 +39,14 @@ function mapRefereeWork(row) {
     score2: row.score2,
     assignedAt: row.assigned_at,
     responsibilityAcceptedAt: row.responsibility_accepted_at,
-    resultConfirmedAt: row.result_confirmed_at
+    resultConfirmedAt: row.result_confirmed_at,
+    courtCondition: row.court_condition || (row.court_id ? "available" : null),
+    courtVersion: Number(row.court_version || 0),
+    disruption: row.disruption_id ? {
+      id: row.disruption_id,
+      disposition: row.disruption_disposition,
+      version: Number(row.disruption_version)
+    } : null
   };
 }
 
@@ -72,9 +79,15 @@ async function findById(tournamentId, matchId, connection = db, lock = false) {
 
 async function findByReferee(tournamentId, refereeId, connection = db) {
   const [rows] = await connection.query(
-    `SELECT m.*, ms.scheduled_at
+    `SELECT m.*, ms.scheduled_at, ms.court_id,
+       coc.condition_name AS court_condition, COALESCE(coc.version, 0) AS court_version,
+       cd.id AS disruption_id, cd.disposition AS disruption_disposition, cd.version AS disruption_version
      FROM matches m
      LEFT JOIN match_schedules ms ON ms.match_id = m.id
+     LEFT JOIN court_operating_conditions coc
+       ON coc.tournament_id = ms.tournament_id AND coc.court_id = ms.court_id
+     LEFT JOIN court_disruptions cd
+       ON cd.tournament_id = ms.tournament_id AND cd.court_id = ms.court_id AND cd.disposition <> 'resolved'
      WHERE m.tournament_id = ? AND m.referee_id = ?
      ORDER BY ms.scheduled_at IS NULL, ms.scheduled_at, m.round_num, m.id`,
     [tournamentId, refereeId]

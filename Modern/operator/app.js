@@ -14,9 +14,17 @@ function matchCard(match) {
   const team2 = escapeHtml(match.team2?.name || "另一方");
   const score1 = match.score1 ?? "–";
   const score2 = match.score2 ?? "–";
+  const playingAction = ["constrained", "uncertain"].includes(match.courtCondition)
+    ? `<p class="notice error">场地${match.courtCondition === "constrained" ? "受限" : "状态待确认"}，请明确中断比赛。</p><button data-action="interrupt">中断比赛</button>`
+    : `<form class="score-form"><label>${team1}<input name="score1" type="number" min="0" required></label><label>${team2}<input name="score2" type="number" min="0" required></label><button>录入比分并结束执行</button></form>`;
+  const interruptedAction = match.courtCondition === "available"
+    ? `<p class="complete">场地已由主控报告恢复，请明确恢复比赛。</p><button data-action="resume">恢复比赛</button>`
+    : `<p class="muted">比赛已中断，等待主控报告场地恢复。</p>`;
   const actions = {
     assigned: `<button data-action="accept">接受执裁任务</button>`,
-    playing: `<form class="score-form"><label>${team1}<input name="score1" type="number" min="0" required></label><label>${team2}<input name="score2" type="number" min="0" required></label><button>录入比分</button></form>`,
+    accepted: `<button data-action="start">开始比赛</button>`,
+    playing: playingAction,
+    interrupted: interruptedAction,
     scored: `<p class="muted">赛果已提交，等待主控确认</p>`,
     confirmed: `<p class="complete">赛果已由比赛操作确认</p>`
   }[match.status] || `<p class="muted">等待比赛操作</p>`;

@@ -1,7 +1,7 @@
 const repository = require("../repositories/master-operational-visibility.repository");
 
 const MATCH_OPERATION_STATUSES = new Set([
-  "idle", "upcoming", "assigned", "playing", "scored",
+  "idle", "upcoming", "assigned", "accepted", "playing", "interrupted", "scored",
   "awaiting_confirmation", "confirmed", "finished"
 ]);
 

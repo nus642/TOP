@@ -24,8 +24,11 @@
     async function refresh() {
       view.loading();
       try {
-        const result = await api.matchOverview(competitionId);
+        const [result, coordination] = await Promise.all([
+          api.matchOverview(competitionId), api.liveCoordination(competitionId)
+        ]);
         view.matches(result.matches);
+        view.courts(coordination.courts || []);
       } catch (error) {
         view.error(error.message);
       }
@@ -53,6 +56,24 @@
       }
     }
 
+    async function reportCourt({ courtId, condition, expectedVersion, affectedMatchId }) {
+      view.busy(`场地 ${courtId}`);
+      try {
+        if (accountabilityFlow) accountabilityFlow.verify(accountability);
+        await api.reportCourt(competitionId, courtId, { condition, expectedVersion, affectedMatchId });
+        await refresh();
+      } catch (error) { view.error(error.message); }
+    }
+
+    async function deferCourt({ courtId, expectedVersion }) {
+      view.busy(`场地 ${courtId}`);
+      try {
+        if (accountabilityFlow) accountabilityFlow.verify(accountability);
+        await api.deferCourt(competitionId, courtId, expectedVersion);
+        await refresh();
+      } catch (error) { view.error(error.message); }
+    }
+
     return {
       start(nextCompetitionId) {
         competitionId = masterCompetition(nextCompetitionId);
@@ -61,6 +82,8 @@
       },
       assign,
       confirm,
+      reportCourt,
+      deferCourt,
       refresh
     };
   }

@@ -6,6 +6,11 @@ const router = express.Router();
 
 router.get("/:competitionId/live-status", async (req, res) => {
   try {
+    if (req.actor?.actorType !== "master") {
+      const error = new Error("Only a master may read live Tournament coordination");
+      error.code = "VALIDATION_ERROR";
+      throw error;
+    }
     res.json(await liveMatchStatusService.getLiveMatchStatus(req.params.competitionId));
   } catch (error) {
     const status = error.code === "VALIDATION_ERROR" ? 400 : 500;

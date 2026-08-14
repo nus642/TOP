@@ -92,7 +92,7 @@ test("master workflow exposes GET live status and maps validation errors", async
 
   service.getLiveMatchStatus = async (competitionId) => ({ competitionId: Number(competitionId), matches: [] });
   const ok = response();
-  await handler({ params: { competitionId: "4" } }, ok);
+  await handler({ params: { competitionId: "4" }, actor: { actorType: "master", actorId: "master-1" } }, ok);
   assert.deepEqual(ok.payload, { competitionId: 4, matches: [] });
 
   service.getLiveMatchStatus = async () => {
@@ -101,8 +101,13 @@ test("master workflow exposes GET live status and maps validation errors", async
     throw error;
   };
   const invalid = response();
-  await handler({ params: { competitionId: "bad" } }, invalid);
+  await handler({ params: { competitionId: "bad" }, actor: { actorType: "master", actorId: "master-1" } }, invalid);
   assert.equal(invalid.statusCode, 400);
+
+  const forbidden = response();
+  await handler({ params: { competitionId: "4" }, actor: { actorType: "referee", actorId: "referee-1" } }, forbidden);
+  assert.equal(forbidden.statusCode, 400);
+  assert.match(forbidden.payload.error, /Only a master/);
 });
 
 test("live visibility introduces no persistence or workflow authority", () => {

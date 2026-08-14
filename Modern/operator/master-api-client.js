@@ -21,6 +21,20 @@
       matchOverview(competitionId) {
         return request(`/master-operations/${encodeURIComponent(competitionId)}/matches`);
       },
+      liveCoordination(competitionId) {
+        return request(`/master-workflow/${encodeURIComponent(competitionId)}/live-status`);
+      },
+      reportCourt(competitionId, courtId, report) {
+        return request(`/master-workflow/${encodeURIComponent(competitionId)}/courts/${encodeURIComponent(courtId)}/condition`, {
+          method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(report)
+        });
+      },
+      deferCourt(competitionId, courtId, expectedVersion) {
+        return request(`/master-workflow/${encodeURIComponent(competitionId)}/courts/${encodeURIComponent(courtId)}/defer`, {
+          method: "POST", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ expectedVersion })
+        });
+      },
       assignReferee(competitionId, matchId, refereeId) {
         return request(
           `/master-workflow/${encodeURIComponent(competitionId)}/matches/${encodeURIComponent(matchId)}/assign`,
