@@ -28,6 +28,21 @@
           method: "POST", headers: { "Content-Type": "application/json" }, body: "{}"
         });
       },
+      start(tournamentId, refereeId, matchId) {
+        return request(`/referee-workflow/${scope(tournamentId, refereeId)}/matches/${encodeURIComponent(matchId)}/start`, {
+          method: "POST", headers: { "Content-Type": "application/json" }, body: "{}"
+        });
+      },
+      interrupt(tournamentId, refereeId, matchId) {
+        return request(`/referee-workflow/${scope(tournamentId, refereeId)}/matches/${encodeURIComponent(matchId)}/interrupt`, {
+          method: "POST", headers: { "Content-Type": "application/json" }, body: "{}"
+        });
+      },
+      resume(tournamentId, refereeId, matchId) {
+        return request(`/referee-workflow/${scope(tournamentId, refereeId)}/matches/${encodeURIComponent(matchId)}/resume`, {
+          method: "POST", headers: { "Content-Type": "application/json" }, body: "{}"
+        });
+      },
       recordScore(tournamentId, refereeId, matchId, score) {
         return request(`/referee-workflow/${scope(tournamentId, refereeId)}/matches/${encodeURIComponent(matchId)}/score`, {
           method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(score)

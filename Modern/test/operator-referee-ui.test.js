@@ -12,10 +12,16 @@ test("operator API client targets only existing referee workflow boundaries", as
   const api = createRefereeApi({ fetchImpl, baseUrl: "/api" });
   await api.assignedMatches(3, "referee/7");
   await api.accept(3, "referee/7", 9);
+  await api.start(3, "referee/7", 9);
+  await api.interrupt(3, "referee/7", 9);
+  await api.resume(3, "referee/7", 9);
   await api.recordScore(3, "referee/7", 9, { score1: 11, score2: 8 });
   assert.deepEqual(calls, [
     ["/api/match-operations/3/referees/referee%2F7/matches", "GET", undefined],
     ["/api/referee-workflow/3/referees/referee%2F7/matches/9/accept", "POST", "{}"],
+    ["/api/referee-workflow/3/referees/referee%2F7/matches/9/start", "POST", "{}"],
+    ["/api/referee-workflow/3/referees/referee%2F7/matches/9/interrupt", "POST", "{}"],
+    ["/api/referee-workflow/3/referees/referee%2F7/matches/9/resume", "POST", "{}"],
     ["/api/referee-workflow/3/referees/referee%2F7/matches/9/score", "POST", '{"score1":11,"score2":8}']
   ]);
 });
@@ -45,4 +51,26 @@ test("API errors are exposed without inventing local workflow state", async () =
     createRefereeApi({ fetchImpl }).recordScore(3, "referee-7", 9, { score1: 11, score2: 8 }),
     /Match is not scored/
   );
+});
+
+test("referee workflow delegates explicit start, interrupt, and resume without local advancement", async () => {
+  const calls = [];
+  const api = {
+    assignedMatches: async () => ({ matches: [] }),
+    start: async (...args) => calls.push(["start", ...args]),
+    interrupt: async (...args) => calls.push(["interrupt", ...args]),
+    resume: async (...args) => calls.push(["resume", ...args])
+  };
+  const workflow = createRefereeWorkflow({ api, view: {
+    loading() {}, busy() {}, error: assert.fail, matches() {}
+  } });
+  await workflow.start({ tournamentId: 3, refereeId: "referee-7" });
+  await workflow.run({ type: "start", matchId: 9 });
+  await workflow.run({ type: "interrupt", matchId: 9 });
+  await workflow.run({ type: "resume", matchId: 9 });
+  assert.deepEqual(calls, [
+    ["start", 3, "referee-7", 9],
+    ["interrupt", 3, "referee-7", 9],
+    ["resume", 3, "referee-7", 9]
+  ]);
 });

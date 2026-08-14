@@ -4,6 +4,7 @@ const test = require("node:test");
 const db = require("../database/db");
 const repository = require("../repositories/match-operation.repository");
 const readinessRepository = require("../repositories/participant-readiness.repository");
+const courtRepository = require("../repositories/court-coordination.repository");
 const officialRecordRepository = require("../repositories/match-official-record.repository");
 const matchRepository = require("../repositories/match.repository");
 const playerRepository = require("../repositories/player.repository");
@@ -35,7 +36,13 @@ test("API -> service -> domain -> repository completes the assigned Referee resu
     score: repository.recordScore,
     confirm: repository.confirm,
     officialCreate: officialRecordRepository.create,
-    officialFindByMatch: officialRecordRepository.findByMatch
+    officialFindByMatch: officialRecordRepository.findByMatch,
+    findCourt: courtRepository.findScheduledCourt,
+    lockCourt: courtRepository.lockCondition,
+    playing: courtRepository.findPlayingMatch,
+    updateCourt: courtRepository.updateCondition,
+    openDisruption: courtRepository.lockOpenDisruption,
+    appendEvent: courtRepository.appendEvent
   };
   t.after(() => {
     db.withTransaction = originals.transaction;
@@ -47,6 +54,12 @@ test("API -> service -> domain -> repository completes the assigned Referee resu
     repository.confirm = originals.confirm;
     officialRecordRepository.create = originals.officialCreate;
     officialRecordRepository.findByMatch = originals.officialFindByMatch;
+    courtRepository.findScheduledCourt = originals.findCourt;
+    courtRepository.lockCondition = originals.lockCourt;
+    courtRepository.findPlayingMatch = originals.playing;
+    courtRepository.updateCondition = originals.updateCourt;
+    courtRepository.lockOpenDisruption = originals.openDisruption;
+    courtRepository.appendEvent = originals.appendEvent;
   });
 
   let stored = { id: 9, tournamentId: 3, refereeId: null, status: "idle", score1: null, score2: null };
@@ -58,6 +71,13 @@ test("API -> service -> domain -> repository completes the assigned Referee resu
     query: async () => [[{ id: 3, status: "running" }]]
   };
   db.withTransaction = (work) => work(mockConnection);
+  let court = { tournamentId: 3, courtId: "court-1", condition: "available", version: 0 };
+  courtRepository.findScheduledCourt = async () => "court-1";
+  courtRepository.lockCondition = async () => ({ ...court });
+  courtRepository.findPlayingMatch = async () => null;
+  courtRepository.updateCondition = async (data) => (court = { ...court, ...data, version: court.version + 1 });
+  courtRepository.lockOpenDisruption = async () => null;
+  courtRepository.appendEvent = async () => 1;
   repository.findById = async () => ({ ...stored });
   repository.assign = async (_tid, _mid, refereeId) => (stored = { ...stored, refereeId, status: "assigned" });
   repository.acceptResponsibility = async () => (stored = { ...stored, status: "accepted" });

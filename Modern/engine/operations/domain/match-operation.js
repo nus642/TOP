@@ -6,6 +6,7 @@ const STATES = Object.freeze({
   ASSIGNED: "assigned", // Referee responsibility is established.
   ACCEPTED: "accepted", // The assigned Referee acknowledged responsibility.
   PLAYING: "playing", // Match execution is in progress.
+  INTERRUPTED: "interrupted", // The assigned Referee explicitly paused execution.
   SCORED: "scored", // The score is captured but is not official yet.
   CONFIRMED: "confirmed", // The assigned Referee officially confirmed the result.
   FINISHED: "finished" // The existing Match lifecycle is completed.
@@ -82,6 +83,26 @@ class MatchOperation {
     this.score2 = score2;
     // A captured score is not yet an officially confirmed result.
     this.status = STATES.SCORED;
+    return this;
+  }
+
+  interrupt(actor) {
+    this.assertActor(actor, "referee");
+    this.assertAssignedReferee(actor.actorId);
+    if (this.status !== STATES.PLAYING) {
+      throw new OperationsError("INVALID_OPERATION_STATE", "Only a playing match can be interrupted");
+    }
+    this.status = STATES.INTERRUPTED;
+    return this;
+  }
+
+  resume(actor) {
+    this.assertActor(actor, "referee");
+    this.assertAssignedReferee(actor.actorId);
+    if (this.status !== STATES.INTERRUPTED) {
+      throw new OperationsError("INVALID_OPERATION_STATE", "Only an interrupted match can be resumed");
+    }
+    this.status = STATES.PLAYING;
     return this;
   }
 

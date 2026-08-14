@@ -37,4 +37,12 @@ function startMatch(tournamentId, refereeValue, matchId) {
   });
 }
 
-module.exports = { acceptMatch, startMatch, recordScore };
+function interruptMatch(tournamentId, refereeValue, matchId, data = {}) {
+  return matchOperationsService.interruptMatch(tournamentId, matchId, refereeActor(refereeValue), data);
+}
+
+function resumeMatch(tournamentId, refereeValue, matchId, data = {}) {
+  return matchOperationsService.resumeMatch(tournamentId, matchId, refereeActor(refereeValue), data);
+}
+
+module.exports = { acceptMatch, startMatch, recordScore, interruptMatch, resumeMatch };

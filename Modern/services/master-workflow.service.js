@@ -1,4 +1,5 @@
 const matchOperationsService = require("./match-operations.service");
+const courtCoordinationService = require("./court-coordination.service");
 
 function validationError(message) {
   const error = new Error(message);
@@ -38,4 +39,12 @@ function confirmResult(competitionValue, matchValue, actor) {
   return matchOperationsService.confirmResult(competitionId, matchId, actor);
 }
 
-module.exports = { assignReferee, confirmResult };
+function reportCourtCondition(competitionId, courtId, actor, data) {
+  return courtCoordinationService.reportCondition(competitionId, courtId, actor, data);
+}
+
+function deferCourtDisruption(competitionId, courtId, actor, data) {
+  return courtCoordinationService.deferDisruption(competitionId, courtId, actor, data);
+}
+
+module.exports = { assignReferee, confirmResult, reportCourtCondition, deferCourtDisruption };
