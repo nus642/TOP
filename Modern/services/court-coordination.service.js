@@ -32,6 +32,7 @@ function reportCondition(tournamentValue, courtValue, actor, data = {}) {
   const tournamentId = positiveId(tournamentValue, "competition id");
   const court = courtId(courtValue); const masterId = actorId(actor, "master");
   if (!["available", "constrained", "uncertain"].includes(data.condition)) throw error("Master may report only available, constrained, or uncertain");
+  const correlationId = String(data.correlationId || randomUUID());
   return db.withTransaction(async (connection) => {
     await lockTournament(tournamentId, connection);
     if (!await repository.isKnownCourt(tournamentId, court, connection)) throw error("Court is not known to the Tournament schedule", "NOT_FOUND");
@@ -41,7 +42,7 @@ function reportCondition(tournamentValue, courtValue, actor, data = {}) {
     if (data.condition === "available" && matchId) throw error("Court cannot be available while a Match is playing");
     let disruption = await repository.lockOpenDisruption(tournamentId, court, connection);
     condition = await repository.updateCondition({ tournamentId, courtId: court, condition: data.condition,
-      sourceType: "master_report", sourceReference: data.correlationId || randomUUID(), actorId: masterId }, connection);
+      sourceType: "master_report", sourceReference: correlationId, actorId: masterId }, connection);
     if (data.condition === "available" && disruption) {
       disruption = await repository.recoverDisruption(disruption.id, masterId, connection);
     } else if (data.condition !== "available" && !disruption) {
@@ -50,7 +51,7 @@ function reportCondition(tournamentValue, courtValue, actor, data = {}) {
     }
     await repository.appendEvent({ tournamentId, courtId: court, matchId: data.affectedMatchId || matchId,
       eventType: data.condition === "available" ? "court_recovered" : "court_condition_reported",
-      sourceType: "master_report", actorId: masterId, correlationId: data.correlationId || randomUUID(),
+      sourceType: "master_report", actorId: masterId, correlationId,
       courtVersion: condition.version, disruptionVersion: disruption?.version }, connection);
     return { courtCondition: condition, disruption };
   });
@@ -59,6 +60,7 @@ function reportCondition(tournamentValue, courtValue, actor, data = {}) {
 function deferDisruption(tournamentValue, courtValue, actor, data = {}) {
   const tournamentId = positiveId(tournamentValue, "competition id");
   const court = courtId(courtValue); const masterId = actorId(actor, "master");
+  const correlationId = String(data.correlationId || randomUUID());
   return db.withTransaction(async (connection) => {
     await lockTournament(tournamentId, connection);
     if (!await repository.isKnownCourt(tournamentId, court, connection)) throw error("Court is not known to the Tournament schedule", "NOT_FOUND");
@@ -69,7 +71,7 @@ function deferDisruption(tournamentValue, courtValue, actor, data = {}) {
     const disruption = await repository.updateDisruption(current.id, "deferred", masterId, connection);
     await repository.appendEvent({ tournamentId, courtId: court, matchId: disruption.affectedMatchId,
       eventType: "court_disruption_deferred", sourceType: "master_coordination", actorId: masterId,
-      correlationId: data.correlationId || randomUUID(), courtVersion: condition.version,
+      correlationId, courtVersion: condition.version,
       disruptionVersion: disruption.version }, connection);
     return { courtCondition: condition, disruption };
   });

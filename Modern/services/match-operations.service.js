@@ -165,16 +165,21 @@ function submitResult(tournamentId, matchId, actor, data = {}) {
     const courtId = await courtRepository.findScheduledCourt(tid, mid, connection);
     let court = courtId ? await courtRepository.lockCondition(tid, courtId, connection) : null;
     const record = await repository.findById(tid, mid, connection, true);
+    let disruption = court ? await courtRepository.lockOpenDisruption(tid, courtId, connection) : null;
     if (!record) { const e = new Error("Match not found"); e.code = "NOT_FOUND"; throw e; }
     try {
       const match = new MatchOperation(record); match.submitResult(actor, data.score1, data.score2);
       const updatedMatch = await repository.recordScore(tid, mid, match.score1, match.score2, connection);
       if (court) court = await courtRepository.updateCondition({ tournamentId: tid, courtId, condition: "available",
         sourceType: "match_execution", sourceReference: `match:${mid}:end`, actorId: actor.actorId }, connection);
+      if (disruption && (!disruption.affectedMatchId || Number(disruption.affectedMatchId) === mid)) {
+        disruption = await courtRepository.resolveDisruption(disruption.id, connection);
+      }
       if (court) await courtRepository.appendEvent({ tournamentId: tid, courtId, matchId: mid,
         eventType: "match_ended_court_released", sourceType: "match_execution", actorId: actor.actorId,
-        correlationId: data.correlationId || randomUUID(), courtVersion: court.version }, connection);
-      return { match: updatedMatch, courtCondition: court };
+        correlationId: data.correlationId || randomUUID(), courtVersion: court.version,
+        disruptionVersion: disruption?.version }, connection);
+      return { match: updatedMatch, courtCondition: court, disruption };
     } catch (error) { return translate(error); }
   });
 }
@@ -209,8 +214,9 @@ function executionChange(tournamentValue, matchValue, actor, data, action) {
       const updatedMatch = await repository[action](tournamentId, matchId, connection);
       if (action === "resume") court = await courtRepository.updateCondition({ tournamentId, courtId,
         condition: "occupied", sourceType: "match_execution", sourceReference: `match:${matchId}:resume`, actorId: actor.actorId }, connection);
-      if (action === "resume" && disruption) {
-        disruption = await courtRepository.updateDisruption(disruption.id, "resolved", actor.actorId, connection);
+      if (action === "resume" && disruption &&
+          (!disruption.affectedMatchId || Number(disruption.affectedMatchId) === matchId)) {
+        disruption = await courtRepository.resolveDisruption(disruption.id, connection);
       }
       await courtRepository.appendEvent({ tournamentId, courtId, matchId,
         eventType: action === "resume" ? "match_resumed_court_occupied" : "match_interrupted",

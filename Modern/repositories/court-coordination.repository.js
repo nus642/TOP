@@ -83,10 +83,17 @@ async function createDisruption(data, connection = db) {
 }
 
 async function updateDisruption(id, disposition, actorId, connection = db) {
-  const fields = disposition === "deferred"
-    ? "disposition = 'deferred', deferred_by = ?, deferred_at = CURRENT_TIMESTAMP(6), version = version + 1"
-    : "disposition = 'resolved', recovered_by = ?, recovered_at = CURRENT_TIMESTAMP(6), resolved_at = CURRENT_TIMESTAMP(6), version = version + 1";
+  if (disposition !== "deferred") throw new TypeError("updateDisruption supports deferment only");
+  const fields = "disposition = 'deferred', deferred_by = ?, deferred_at = CURRENT_TIMESTAMP(6), version = version + 1";
   await connection.query(`UPDATE court_disruptions SET ${fields} WHERE id = ?`, [actorId, id]);
+  const [rows] = await connection.query(`SELECT * FROM court_disruptions WHERE id = ?`, [id]);
+  return mapDisruption(rows[0]);
+}
+
+async function resolveDisruption(id, connection = db) {
+  await connection.query(
+    `UPDATE court_disruptions SET disposition = 'resolved', resolved_at = CURRENT_TIMESTAMP(6),
+       version = version + 1 WHERE id = ?`, [id]);
   const [rows] = await connection.query(`SELECT * FROM court_disruptions WHERE id = ?`, [id]);
   return mapDisruption(rows[0]);
 }
@@ -115,4 +122,5 @@ async function appendEvent(data, connection = db) {
 }
 
 module.exports = { findScheduledCourt, isKnownCourt, lockCondition, updateCondition,
-  findPlayingMatch, lockOpenDisruption, createDisruption, updateDisruption, recoverDisruption, appendEvent };
+  findPlayingMatch, lockOpenDisruption, createDisruption, updateDisruption,
+  recoverDisruption, resolveDisruption, appendEvent };
