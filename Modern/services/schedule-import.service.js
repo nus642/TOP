@@ -26,6 +26,12 @@ function parsePositiveId(value, label) {
   return id;
 }
 
+// Match statuses that indicate active execution — import must be rejected.
+const ACTIVE_MATCH_STATUSES = new Set([
+  "assigned", "accepted", "playing", "interrupted", "scored",
+  "awaiting_confirmation", "confirmed", "finished"
+]);
+
 /**
  * Validate the entire import template before any writes.
  * Returns { errors: [] } — empty means valid.
@@ -64,33 +70,56 @@ function validateImportData(data) {
     playerNames.add(name);
   }
 
-  // Validate pairs (if present)
-  if (data.pairs) {
-    if (!Array.isArray(data.pairs)) {
-      errors.push({ row: "pairs", message: "Pairs must be an array" });
-    } else {
-      for (let i = 0; i < data.pairs.length; i++) {
-        const pair = data.pairs[i];
-        const row = `pairs[${i}]`;
-        if (!pair.name || typeof pair.name !== "string" || !pair.name.trim()) {
-          errors.push({ row, message: "Pair name is required" });
-          continue;
+  // Validate pairs
+  if (data.mode === "fixed-pair") {
+    if (!Array.isArray(data.pairs) || data.pairs.length === 0) {
+      errors.push({ row: "pairs", message: "Fixed-pair mode requires a non-empty pairs array" });
+    }
+  }
+
+  const pairPlayerCounts = {};
+  if (Array.isArray(data.pairs)) {
+    for (let i = 0; i < data.pairs.length; i++) {
+      const pair = data.pairs[i];
+      const row = `pairs[${i}]`;
+      if (!pair.name || typeof pair.name !== "string" || !pair.name.trim()) {
+        errors.push({ row, message: "Pair name is required" });
+        continue;
+      }
+      const names = pair.name.split(" & ").map((s) => s.trim());
+      if (names.length !== 2) {
+        errors.push({ row, message: "Pair name must contain exactly two player names separated by ' & '" });
+        continue;
+      }
+      for (const n of names) {
+        if (!playerNames.has(n)) {
+          errors.push({ row, message: `Pair references unknown player: ${n}` });
         }
-        const names = pair.name.split(" & ").map((s) => s.trim());
-        if (names.length !== 2) {
-          errors.push({ row, message: "Pair name must contain exactly two player names separated by ' & '" });
-          continue;
-        }
-        for (const n of names) {
-          if (!playerNames.has(n)) {
-            errors.push({ row, message: `Pair references unknown player: ${n}` });
-          }
-        }
+        pairPlayerCounts[n] = (pairPlayerCounts[n] || 0) + 1;
+      }
+    }
+
+    // Players in multiple pairs
+    for (const [name, count] of Object.entries(pairPlayerCounts)) {
+      if (count > 1) {
+        errors.push({ row: "pairs", message: `Player '${name}' belongs to ${count} pairs` });
       }
     }
   }
 
+  // Build pair lookup for team consistency check
+  const pairLookup = new Set();
+  if (Array.isArray(data.pairs)) {
+    for (const pair of data.pairs) {
+      const names = pair.name.split(" & ").map((s) => s.trim()).sort();
+      pairLookup.add(names.join(" & "));
+    }
+  }
+
   // Validate rounds and matches
+  const courtTimeSlots = new Set();
+  let totalMatches = 0;
+
   for (let r = 0; r < data.rounds.length; r++) {
     const round = data.rounds[r];
     const roundLabel = `rounds[${r}]`;
@@ -99,10 +128,15 @@ function validateImportData(data) {
       errors.push({ row: roundLabel, message: "Round must contain a matches array" });
       continue;
     }
+    if (round.matches.length === 0) {
+      errors.push({ row: roundLabel, message: "Round must not be empty" });
+      continue;
+    }
 
     for (let m = 0; m < round.matches.length; m++) {
       const match = round.matches[m];
       const row = `${roundLabel}.matches[${m}]`;
+      totalMatches++;
 
       if (!match.court || typeof match.court !== "string" || !match.court.trim()) {
         errors.push({ row, message: "Court is required" });
@@ -115,11 +149,48 @@ function validateImportData(data) {
           errors.push({ row, message: "Invalid scheduled time" });
         }
       }
+
+      const matchPlayers = [];
       for (const field of ["p1", "p2", "p3", "p4"]) {
         if (!match[field] || typeof match[field] !== "string" || !match[field].trim()) {
           errors.push({ row, message: `${field} is required` });
         } else if (!playerNames.has(match[field].trim())) {
           errors.push({ row, message: `Unknown player reference: ${match[field]}` });
+        } else {
+          matchPlayers.push(match[field].trim());
+        }
+      }
+
+      // Duplicate participants within a single match
+      if (matchPlayers.length === 4) {
+        const unique = new Set(matchPlayers);
+        if (unique.size !== 4) {
+          errors.push({ row, message: "Duplicate participant within a single match" });
+        }
+      }
+
+      // Court-time conflict
+      if (match.court && match.scheduledAt) {
+        const slotKey = `${match.court.trim()}|${match.scheduledAt}`;
+        if (courtTimeSlots.has(slotKey)) {
+          errors.push({ row, message: `Court-time conflict: ${match.court} at ${match.scheduledAt}` });
+        }
+        courtTimeSlots.add(slotKey);
+      }
+
+      // Team name consistency with p1–p4
+      if (data.mode === "fixed-pair" && match.team1 && matchPlayers.length === 4) {
+        const team1Names = match.team1.split(" & ").map((s) => s.trim()).sort();
+        const side1 = [matchPlayers[0], matchPlayers[1]].sort();
+        if (team1Names[0] !== side1[0] || team1Names[1] !== side1[1]) {
+          errors.push({ row, message: "team1 does not match p1 & p2" });
+        }
+        if (match.team2) {
+          const team2Names = match.team2.split(" & ").map((s) => s.trim()).sort();
+          const side2 = [matchPlayers[2], matchPlayers[3]].sort();
+          if (team2Names[0] !== side2[0] || team2Names[1] !== side2[1]) {
+            errors.push({ row, message: "team2 does not match p3 & p4" });
+          }
         }
       }
     }
@@ -160,6 +231,25 @@ async function importSchedule(competitionIdValue, data) {
       tournamentId, connection
     );
     if (!competition) throw makeNotFoundError("Competition not found");
+
+    // Lifecycle guard: only allow import during the import window (default: draft)
+    if (competition.status !== "draft") {
+      const err = new Error(
+        `Import is only allowed in draft status (current: ${competition.status})`
+      );
+      err.code = "LIFECYCLE_BLOCKED";
+      throw err;
+    }
+
+    // Active-match guard: reject if any match has execution evidence
+    const activeMatches = await matchRepository.getActiveMatchesByTournament(tournamentId, connection);
+    if (activeMatches > 0) {
+      const err = new Error(
+        `Import rejected: ${activeMatches} match(es) have active or confirmed status`
+      );
+      err.code = "LIFECYCLE_BLOCKED";
+      throw err;
+    }
 
     // Update tournament name if provided
     if (data.tournamentName) {

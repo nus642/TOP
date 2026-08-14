@@ -260,7 +260,12 @@ CREATE TABLE IF NOT EXISTS player_check_ins (
 ) DEFAULT CHARSET=utf8mb4;
 
 -- Additive migration: source column for Participant Readiness provenance.
-ALTER TABLE player_check_ins ADD COLUMN IF NOT EXISTS source VARCHAR(50) DEFAULT NULL;
+-- MySQL does not support ADD COLUMN IF NOT EXISTS; safe to re-run on fresh schemas.
+SET @col_exists = (SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='player_check_ins' AND COLUMN_NAME='source');
+SET @sql = IF(@col_exists = 0, 'ALTER TABLE player_check_ins ADD COLUMN source VARCHAR(50) DEFAULT NULL', 'SELECT 1');
+PREPARE stmt FROM @sql;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
 
 CREATE TABLE IF NOT EXISTS waivers (
     id INT PRIMARY KEY AUTO_INCREMENT,

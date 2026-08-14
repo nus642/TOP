@@ -6,7 +6,6 @@ const checkinService = require("../services/checkin.service");
 const teamService = require("../services/team.service");
 const schedulingService = require("../services/scheduling.service");
 const competitionResultService = require("../services/competition-result.service");
-const scheduleImportService = require("../services/schedule-import.service");
 
 const DEFAULT_TOURNAMENT_ID = 1;
 
@@ -268,21 +267,6 @@ router.post("/:competitionId/schedule", async (req, res) => {
 
         res.json(result);
     } catch (err) {
-        sendWriteError(res, err);
-    }
-});
-
-router.post("/:competitionId/schedule/import", async (req, res) => {
-    try {
-        const result = await scheduleImportService.importSchedule(
-            getScopedCompetitionId(req),
-            req.body
-        );
-        res.status(201).json(result);
-    } catch (err) {
-        if (err.code === "VALIDATION_ERROR") {
-            return res.status(400).json({ error: err.message, details: err.details || null });
-        }
         sendWriteError(res, err);
     }
 });
