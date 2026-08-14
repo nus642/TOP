@@ -38,14 +38,14 @@ Alternative-Court reassignment is explicitly excluded from required M2 completio
 A later Product Scope version may reconsider it only after authoritative Scheduling
 meaning and history are governed.
 
-The M2 Engineering Readiness assessment is `Ready` for the exact Approved Product
-Scope Version 1.0 baseline. This authorizes entry into governed Engineering Design
-only; it does not authorize implementation issues, a Milestone, roadmap placement,
-release assignment, or delivery work.
+Engineering Readiness Version 1.1 is `Changes Required`. Finding
+`ERA-M2-TC-F-001` requires Product and Business Architecture governance to identify
+the authority that may establish and restore Court operating condition. Engineering
+Design is paused because Engineering may not invent that responsibility.
 
-Version: 1.3
+Version: 1.4
 
-Status: Product Map — M1 delivered; M2 Product Scope approved; Engineering Readiness ready; Engineering Design next
+Status: Product Map — M1 delivered; M2 Product Scope approved; Engineering Readiness changes required; upstream decision pending
 
 Last Update: 2026-08-14
 
