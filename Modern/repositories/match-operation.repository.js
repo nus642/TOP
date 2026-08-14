@@ -115,6 +115,20 @@ async function recordScore(tournamentId, matchId, score1, score2, connection = d
   return findById(tournamentId, matchId, connection);
 }
 
+async function interrupt(tournamentId, matchId, connection = db) {
+  await connection.query(
+    `UPDATE matches SET status = 'interrupted' WHERE tournament_id = ? AND id = ?`,
+    [tournamentId, matchId]);
+  return findById(tournamentId, matchId, connection);
+}
+
+async function resume(tournamentId, matchId, connection = db) {
+  await connection.query(
+    `UPDATE matches SET status = 'playing' WHERE tournament_id = ? AND id = ?`,
+    [tournamentId, matchId]);
+  return findById(tournamentId, matchId, connection);
+}
+
 async function confirm(tournamentId, matchId, confirmedBy, connection = db) {
   await connection.query(
     `UPDATE matches SET result_confirmed_at = CURRENT_TIMESTAMP, result_confirmed_by = ?, status = 'confirmed'
@@ -139,6 +153,8 @@ module.exports = {
   acceptResponsibility,
   start,
   recordScore,
+  interrupt,
+  resume,
   confirm,
   findOfficialRecords
 };

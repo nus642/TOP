@@ -76,8 +76,67 @@ CREATE TABLE IF NOT EXISTS matches (
     started_at TIMESTAMP NULL DEFAULT NULL,
     result_confirmed_at TIMESTAMP NULL DEFAULT NULL,
     result_confirmed_by VARCHAR(100) DEFAULT NULL,
-    status ENUM('idle','upcoming','assigned','accepted','playing','scored','awaiting_confirmation','confirmed','finished') DEFAULT 'idle',
+    status ENUM('idle','upcoming','assigned','accepted','playing','interrupted','scored','awaiting_confirmation','confirmed','finished') DEFAULT 'idle',
     FOREIGN KEY (tournament_id) REFERENCES tournaments(id) ON DELETE CASCADE
+) DEFAULT CHARSET=utf8mb4;
+
+-- Additive upgrade for databases created before M2.
+ALTER TABLE matches MODIFY COLUMN status
+    ENUM('idle','upcoming','assigned','accepted','playing','interrupted','scored','awaiting_confirmation','confirmed','finished') DEFAULT 'idle';
+
+-- M2 Court Management authority. Schedule court references remain the source of
+-- known Courts; these rows contain only mutable operating truth.
+CREATE TABLE IF NOT EXISTS court_operating_conditions (
+    tournament_id INT NOT NULL,
+    court_id VARCHAR(100) NOT NULL,
+    condition_name ENUM('available','occupied','constrained','uncertain') NOT NULL,
+    source_type ENUM('initial_baseline','match_execution','master_report','migration_match_execution') NOT NULL,
+    source_reference VARCHAR(100) NOT NULL,
+    actor_id VARCHAR(100) DEFAULT NULL,
+    effective_at TIMESTAMP(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
+    version BIGINT NOT NULL DEFAULT 0,
+    last_chronology_id BIGINT DEFAULT NULL,
+    PRIMARY KEY (tournament_id, court_id),
+    FOREIGN KEY (tournament_id) REFERENCES tournaments(id) ON DELETE CASCADE
+) DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE IF NOT EXISTS court_disruptions (
+    id BIGINT PRIMARY KEY AUTO_INCREMENT,
+    tournament_id INT NOT NULL,
+    court_id VARCHAR(100) NOT NULL,
+    affected_match_id INT DEFAULT NULL,
+    opening_condition ENUM('constrained','uncertain') NOT NULL,
+    disposition ENUM('attention_required','deferred','resolved') NOT NULL DEFAULT 'attention_required',
+    opened_by VARCHAR(100) NOT NULL,
+    opened_at TIMESTAMP(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
+    deferred_by VARCHAR(100) DEFAULT NULL,
+    deferred_at TIMESTAMP(6) NULL DEFAULT NULL,
+    recovered_by VARCHAR(100) DEFAULT NULL,
+    recovered_at TIMESTAMP(6) NULL DEFAULT NULL,
+    resolved_at TIMESTAMP(6) NULL DEFAULT NULL,
+    version BIGINT NOT NULL DEFAULT 0,
+    FOREIGN KEY (tournament_id) REFERENCES tournaments(id) ON DELETE CASCADE,
+    FOREIGN KEY (affected_match_id) REFERENCES matches(id) ON DELETE SET NULL,
+    INDEX ix_court_disruptions_open (tournament_id, court_id, disposition)
+) DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE IF NOT EXISTS tournament_coordination_chronology (
+    id BIGINT PRIMARY KEY AUTO_INCREMENT,
+    tournament_id INT NOT NULL,
+    court_id VARCHAR(100) NOT NULL,
+    match_id INT DEFAULT NULL,
+    event_type VARCHAR(80) NOT NULL,
+    source_type VARCHAR(40) NOT NULL,
+    actor_id VARCHAR(100) DEFAULT NULL,
+    effective_at TIMESTAMP(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
+    correlation_id VARCHAR(100) NOT NULL,
+    court_version BIGINT DEFAULT NULL,
+    disruption_version BIGINT DEFAULT NULL,
+    details JSON DEFAULT NULL,
+    FOREIGN KEY (tournament_id) REFERENCES tournaments(id) ON DELETE CASCADE,
+    FOREIGN KEY (match_id) REFERENCES matches(id) ON DELETE SET NULL,
+    UNIQUE KEY uq_coordination_correlation (tournament_id, correlation_id),
+    INDEX ix_coordination_history (tournament_id, effective_at, id)
 ) DEFAULT CHARSET=utf8mb4;
 
 -- Scheduling owns these placement facts; match execution remains in matches.
@@ -93,6 +152,15 @@ CREATE TABLE IF NOT EXISTS match_schedules (
     UNIQUE KEY uq_match_schedules_match (match_id),
     INDEX ix_match_schedules_competition_time (tournament_id, scheduled_at)
 ) DEFAULT CHARSET=utf8mb4;
+
+-- Reconstruct current occupied truth only for execution that is active at migration.
+INSERT IGNORE INTO court_operating_conditions
+    (tournament_id, court_id, condition_name, source_type, source_reference, version)
+SELECT m.tournament_id, ms.court_id, 'occupied', 'migration_match_execution',
+       CONCAT('match:', m.id, ':migration'), 0
+FROM matches m
+JOIN match_schedules ms ON ms.tournament_id = m.tournament_id AND ms.match_id = m.id
+WHERE m.status = 'playing' AND ms.court_id IS NOT NULL AND ms.court_id <> '';
 
 -- Append-only trusted records created by official match confirmation. Their
 -- identity and attribution remain independent from the mutable match row.

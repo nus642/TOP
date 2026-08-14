@@ -40,4 +40,18 @@ router.post("/:competitionId/matches/:matchId/confirm-result", async (req, res) 
   }
 });
 
+function courtHandler(action) {
+  return async (req, res) => {
+    try {
+      res.json(await service[action](req.params.competitionId, req.params.courtId, req.actor, req.body));
+    } catch (error) {
+      const statuses = { VALIDATION_ERROR: 400, NOT_FOUND: 404 };
+      res.status(statuses[error.code] || 500).json({ error: error.message });
+    }
+  };
+}
+
+router.post("/:competitionId/courts/:courtId/condition", courtHandler("reportCourtCondition"));
+router.post("/:competitionId/courts/:courtId/defer", courtHandler("deferCourtDisruption"));
+
 module.exports = router;

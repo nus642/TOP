@@ -3,6 +3,8 @@ const repository = require("../repositories/match-operation.repository");
 const officialRecordRepository = require("../repositories/match-official-record.repository");
 const readinessRepository = require("../repositories/participant-readiness.repository");
 const tournamentRepository = require("../repositories/tournament.repository");
+const courtRepository = require("../repositories/court-coordination.repository");
+const { randomUUID } = require("node:crypto");
 const { assertCompetitionLifecycleEligible } = require("./competition-lifecycle-eligibility");
 const {
   MatchOperation,
@@ -96,6 +98,8 @@ function startMatch(tournamentValue, matchValue, data = {}) {
   return db.withTransaction(async (connection) => {
     const tournament = await authoritativeTournament(tournamentId, connection);
     assertCompetitionLifecycleEligible(tournament.status, "matchStart");
+    const courtId = await courtRepository.findScheduledCourt(tournamentId, matchId, connection);
+    let court = courtId ? await courtRepository.lockCondition(tournamentId, courtId, connection) : null;
     const record = await repository.findById(tournamentId, matchId, connection, true);
     if (!record) {
       const error = new Error("Match not found");
@@ -109,7 +113,17 @@ function startMatch(tournamentValue, matchValue, data = {}) {
     try {
       const match = new MatchOperation(record);
       match.start(data.refereeId, readiness);
-      return { match: await repository.start(tournamentId, matchId, connection), participantReadiness: readiness };
+      if (court && court.condition !== "available") throw new OperationsError("COURT_NOT_AVAILABLE", "Assigned Court is not available");
+      if (court && await courtRepository.findPlayingMatch(tournamentId, courtId, connection)) {
+        throw new OperationsError("COURT_ALREADY_OCCUPIED", "Another Match is already playing on the assigned Court");
+      }
+      const updatedMatch = await repository.start(tournamentId, matchId, connection);
+      if (court) court = await courtRepository.updateCondition({ tournamentId, courtId, condition: "occupied",
+        sourceType: "match_execution", sourceReference: `match:${matchId}:start`, actorId: data.refereeId }, connection);
+      if (court) await courtRepository.appendEvent({ tournamentId, courtId, matchId, eventType: "match_started_court_occupied",
+        sourceType: "match_execution", actorId: data.refereeId, correlationId: data.correlationId || randomUUID(),
+        courtVersion: court.version }, connection);
+      return { match: updatedMatch, courtCondition: court, participantReadiness: readiness };
     } catch (error) {
       return translate(error);
     }
@@ -144,9 +158,67 @@ function recordScore(tournamentId, matchId, data = {}) {
 }
 
 function submitResult(tournamentId, matchId, actor, data = {}) {
-  return mutate(tournamentId, matchId, "scoreSubmission",
-    (match) => match.submitResult(actor, data.score1, data.score2),
-    (connection, tid, mid, match) => repository.recordScore(tid, mid, match.score1, match.score2, connection));
+  const tid = positiveId(tournamentId, "tournament id"); const mid = positiveId(matchId, "match id");
+  return db.withTransaction(async (connection) => {
+    const tournament = await authoritativeTournament(tid, connection);
+    assertCompetitionLifecycleEligible(tournament.status, "scoreSubmission");
+    const courtId = await courtRepository.findScheduledCourt(tid, mid, connection);
+    let court = courtId ? await courtRepository.lockCondition(tid, courtId, connection) : null;
+    const record = await repository.findById(tid, mid, connection, true);
+    if (!record) { const e = new Error("Match not found"); e.code = "NOT_FOUND"; throw e; }
+    try {
+      const match = new MatchOperation(record); match.submitResult(actor, data.score1, data.score2);
+      const updatedMatch = await repository.recordScore(tid, mid, match.score1, match.score2, connection);
+      if (court) court = await courtRepository.updateCondition({ tournamentId: tid, courtId, condition: "available",
+        sourceType: "match_execution", sourceReference: `match:${mid}:end`, actorId: actor.actorId }, connection);
+      if (court) await courtRepository.appendEvent({ tournamentId: tid, courtId, matchId: mid,
+        eventType: "match_ended_court_released", sourceType: "match_execution", actorId: actor.actorId,
+        correlationId: data.correlationId || randomUUID(), courtVersion: court.version }, connection);
+      return { match: updatedMatch, courtCondition: court };
+    } catch (error) { return translate(error); }
+  });
+}
+
+function interruptMatch(tournamentId, matchId, actor, data = {}) {
+  return executionChange(tournamentId, matchId, actor, data, "interrupt");
+}
+
+function resumeMatch(tournamentId, matchId, actor, data = {}) {
+  return executionChange(tournamentId, matchId, actor, data, "resume");
+}
+
+function executionChange(tournamentValue, matchValue, actor, data, action) {
+  const tournamentId = positiveId(tournamentValue, "tournament id"); const matchId = positiveId(matchValue, "match id");
+  return db.withTransaction(async (connection) => {
+    const tournament = await authoritativeTournament(tournamentId, connection);
+    assertCompetitionLifecycleEligible(tournament.status, "matchStart");
+    const courtId = await courtRepository.findScheduledCourt(tournamentId, matchId, connection);
+    if (!courtId) { const e = new Error("Match requires a known assigned Court"); e.code = "VALIDATION_ERROR"; throw e; }
+    let court = await courtRepository.lockCondition(tournamentId, courtId, connection);
+    const record = await repository.findById(tournamentId, matchId, connection, true);
+    if (!record) { const e = new Error("Match not found"); e.code = "NOT_FOUND"; throw e; }
+    let disruption = await courtRepository.lockOpenDisruption(tournamentId, courtId, connection);
+    try {
+      const match = new MatchOperation(record); match[action](actor);
+      if (action === "interrupt" && !["constrained", "uncertain"].includes(court.condition)) {
+        throw new OperationsError("COURT_NOT_BLOCKED", "Match interruption requires a constrained or uncertain Court");
+      }
+      if (action === "resume" && court.condition !== "available") {
+        throw new OperationsError("COURT_NOT_AVAILABLE", "Match resume requires an available Court");
+      }
+      const updatedMatch = await repository[action](tournamentId, matchId, connection);
+      if (action === "resume") court = await courtRepository.updateCondition({ tournamentId, courtId,
+        condition: "occupied", sourceType: "match_execution", sourceReference: `match:${matchId}:resume`, actorId: actor.actorId }, connection);
+      if (action === "resume" && disruption) {
+        disruption = await courtRepository.updateDisruption(disruption.id, "resolved", actor.actorId, connection);
+      }
+      await courtRepository.appendEvent({ tournamentId, courtId, matchId,
+        eventType: action === "resume" ? "match_resumed_court_occupied" : "match_interrupted",
+        sourceType: "match_execution", actorId: actor.actorId, correlationId: data.correlationId || randomUUID(),
+        courtVersion: court.version, disruptionVersion: disruption?.version }, connection);
+      return { match: updatedMatch, courtCondition: court, disruption };
+    } catch (error) { return translate(error); }
+  });
 }
 
 function confirmResult(tournamentId, matchId, actor = {}) {
@@ -301,6 +373,8 @@ module.exports = {
   getMatchOperationContext,
   recordScore,
   submitResult,
+  interruptMatch,
+  resumeMatch,
   confirmResult,
   getOfficialRecord,
   getRefereeWorkflow
