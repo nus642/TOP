@@ -29,18 +29,18 @@ milestone, or implementation authorization.
 | Authoritative input | Baseline |
 |---|---|
 | `M2-Tournament-Coordination-Loop-Boundary.md` | Canon Review Passed, merged by #124 at `500e0b8a4b172889ed308a9c5a510335b00b7974`, 2026-08-14 |
-| `TOP-Product-Layer-Definition.md` | Version 1.1, Active, 2026-08-06; commit `500e0b8a…` |
-| `TOP-Product-Actor-and-Goal-Model.md` | Version 1.1, Active, 2026-08-06; commit `500e0b8a…` |
-| `TOP-Product-Story-Definition-Rules.md` | Version 1.1, Active, 2026-08-06; commit `500e0b8a…` |
-| `TOP-Product-Story-Map-Structure.md` | Version 1.1, Active, 2026-08-07; commit `500e0b8a…` |
-| `TOP-Initial-Product-Story-Map.md` | Version 1.0, Active, 2026-08-07; Approved stories; commit `500e0b8a…` |
-| `TOP-Operational-Workflow-Definition-Rules.md` | Version 1.0, Active, 2026-08-07; commit `500e0b8a…` |
-| `TOP-Operational-Workflow-Structure.md` | Version 1.2, Active, 2026-08-07; commit `500e0b8a…` |
-| `TOP-Initial-Operational-Workflows.md` | Version 1.0, Approved, 2026-08-07; commit `500e0b8a…` |
-| `TOP-Product-Scope-Definition-Rules.md` | Version 1.0, Active, 2026-08-07; commit `500e0b8a…` |
-| `TOP-Business-Domain-Boundary.md` | Business Architecture baseline at commit `500e0b8a…` |
-| `TOP-Operational-Capability-Model.md` | Business Architecture baseline at commit `500e0b8a…` |
-| `TOP-Core-Business-Object-Model.md` | Business Architecture baseline at commit `500e0b8a…` |
+| `TOP-Product-Layer-Definition.md` | Version 1.1, Active, 2026-08-06; commit `500e0b8a4b172889ed308a9c5a510335b00b7974` |
+| `TOP-Product-Actor-and-Goal-Model.md` | Version 1.1, Active, 2026-08-06; commit `500e0b8a4b172889ed308a9c5a510335b00b7974` |
+| `TOP-Product-Story-Definition-Rules.md` | Version 1.1, Active, 2026-08-06; commit `500e0b8a4b172889ed308a9c5a510335b00b7974` |
+| `TOP-Product-Story-Map-Structure.md` | Version 1.1, Active, 2026-08-07; commit `500e0b8a4b172889ed308a9c5a510335b00b7974` |
+| `TOP-Initial-Product-Story-Map.md` | Version 1.0, Active, 2026-08-07; Approved stories; commit `500e0b8a4b172889ed308a9c5a510335b00b7974` |
+| `TOP-Operational-Workflow-Definition-Rules.md` | Version 1.0, Active, 2026-08-07; commit `500e0b8a4b172889ed308a9c5a510335b00b7974` |
+| `TOP-Operational-Workflow-Structure.md` | Version 1.2, Active, 2026-08-07; commit `500e0b8a4b172889ed308a9c5a510335b00b7974` |
+| `TOP-Initial-Operational-Workflows.md` | Version 1.0, Approved, 2026-08-07; commit `500e0b8a4b172889ed308a9c5a510335b00b7974` |
+| `TOP-Product-Scope-Definition-Rules.md` | Version 1.0, Active, 2026-08-07; commit `500e0b8a4b172889ed308a9c5a510335b00b7974` |
+| `TOP-Business-Domain-Boundary.md` | Business Architecture baseline at commit `500e0b8a4b172889ed308a9c5a510335b00b7974` |
+| `TOP-Operational-Capability-Model.md` | Business Architecture baseline at commit `500e0b8a4b172889ed308a9c5a510335b00b7974` |
+| `TOP-Core-Business-Object-Model.md` | Business Architecture baseline at commit `500e0b8a4b172889ed308a9c5a510335b00b7974` |
 
 ## 3. Outcome boundary
 
@@ -135,7 +135,7 @@ The minimum approved course is:
 
 | Exclusion ID | Classification | Excluded outcome | Rationale and evidence | Reconsideration condition | Related inclusions |
 |---|---|---|---|---|---|
-| M2-PSE-001 | Context exclusion | Alternative-Court reassignment as a required M2 completion path. | M2 Boundary §§5, 8, M2-AC-08 and real-DB item 6 make original-Court recovery sufficient. | A later approved Product Scope version may include it only after authoritative Scheduling meaning and history are governed. | M2-PSI-004 remains complete without it. |
+| M2-PSE-001 | Context exclusion | Alternative-Court reassignment as a required M2 completion path. | M2 Boundary §§5 and 8 and M2-AC-08 establish original-Court recovery as sufficient and classify reassignment as optional. | A later approved Product Scope version may include it only after authoritative Scheduling meaning and history are governed. | M2-PSI-004 remains complete without it. |
 | M2-PSE-002 | Boundary exclusion | Master or experience authority to create Court condition, Match execution, Referee responsibility, or Scheduling facts. | M2 Boundary §§3, 6–7; Actor/Goal Model; Domain Boundary; Capability Model. | Requires upstream actor, capability, and domain authority change plus full revalidation. | All inclusions. |
 | M2-PSE-003 | Boundary exclusion | TOP authority over external competition definitions, draw, rules, or externally governed schedule-plan meaning. | M2 Boundary §§3, 6, 9; Competition Context boundary. | Requires upstream Business Architecture authority change. | M2-PSI-001, M2-PSI-003. |
 | M2-PSE-004 | Context exclusion | Full schedule management, automatic optimization, generic court booking, or facility management. | M2 Boundary §9 limits the decision to one constrained-Court coordination loop. | Separate approved product evidence and Product Scope decision. | M2-PSI-002, M2-PSI-004. |
