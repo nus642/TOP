@@ -41,10 +41,21 @@ test("archive workflow loads and renders the backend projection", async () => {
   assert.match(loaded[1].results, /比赛 12[\s\S]*11[\s\S]*8/);
 });
 
-test("archive renderer presents real competition lifecycle statuses in Chinese", () => {
-  const rendered = renderArchive({ competitionId: 7, competitionStatus: "draft", standings: [], matches: [] });
-  assert.match(rendered.summary, /草稿/);
-  assert.doesNotMatch(rendered.summary, /draft/i);
+test("archive renderer presents every competition lifecycle status in Chinese", () => {
+  const lifecycleStatuses = [
+    ["draft", "草稿"],
+    ["configured", "已配置"],
+    ["scheduled", "已排期"],
+    ["running", "进行中"],
+    ["completed", "已结束"],
+    ["archived", "已归档"]
+  ];
+
+  for (const [status, expectedLabel] of lifecycleStatuses) {
+    const rendered = renderArchive({ competitionId: 7, competitionStatus: status, standings: [], matches: [] });
+    assert.match(rendered.summary, new RegExp(expectedLabel), status);
+    assert.doesNotMatch(rendered.summary, new RegExp(status, "i"), status);
+  }
 });
 
 test("archive renderer presents unknown competition lifecycle statuses with a Chinese fallback", () => {

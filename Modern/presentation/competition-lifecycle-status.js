@@ -5,8 +5,8 @@
 })(function createModule() {
     const COMPETITION_LIFECYCLE_STATUS_LABELS = Object.freeze({
         draft: "草稿",
-        registration_open: "报名开放",
-        ready: "准备就绪",
+        configured: "已配置",
+        scheduled: "已排期",
         running: "进行中",
         completed: "已结束",
         archived: "已归档"

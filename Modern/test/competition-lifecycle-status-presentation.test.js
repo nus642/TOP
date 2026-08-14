@@ -6,14 +6,19 @@ const {
 } = require("../presentation/competition-lifecycle-status");
 
 test("competition lifecycle statuses have Simplified Chinese labels", () => {
-    assert.deepEqual(COMPETITION_LIFECYCLE_STATUS_LABELS, {
-        draft: "草稿",
-        registration_open: "报名开放",
-        ready: "准备就绪",
-        running: "进行中",
-        completed: "已结束",
-        archived: "已归档"
-    });
+    const lifecycleStatuses = [
+        ["draft", "草稿"],
+        ["configured", "已配置"],
+        ["scheduled", "已排期"],
+        ["running", "进行中"],
+        ["completed", "已结束"],
+        ["archived", "已归档"]
+    ];
+
+    assert.deepEqual(Object.entries(COMPETITION_LIFECYCLE_STATUS_LABELS), lifecycleStatuses);
+    for (const [status, expectedLabel] of lifecycleStatuses) {
+        assert.equal(competitionLifecycleStatusLabel(status), expectedLabel, status);
+    }
 });
 
 test("unknown competition lifecycle statuses use a Chinese fallback", () => {
