@@ -14,10 +14,10 @@ visibility.
 M1 delivery evidence includes the complete Modern test suite, real-DB rehearsal, and
 the frozen main commit referenced by the release tag.
 
-## Proposed Next Product Boundary
+## Approved Next Product Boundary
 
 [M2 Tournament Coordination Loop Boundary](M2-Tournament-Coordination-Loop-Boundary.md)
-is the Product Decision-confirmed proposal for Canon review.
+is the Canon-approved Product Boundary entering Engineering Readiness.
 
 M2 extends TOP from one safe match-operation loop to the minimum live-tournament
 coordination loop needed by a Master operating multiple matches and Courts. Its
@@ -34,12 +34,11 @@ Alternative-Court reassignment is conditional on Engineering Readiness confirmin
 authoritative Scheduling reassignment contract.
 
 M2 remains unimplemented and does not authorize Engineering Design, implementation
-issues, or a Milestone until the Product Boundary passes Canon review and Engineering
-Readiness.
+issues, or a Milestone until Engineering Readiness passes.
 
 Version: 1.1
 
-Status: Product Map — M1 delivered; M2 proposed for Canon review
+Status: Product Map — M1 delivered; M2 Canon-approved, Engineering Readiness pending
 
 Last Update: 2026-08-14
 
