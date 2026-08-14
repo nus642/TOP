@@ -44,8 +44,8 @@ test("archive workflow loads and renders the backend projection", async () => {
 test("archive renderer presents every competition lifecycle status in Chinese", () => {
   const lifecycleStatuses = [
     ["draft", "草稿"],
-    ["configured", "已配置"],
-    ["scheduled", "已排期"],
+    ["registration_open", "报名开放"],
+    ["ready", "准备就绪"],
     ["running", "进行中"],
     ["completed", "已结束"],
     ["archived", "已归档"]
