@@ -26,7 +26,8 @@ function response(competitionId, participantId, row) {
     competitionId,
     participantId: readiness.participantId,
     state: readiness.state,
-    checkedInAt: readiness.checkedInAt
+    checkedInAt: readiness.checkedInAt,
+    source: (row && row.source) || null
   };
 }
 

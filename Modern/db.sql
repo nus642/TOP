@@ -252,11 +252,15 @@ CREATE TABLE IF NOT EXISTS player_check_ins (
     player_id INT NOT NULL,
     checked_in BOOLEAN NOT NULL DEFAULT FALSE,
     checked_in_at TIMESTAMP NULL DEFAULT NULL,
+    source VARCHAR(50) DEFAULT NULL,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     UNIQUE KEY uq_player_check_in (tournament_id, player_id),
     FOREIGN KEY (tournament_id) REFERENCES tournaments(id) ON DELETE CASCADE,
     FOREIGN KEY (player_id) REFERENCES players(id) ON DELETE CASCADE
 ) DEFAULT CHARSET=utf8mb4;
+
+-- Additive migration: source column for Participant Readiness provenance.
+ALTER TABLE player_check_ins ADD COLUMN IF NOT EXISTS source VARCHAR(50) DEFAULT NULL;
 
 CREATE TABLE IF NOT EXISTS waivers (
     id INT PRIMARY KEY AUTO_INCREMENT,
