@@ -13,6 +13,10 @@ const { importSchedule, validateImportData } = require("../services/schedule-imp
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
+const MASTER_ACTOR = Object.freeze({ actorId: "master-1", actorType: "master" });
+const REFEREE_ACTOR = Object.freeze({ actorId: "referee-1", actorType: "referee" });
+const PARTICIPANT_ACTOR = Object.freeze({ actorId: "participant-1", actorType: "participant" });
+
 function makePlayers(count) {
   const players = [];
   for (let i = 1; i <= count; i++) {
@@ -81,6 +85,7 @@ function make32DrawImport() {
 const original = {
   withTransaction: db.withTransaction,
   getCompetition: tournamentRepository.getTournamentByIdWithConnection,
+  getCompetitionForUpdate: tournamentRepository.getTournamentByIdForUpdate,
   updateTournamentName: tournamentRepository.updateTournamentName,
   createPlayer: playerRepository.createPlayer,
   getPlayerMap: playerRepository.getPlayerMap,
@@ -104,11 +109,12 @@ function setupMocks(competitionStatus = "draft", activeMatchCount = 0) {
     createPlayer: [], createPairing: [], createMatch: [], createSchedule: [],
     bulkUpsert: [], deleteSchedules: 0, deleteMatches: 0, deletePairings: 0,
     deletePlayers: 0, deletePartners: 0, deleteOpponents: 0, deleteCheckIns: 0,
-    updateTournamentName: []
+    updateTournamentName: [], forUpdateCalled: false
   };
 
   db.withTransaction = async (work) => work({ query: async () => [[]] });
-  tournamentRepository.getTournamentByIdWithConnection = async () => ({ id: 1, status: competitionStatus });
+  const tournamentRow = { id: 1, status: competitionStatus };
+  tournamentRepository.getTournamentByIdForUpdate = async () => { calls.forUpdateCalled = true; return tournamentRow; };
   tournamentRepository.updateTournamentName = async (_id, name) => { calls.updateTournamentName.push(name); };
   matchRepository.getActiveMatchesByTournament = async () => activeMatchCount;
 
@@ -136,6 +142,7 @@ function setupMocks(competitionStatus = "draft", activeMatchCount = 0) {
 function restoreMocks() {
   db.withTransaction = original.withTransaction;
   tournamentRepository.getTournamentByIdWithConnection = original.getCompetition;
+  tournamentRepository.getTournamentByIdForUpdate = original.getCompetitionForUpdate;
   tournamentRepository.updateTournamentName = original.updateTournamentName;
   playerRepository.createPlayer = original.createPlayer;
   playerRepository.getPlayerMap = original.getPlayerMap;
@@ -211,11 +218,11 @@ test("validateImportData passes for 32-draw import", () => {
   assert.equal(validateImportData(make32DrawImport()).errors.length, 0);
 });
 
-// ─── Enhanced validation tests (review fix #2) ─────────────────────────────
+// ─── Enhanced validation tests ──────────────────────────────────────────────
 
 test("rejects duplicate participant within a single match", () => {
   const data = makeMinimalImport();
-  data.rounds[0].matches[0].p3 = "Player 01"; // Player 01 appears twice
+  data.rounds[0].matches[0].p3 = "Player 01";
   const { errors } = validateImportData(data);
   assert.ok(errors.some((e) => e.message.includes("Duplicate participant")));
 });
@@ -233,7 +240,7 @@ test("rejects court-time conflict", () => {
 
 test("rejects player belonging to multiple pairs", () => {
   const data = makeMinimalImport();
-  data.pairs.push({ name: "Player 01 & Player 03" }); // Player 01 already in pair 0
+  data.pairs.push({ name: "Player 01 & Player 03" });
   const { errors } = validateImportData(data);
   assert.ok(errors.some((e) => e.message.includes("belongs to 2 pairs")));
 });
@@ -248,7 +255,7 @@ test("rejects fixed-pair mode with missing pairs array", () => {
 
 test("rejects team1 inconsistent with p1 & p2", () => {
   const data = makeMinimalImport();
-  data.rounds[0].matches[0].team1 = "Player 03 & Player 04"; // swapped with team2
+  data.rounds[0].matches[0].team1 = "Player 03 & Player 04";
   const { errors } = validateImportData(data);
   assert.ok(errors.some((e) => e.message.includes("team1 does not match p1 & p2")));
 });
@@ -260,13 +267,119 @@ test("rejects empty round with no matches", () => {
   assert.ok(errors.some((e) => e.message.includes("Round must not be empty")));
 });
 
-// ─── Lifecycle guard tests (review fix #1) ─────────────────────────────────
+// ─── Blocking review fix #3: strict fixed-pair validation ──────────────────
+
+test("rejects player not belonging to any pair in fixed-pair mode", () => {
+  const data = makeMinimalImport();
+  // Remove Player 04 from all pairs by replacing pairs with only Player 01-03
+  data.pairs = [{ name: "Player 01 & Player 02" }];
+  data.players = [
+    { name: "Player 01", lv: 3, paired: true },
+    { name: "Player 02", lv: 3, paired: true },
+    { name: "Player 03", lv: 3, paired: true },
+    { name: "Player 04", lv: 3, paired: true }
+  ];
+  const { errors } = validateImportData(data);
+  assert.ok(errors.some((e) => e.message.includes("does not belong to any pair")));
+});
+
+test("rejects missing team1 in fixed-pair mode", () => {
+  const data = makeMinimalImport();
+  delete data.rounds[0].matches[0].team1;
+  const { errors } = validateImportData(data);
+  assert.ok(errors.some((e) => e.message.includes("team1 is required")));
+});
+
+test("rejects missing team2 in fixed-pair mode", () => {
+  const data = makeMinimalImport();
+  delete data.rounds[0].matches[0].team2;
+  const { errors } = validateImportData(data);
+  assert.ok(errors.some((e) => e.message.includes("team2 is required")));
+});
+
+test("rejects team1 that does not match any declared pair", () => {
+  const data = makeMinimalImport();
+  data.rounds[0].matches[0].team1 = "Player 01 & Player 03"; // not a declared pair
+  const { errors } = validateImportData(data);
+  assert.ok(errors.some((e) => e.message.includes("does not match any declared pair")));
+});
+
+// ─── Blocking review fix #4: normalization ──────────────────────────────────
+
+test("court-time conflict detected despite whitespace variation", () => {
+  const data = makeMinimalImport();
+  data.rounds[0].matches.push({
+    court: "  Court   1  ", scheduledAt: "2026-09-12T08:00:00.000Z",
+    p1: "Player 01", p2: "Player 02", p3: "Player 03", p4: "Player 04",
+    team1: data.pairs[0].name, team2: data.pairs[1].name
+  });
+  const { errors } = validateImportData(data);
+  assert.ok(errors.some((e) => e.message.includes("Court-time conflict")),
+    `Expected conflict but got: ${JSON.stringify(errors)}`);
+});
+
+test("normalized court and time are stored consistently", async () => {
+  const calls = setupMocks();
+  try {
+    const data = makeMinimalImport();
+    data.rounds[0].matches[0].court = "  Court   1  ";
+    data.rounds[0].matches[0].scheduledAt = "2026-09-12T08:00:00.000Z";
+    await importSchedule(1, data, MASTER_ACTOR);
+    assert.equal(calls.createSchedule[0].courtId, "Court 1");
+    assert.equal(calls.createSchedule[0].scheduledAt, "2026-09-12T08:00:00Z");
+    assert.equal(calls.createMatch[0].court, "Court 1");
+  } finally { restoreMocks(); }
+});
+
+// ─── Blocking review fix #1: Master-only authorization ──────────────────────
+
+test("importSchedule rejects non-master actor (referee)", async () => {
+  setupMocks();
+  try {
+    await assert.rejects(
+      () => importSchedule(1, makeMinimalImport(), REFEREE_ACTOR),
+      (err) => err.code === "FORBIDDEN" && err.message.includes("master")
+    );
+  } finally { restoreMocks(); }
+});
+
+test("importSchedule rejects non-master actor (participant)", async () => {
+  setupMocks();
+  try {
+    await assert.rejects(
+      () => importSchedule(1, makeMinimalImport(), PARTICIPANT_ACTOR),
+      (err) => err.code === "FORBIDDEN" && err.message.includes("master")
+    );
+  } finally { restoreMocks(); }
+});
+
+test("importSchedule rejects missing actor", async () => {
+  setupMocks();
+  try {
+    await assert.rejects(
+      () => importSchedule(1, makeMinimalImport()),
+      (err) => err.code === "FORBIDDEN"
+    );
+  } finally { restoreMocks(); }
+});
+
+// ─── Blocking review fix #2: tournament row lock ────────────────────────────
+
+test("importSchedule uses FOR UPDATE lock on tournament row", async () => {
+  const calls = setupMocks();
+  try {
+    await importSchedule(1, makeMinimalImport(), MASTER_ACTOR);
+    assert.equal(calls.forUpdateCalled, true);
+  } finally { restoreMocks(); }
+});
+
+// ─── Lifecycle guard tests ──────────────────────────────────────────────────
 
 test("importSchedule rejects non-draft competition without any deletes", async () => {
   const calls = setupMocks("running");
   try {
     await assert.rejects(
-      () => importSchedule(1, makeMinimalImport()),
+      () => importSchedule(1, makeMinimalImport(), MASTER_ACTOR),
       (err) => err.code === "LIFECYCLE_BLOCKED" && err.message.includes("draft")
     );
     assert.equal(calls.deleteSchedules, 0);
@@ -279,7 +392,7 @@ test("importSchedule rejects when active matches exist without any deletes", asy
   const calls = setupMocks("draft", 3);
   try {
     await assert.rejects(
-      () => importSchedule(1, makeMinimalImport()),
+      () => importSchedule(1, makeMinimalImport(), MASTER_ACTOR),
       (err) => err.code === "LIFECYCLE_BLOCKED" && err.message.includes("3 match(es)")
     );
     assert.equal(calls.deleteSchedules, 0);
@@ -292,7 +405,7 @@ test("importSchedule rejects when active matches exist without any deletes", asy
 test("importSchedule writes players, matches, schedules, and readiness in one transaction", async () => {
   const calls = setupMocks();
   try {
-    const result = await importSchedule(1, makeMinimalImport());
+    const result = await importSchedule(1, makeMinimalImport(), MASTER_ACTOR);
     assert.equal(result.success, true);
     assert.equal(result.summary.players, 4);
     assert.equal(result.summary.pairs, 2);
@@ -310,17 +423,17 @@ test("importSchedule updates tournament name when provided", async () => {
   try {
     const data = makeMinimalImport();
     data.tournamentName = "Updated Name";
-    await importSchedule(1, data);
+    await importSchedule(1, data, MASTER_ACTOR);
     assert.deepEqual(calls.updateTournamentName, ["Updated Name"]);
   } finally { restoreMocks(); }
 });
 
 test("importSchedule rejects unknown competition", async () => {
   setupMocks();
-  tournamentRepository.getTournamentByIdWithConnection = async () => null;
+  tournamentRepository.getTournamentByIdForUpdate = async () => null;
   try {
     await assert.rejects(
-      () => importSchedule(999, makeMinimalImport()),
+      () => importSchedule(999, makeMinimalImport(), MASTER_ACTOR),
       (err) => err.code === "NOT_FOUND"
     );
   } finally { restoreMocks(); }
@@ -332,7 +445,7 @@ test("validation errors prevent any writes", async () => {
     const data = makeMinimalImport();
     data.rounds[0].matches[0].p1 = "Ghost";
     await assert.rejects(
-      () => importSchedule(1, data),
+      () => importSchedule(1, data, MASTER_ACTOR),
       (err) => err.code === "VALIDATION_ERROR"
     );
     assert.equal(calls.createPlayer.length, 0);
@@ -344,14 +457,14 @@ test("importSchedule is idempotent — re-import produces same result", async ()
   const calls = setupMocks();
   try {
     const data = makeMinimalImport();
-    const r1 = await importSchedule(1, data);
-    const r2 = await importSchedule(1, data);
+    const r1 = await importSchedule(1, data, MASTER_ACTOR);
+    const r2 = await importSchedule(1, data, MASTER_ACTOR);
     assert.equal(r1.summary.players, r2.summary.players);
     assert.equal(calls.deletePlayers, 2);
   } finally { restoreMocks(); }
 });
 
-// ─── 32-draw realistic scale test (review fix #3) ──────────────────────────
+// ─── 32-draw realistic scale test ───────────────────────────────────────────
 
 test("32-draw template has 16 first-round matches, consistent names, no conflicts", async () => {
   const data = make32DrawImport();
@@ -364,7 +477,7 @@ test("32-draw template has 16 first-round matches, consistent names, no conflict
 test("32-draw import creates 64 players, 32 pairs, and 16 authoritative schedules", async () => {
   const calls = setupMocks();
   try {
-    const result = await importSchedule(1, make32DrawImport());
+    const result = await importSchedule(1, make32DrawImport(), MASTER_ACTOR);
     assert.equal(result.summary.players, 64);
     assert.equal(result.summary.pairs, 32);
     assert.equal(result.summary.matches, 16);
@@ -397,7 +510,7 @@ test("32-draw sample template file is valid for import", () => {
 test("imported readiness carries source event_import", async () => {
   const calls = setupMocks();
   try {
-    await importSchedule(1, makeMinimalImport());
+    await importSchedule(1, makeMinimalImport(), MASTER_ACTOR);
     assert.equal(calls.bulkUpsert[0].source, "event_import");
   } finally { restoreMocks(); }
 });

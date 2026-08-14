@@ -10,9 +10,12 @@ function createImportRouter() {
       if (!Number.isInteger(competitionId) || competitionId <= 0) {
         return res.status(400).json({ error: "Valid competition id is required" });
       }
-      const result = await scheduleImportService.importSchedule(competitionId, req.body);
+      const result = await scheduleImportService.importSchedule(competitionId, req.body, req.actor);
       res.status(201).json(result);
     } catch (err) {
+      if (err.code === "FORBIDDEN") {
+        return res.status(403).json({ error: err.message });
+      }
       if (err.code === "VALIDATION_ERROR") {
         return res.status(400).json({ error: err.message, details: err.details || null });
       }

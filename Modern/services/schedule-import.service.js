@@ -33,6 +33,26 @@ const ACTIVE_MATCH_STATUSES = new Set([
 ]);
 
 /**
+ * Normalize a court identifier for consistent comparison.
+ * Trims whitespace and collapses internal runs of spaces.
+ */
+function normalizeCourt(value) {
+  if (!value) return value;
+  return value.trim().replace(/\s+/g, " ");
+}
+
+/**
+ * Normalize a scheduled-at value to canonical ISO 8601 (second precision, UTC).
+ * Prevents conflict-check bypass via format variation (e.g. with/without ms).
+ */
+function normalizeScheduledAt(value) {
+  if (!value) return value;
+  const d = new Date(value);
+  if (Number.isNaN(d.getTime())) return value;
+  return d.toISOString().replace(/\.\d{3}Z$/, "Z");
+}
+
+/**
  * Validate the entire import template before any writes.
  * Returns { errors: [] } — empty means valid.
  */
@@ -105,6 +125,15 @@ function validateImportData(data) {
         errors.push({ row: "pairs", message: `Player '${name}' belongs to ${count} pairs` });
       }
     }
+
+    // In fixed-pair mode every player must belong to exactly one pair
+    if (data.mode === "fixed-pair") {
+      for (const name of playerNames) {
+        if (!pairPlayerCounts[name]) {
+          errors.push({ row: "pairs", message: `Player '${name}' does not belong to any pair` });
+        }
+      }
+    }
   }
 
   // Build pair lookup for team consistency check
@@ -138,13 +167,17 @@ function validateImportData(data) {
       const row = `${roundLabel}.matches[${m}]`;
       totalMatches++;
 
-      if (!match.court || typeof match.court !== "string" || !match.court.trim()) {
+      // Normalize court and scheduledAt before validation
+      const normCourt = normalizeCourt(match.court);
+      const normAt = normalizeScheduledAt(match.scheduledAt);
+
+      if (!normCourt || typeof normCourt !== "string" || !normCourt.trim()) {
         errors.push({ row, message: "Court is required" });
       }
-      if (!match.scheduledAt) {
+      if (!normAt) {
         errors.push({ row, message: "Scheduled time is required" });
       } else {
-        const d = new Date(match.scheduledAt);
+        const d = new Date(normAt);
         if (Number.isNaN(d.getTime())) {
           errors.push({ row, message: "Invalid scheduled time" });
         }
@@ -169,27 +202,41 @@ function validateImportData(data) {
         }
       }
 
-      // Court-time conflict
-      if (match.court && match.scheduledAt) {
-        const slotKey = `${match.court.trim()}|${match.scheduledAt}`;
+      // Court-time conflict (using normalized values)
+      if (normCourt && normAt) {
+        const slotKey = `${normCourt}|${normAt}`;
         if (courtTimeSlots.has(slotKey)) {
-          errors.push({ row, message: `Court-time conflict: ${match.court} at ${match.scheduledAt}` });
+          errors.push({ row, message: `Court-time conflict: ${normCourt} at ${normAt}` });
         }
         courtTimeSlots.add(slotKey);
       }
 
-      // Team name consistency with p1–p4
-      if (data.mode === "fixed-pair" && match.team1 && matchPlayers.length === 4) {
-        const team1Names = match.team1.split(" & ").map((s) => s.trim()).sort();
-        const side1 = [matchPlayers[0], matchPlayers[1]].sort();
-        if (team1Names[0] !== side1[0] || team1Names[1] !== side1[1]) {
-          errors.push({ row, message: "team1 does not match p1 & p2" });
+      // Team name consistency — required in fixed-pair mode
+      if (data.mode === "fixed-pair") {
+        if (!match.team1 || typeof match.team1 !== "string" || !match.team1.trim()) {
+          errors.push({ row, message: "team1 is required in fixed-pair mode" });
+        } else if (matchPlayers.length === 4) {
+          const team1Names = match.team1.split(" & ").map((s) => s.trim()).sort();
+          const side1 = [matchPlayers[0], matchPlayers[1]].sort();
+          if (team1Names[0] !== side1[0] || team1Names[1] !== side1[1]) {
+            errors.push({ row, message: "team1 does not match p1 & p2" });
+          }
+          // team1 must exist as a declared pair
+          if (!pairLookup.has(team1Names.join(" & "))) {
+            errors.push({ row, message: `team1 '${match.team1}' does not match any declared pair` });
+          }
         }
-        if (match.team2) {
+        if (!match.team2 || typeof match.team2 !== "string" || !match.team2.trim()) {
+          errors.push({ row, message: "team2 is required in fixed-pair mode" });
+        } else if (matchPlayers.length === 4) {
           const team2Names = match.team2.split(" & ").map((s) => s.trim()).sort();
           const side2 = [matchPlayers[2], matchPlayers[3]].sort();
           if (team2Names[0] !== side2[0] || team2Names[1] !== side2[1]) {
             errors.push({ row, message: "team2 does not match p3 & p4" });
+          }
+          // team2 must exist as a declared pair
+          if (!pairLookup.has(team2Names.join(" & "))) {
+            errors.push({ row, message: `team2 '${match.team2}' does not match any declared pair` });
           }
         }
       }
@@ -213,7 +260,14 @@ function validateImportData(data) {
  * Any row failure rolls back the whole import.
  * Retry is safe: DELETE+INSERT guarantees no duplicates.
  */
-async function importSchedule(competitionIdValue, data) {
+async function importSchedule(competitionIdValue, data, actor) {
+  // Authorization: only master actors may import schedules.
+  if (!actor || actor.actorType !== "master") {
+    const err = new Error("Only a master may import schedules");
+    err.code = "FORBIDDEN";
+    throw err;
+  }
+
   const tournamentId = parsePositiveId(competitionIdValue, "competition");
 
   // Phase 1: Validate entire file before any writes
@@ -227,7 +281,8 @@ async function importSchedule(competitionIdValue, data) {
 
   // Phase 2: Single transaction for all writes
   return db.withTransaction(async (connection) => {
-    const competition = await tournamentRepository.getTournamentByIdWithConnection(
+    // Lock the tournament row to prevent concurrent status changes.
+    const competition = await tournamentRepository.getTournamentByIdForUpdate(
       tournamentId, connection
     );
     if (!competition) throw makeNotFoundError("Competition not found");
@@ -304,7 +359,7 @@ async function importSchedule(competitionIdValue, data) {
         const createdMatch = await matchRepository.createMatch({
           tournament_id: tournamentId,
           round_num: roundNum,
-          court: m.court.trim(),
+          court: normalizeCourt(m.court),
           player1_id: playerMap[m.p1.trim()],
           player2_id: playerMap[m.p2.trim()],
           player3_id: playerMap[m.p3.trim()],
@@ -319,8 +374,8 @@ async function importSchedule(competitionIdValue, data) {
         await scheduleRepository.create({
           competitionId: tournamentId,
           matchId: createdMatch.id,
-          scheduledAt: new Date(m.scheduledAt).toISOString(),
-          courtId: m.court.trim()
+          scheduledAt: normalizeScheduledAt(m.scheduledAt),
+          courtId: normalizeCourt(m.court)
         }, connection);
 
         createdMatchIds.push(createdMatch.id);
