@@ -52,13 +52,20 @@ A later Product Scope version may reconsider it only after authoritative Schedul
 meaning and history are governed.
 
 Engineering Readiness Version 1.2 is `Ready` for Product Scope
-PS-M2-TC-001 Version 1.1. Engineering Design #129 may resume against that exact
-baseline. This authorizes Engineering Design only, not implementation, milestone,
-release, or delivery work.
+PS-M2-TC-001 Version 1.1.
 
-Version: 1.5
+[M2 Tournament Coordination Engineering Design](../03_Engineering/M2-Tournament-Coordination-Engineering-Design.md)
+ED-M2-TC-001 Version 1.0 is Approved. It selects separate authoritative Court
+condition, transactional Match consequences, explicit Master reporting, Referee
+interrupt/resume, bounded deferment, combined projection, concurrency control,
+restart reconstruction, and additive M1-compatible migration.
 
-Status: Product Map — M1 delivered; M2 Product Scope v1.1 approved; Engineering Readiness v1.2 ready; Engineering Design active
+The approved design authorizes a bounded implementation issue. It does not itself
+authorize a milestone, release, deployment, or completion claim.
+
+Version: 1.6
+
+Status: Product Map — M1 delivered; M2 Scope/Readiness/Engineering Design approved; bounded implementation next
 
 Last Update: 2026-08-14
 
