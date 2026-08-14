@@ -90,7 +90,9 @@ async function findByCompetitionId(competitionId, connection = db) {
         disposition: row.disruption_disposition, version: Number(row.disruption_version) } : null,
       attentionRequired: attention,
       attentionReason: attention ? "playing_match_on_blocked_court" : null,
-      nextResponsibleActor: attention || interrupted ? "referee" : null
+      nextResponsibleActor: attention ? "referee"
+        : interrupted ? (["constrained", "uncertain"].includes(condition) ? "master" : "referee")
+          : null
     });
   }
   return {

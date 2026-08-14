@@ -4,6 +4,7 @@ const test = require("node:test");
 const db = require("../database/db");
 const matchRepository = require("../repositories/match-operation.repository");
 const readinessRepository = require("../repositories/participant-readiness.repository");
+const courtRepository = require("../repositories/court-coordination.repository");
 const service = require("../services/match-operations.service");
 const { MatchOperation } = require("../engine/operations/domain");
 
@@ -42,13 +43,23 @@ test("operation context projects authoritative readiness and gates explicit star
     transaction: db.withTransaction,
     find: matchRepository.findById,
     readiness: readinessRepository.listForCompetition,
-    start: matchRepository.start
+    start: matchRepository.start,
+    findCourt: courtRepository.findScheduledCourt,
+    lockCourt: courtRepository.lockCondition,
+    playing: courtRepository.findPlayingMatch,
+    updateCourt: courtRepository.updateCondition,
+    appendEvent: courtRepository.appendEvent
   };
   t.after(() => {
     db.withTransaction = originals.transaction;
     matchRepository.findById = originals.find;
     readinessRepository.listForCompetition = originals.readiness;
     matchRepository.start = originals.start;
+    courtRepository.findScheduledCourt = originals.findCourt;
+    courtRepository.lockCondition = originals.lockCourt;
+    courtRepository.findPlayingMatch = originals.playing;
+    courtRepository.updateCondition = originals.updateCourt;
+    courtRepository.appendEvent = originals.appendEvent;
   });
 
   const record = {
@@ -65,6 +76,11 @@ test("operation context projects authoritative readiness and gates explicit star
     { participant_id: 12, checked_in: 0 }
   ];
   matchRepository.start = async () => ({ ...record, status: "playing" });
+  courtRepository.findScheduledCourt = async () => "court-1";
+  courtRepository.lockCondition = async () => ({ condition: "available", version: 0 });
+  courtRepository.findPlayingMatch = async () => null;
+  courtRepository.updateCondition = async (data) => ({ ...data, version: 1 });
+  courtRepository.appendEvent = async () => 1;
 
   const context = await service.getMatchOperationContext(3, 9);
   assert.equal(context.allParticipantsReady, false);

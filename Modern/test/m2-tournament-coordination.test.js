@@ -7,6 +7,8 @@ const { MatchOperation, MATCH_OPERATION_STATES } = require("../engine/operations
 const courtService = require("../services/court-coordination.service");
 const masterRouter = require("../api/master-workflow");
 const refereeRouter = require("../api/referee-workflow");
+const courtRepository = require("../repositories/court-coordination.repository");
+const liveStatusRepository = require("../repositories/live-match-status.repository");
 
 function playingMatch(overrides = {}) {
   return new MatchOperation({
@@ -76,4 +78,46 @@ test("resolving a disruption preserves recovery attribution", () => {
   const resolveBody = source.slice(source.indexOf("async function resolveDisruption"), source.indexOf("async function recoverDisruption"));
   assert.match(resolveBody, /resolved_at/);
   assert.doesNotMatch(resolveBody, /recovered_by|recovered_at/);
+});
+
+test("a duplicate correlation is rejected as a governed conflict", async () => {
+  const connection = {
+    async query() {
+      const duplicate = new Error("duplicate");
+      duplicate.code = "ER_DUP_ENTRY";
+      throw duplicate;
+    }
+  };
+  await assert.rejects(
+    courtRepository.appendEvent({
+      tournamentId: 4, courtId: "court-1", matchId: 17,
+      eventType: "court_condition_reported", sourceType: "master_report",
+      actorId: "master-1", correlationId: "report-1"
+    }, connection),
+    (error) => error.code === "VALIDATION_ERROR" && /already been used/.test(error.message)
+  );
+});
+
+test("the combined projection identifies the correct next responsible actor", async () => {
+  const base = {
+    competition_status: "running", round_number: 1, court_id: "court-1",
+    scheduled_at: new Date("2026-08-14T10:00:00Z"), referee_id: "referee-7",
+    responsibility_accepted_at: new Date(), score1: null, score2: null,
+    has_official_record: 0, court_source_type: "master_report",
+    court_source_reference: "report-1", court_actor_id: "master-1",
+    court_effective_at: new Date("2026-08-14T10:15:00Z"), court_version: 2,
+    disruption_id: 5, disruption_match_id: 17,
+    disruption_disposition: "deferred", disruption_version: 1
+  };
+  const connection = { query: async () => [[{
+    ...base, match_id: 17, match_status: "interrupted", court_condition: "constrained"
+  }]] };
+  let projection = await liveStatusRepository.findByCompetitionId(4, connection);
+  assert.equal(projection.courts[0].nextResponsibleActor, "master");
+
+  connection.query = async () => [[{
+    ...base, match_id: 17, match_status: "interrupted", court_condition: "available"
+  }]];
+  projection = await liveStatusRepository.findByCompetitionId(4, connection);
+  assert.equal(projection.courts[0].nextResponsibleActor, "referee");
 });

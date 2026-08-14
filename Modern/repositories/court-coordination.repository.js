@@ -60,9 +60,18 @@ async function findPlayingMatch(tournamentId, courtId, connection = db) {
   const [rows] = await connection.query(
     `SELECT m.id FROM matches m JOIN match_schedules ms ON ms.match_id = m.id
      AND ms.tournament_id = m.tournament_id
-     WHERE m.tournament_id = ? AND ms.court_id = ? AND m.status = 'playing' LIMIT 1`,
+     WHERE m.tournament_id = ? AND ms.court_id = ? AND m.status = 'playing' LIMIT 1 FOR UPDATE`,
     [tournamentId, courtId]);
   return rows[0]?.id || null;
+}
+
+async function lockScheduledMatch(tournamentId, courtId, matchId, connection = db) {
+  const [rows] = await connection.query(
+    `SELECT m.id, m.status FROM matches m
+     JOIN match_schedules ms ON ms.match_id = m.id AND ms.tournament_id = m.tournament_id
+     WHERE m.tournament_id = ? AND ms.court_id = ? AND m.id = ? FOR UPDATE`,
+    [tournamentId, courtId, matchId]);
+  return rows[0] || null;
 }
 
 async function lockOpenDisruption(tournamentId, courtId, connection = db) {
@@ -107,14 +116,22 @@ async function recoverDisruption(id, actorId, connection = db) {
 }
 
 async function appendEvent(data, connection = db) {
-  const [result] = await connection.query(
-    `INSERT INTO tournament_coordination_chronology
-       (tournament_id, court_id, match_id, event_type, source_type, actor_id,
-        correlation_id, court_version, disruption_version, details)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-    [data.tournamentId, data.courtId, data.matchId || null, data.eventType, data.sourceType,
-      data.actorId || null, data.correlationId, data.courtVersion ?? null,
-      data.disruptionVersion ?? null, JSON.stringify(data.details || {})]);
+  let result;
+  try {
+    [result] = await connection.query(
+      `INSERT INTO tournament_coordination_chronology
+         (tournament_id, court_id, match_id, event_type, source_type, actor_id,
+          correlation_id, court_version, disruption_version, details)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [data.tournamentId, data.courtId, data.matchId || null, data.eventType, data.sourceType,
+        data.actorId || null, data.correlationId, data.courtVersion ?? null,
+        data.disruptionVersion ?? null, JSON.stringify(data.details || {})]);
+  } catch (error) {
+    if (error.code !== "ER_DUP_ENTRY") throw error;
+    const conflict = new Error("Coordination correlation identity has already been used");
+    conflict.code = "VALIDATION_ERROR";
+    throw conflict;
+  }
   await connection.query(
     `UPDATE court_operating_conditions SET last_chronology_id = ? WHERE tournament_id = ? AND court_id = ?`,
     [result.insertId, data.tournamentId, data.courtId]);
@@ -122,5 +139,5 @@ async function appendEvent(data, connection = db) {
 }
 
 module.exports = { findScheduledCourt, isKnownCourt, lockCondition, updateCondition,
-  findPlayingMatch, lockOpenDisruption, createDisruption, updateDisruption,
+  findPlayingMatch, lockScheduledMatch, lockOpenDisruption, createDisruption, updateDisruption,
   recoverDisruption, resolveDisruption, appendEvent };

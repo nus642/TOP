@@ -52,6 +52,14 @@ async function authoritativeTournament(tournamentId, connection) {
   return tournament;
 }
 
+async function requiredScheduledCourt(tournamentId, matchId, connection) {
+  const courtId = await courtRepository.findScheduledCourt(tournamentId, matchId, connection);
+  if (courtId) return courtId;
+  const error = new Error("Match requires a known assigned Court");
+  error.code = "VALIDATION_ERROR";
+  throw error;
+}
+
 async function mutate(tournamentValue, matchValue, capability, operation, persist) {
   const tournamentId = positiveId(tournamentValue, "tournament id");
   const matchId = positiveId(matchValue, "match id");
@@ -98,8 +106,8 @@ function startMatch(tournamentValue, matchValue, data = {}) {
   return db.withTransaction(async (connection) => {
     const tournament = await authoritativeTournament(tournamentId, connection);
     assertCompetitionLifecycleEligible(tournament.status, "matchStart");
-    const courtId = await courtRepository.findScheduledCourt(tournamentId, matchId, connection);
-    let court = courtId ? await courtRepository.lockCondition(tournamentId, courtId, connection) : null;
+    const courtId = await requiredScheduledCourt(tournamentId, matchId, connection);
+    let court = await courtRepository.lockCondition(tournamentId, courtId, connection);
     const record = await repository.findById(tournamentId, matchId, connection, true);
     if (!record) {
       const error = new Error("Match not found");
@@ -113,14 +121,14 @@ function startMatch(tournamentValue, matchValue, data = {}) {
     try {
       const match = new MatchOperation(record);
       match.start(data.refereeId, readiness);
-      if (court && court.condition !== "available") throw new OperationsError("COURT_NOT_AVAILABLE", "Assigned Court is not available");
-      if (court && await courtRepository.findPlayingMatch(tournamentId, courtId, connection)) {
+      if (court.condition !== "available") throw new OperationsError("COURT_NOT_AVAILABLE", "Assigned Court is not available");
+      if (await courtRepository.findPlayingMatch(tournamentId, courtId, connection)) {
         throw new OperationsError("COURT_ALREADY_OCCUPIED", "Another Match is already playing on the assigned Court");
       }
       const updatedMatch = await repository.start(tournamentId, matchId, connection);
-      if (court) court = await courtRepository.updateCondition({ tournamentId, courtId, condition: "occupied",
+      court = await courtRepository.updateCondition({ tournamentId, courtId, condition: "occupied",
         sourceType: "match_execution", sourceReference: `match:${matchId}:start`, actorId: data.refereeId }, connection);
-      if (court) await courtRepository.appendEvent({ tournamentId, courtId, matchId, eventType: "match_started_court_occupied",
+      await courtRepository.appendEvent({ tournamentId, courtId, matchId, eventType: "match_started_court_occupied",
         sourceType: "match_execution", actorId: data.refereeId, correlationId: data.correlationId || randomUUID(),
         courtVersion: court.version }, connection);
       return { match: updatedMatch, courtCondition: court, participantReadiness: readiness };
@@ -162,20 +170,20 @@ function submitResult(tournamentId, matchId, actor, data = {}) {
   return db.withTransaction(async (connection) => {
     const tournament = await authoritativeTournament(tid, connection);
     assertCompetitionLifecycleEligible(tournament.status, "scoreSubmission");
-    const courtId = await courtRepository.findScheduledCourt(tid, mid, connection);
-    let court = courtId ? await courtRepository.lockCondition(tid, courtId, connection) : null;
+    const courtId = await requiredScheduledCourt(tid, mid, connection);
+    let court = await courtRepository.lockCondition(tid, courtId, connection);
     const record = await repository.findById(tid, mid, connection, true);
-    let disruption = court ? await courtRepository.lockOpenDisruption(tid, courtId, connection) : null;
+    let disruption = await courtRepository.lockOpenDisruption(tid, courtId, connection);
     if (!record) { const e = new Error("Match not found"); e.code = "NOT_FOUND"; throw e; }
     try {
       const match = new MatchOperation(record); match.submitResult(actor, data.score1, data.score2);
       const updatedMatch = await repository.recordScore(tid, mid, match.score1, match.score2, connection);
-      if (court) court = await courtRepository.updateCondition({ tournamentId: tid, courtId, condition: "available",
+      court = await courtRepository.updateCondition({ tournamentId: tid, courtId, condition: "available",
         sourceType: "match_execution", sourceReference: `match:${mid}:end`, actorId: actor.actorId }, connection);
       if (disruption && (!disruption.affectedMatchId || Number(disruption.affectedMatchId) === mid)) {
         disruption = await courtRepository.resolveDisruption(disruption.id, connection);
       }
-      if (court) await courtRepository.appendEvent({ tournamentId: tid, courtId, matchId: mid,
+      await courtRepository.appendEvent({ tournamentId: tid, courtId, matchId: mid,
         eventType: "match_ended_court_released", sourceType: "match_execution", actorId: actor.actorId,
         correlationId: data.correlationId || randomUUID(), courtVersion: court.version,
         disruptionVersion: disruption?.version }, connection);
@@ -197,8 +205,7 @@ function executionChange(tournamentValue, matchValue, actor, data, action) {
   return db.withTransaction(async (connection) => {
     const tournament = await authoritativeTournament(tournamentId, connection);
     assertCompetitionLifecycleEligible(tournament.status, "matchStart");
-    const courtId = await courtRepository.findScheduledCourt(tournamentId, matchId, connection);
-    if (!courtId) { const e = new Error("Match requires a known assigned Court"); e.code = "VALIDATION_ERROR"; throw e; }
+    const courtId = await requiredScheduledCourt(tournamentId, matchId, connection);
     let court = await courtRepository.lockCondition(tournamentId, courtId, connection);
     const record = await repository.findById(tournamentId, matchId, connection, true);
     if (!record) { const e = new Error("Match not found"); e.code = "NOT_FOUND"; throw e; }
