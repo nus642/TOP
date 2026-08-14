@@ -2,6 +2,7 @@ const assert = require("node:assert/strict");
 const fs = require("node:fs");
 const path = require("node:path");
 const test = require("node:test");
+const vm = require("node:vm");
 const { createCompetitionArchiveApi } = require("../archive/api-client");
 const { createArchiveWorkflow, renderArchive } = require("../archive/archive");
 
@@ -40,10 +41,49 @@ test("archive workflow loads and renders the backend projection", async () => {
   assert.match(loaded[1].results, /比赛 12[\s\S]*11[\s\S]*8/);
 });
 
+test("archive renderer presents every competition lifecycle status in Chinese", () => {
+  const lifecycleStatuses = [
+    ["draft", "草稿"],
+    ["configured", "已配置"],
+    ["scheduled", "已排期"],
+    ["running", "进行中"],
+    ["completed", "已结束"],
+    ["archived", "已归档"]
+  ];
+
+  for (const [status, expectedLabel] of lifecycleStatuses) {
+    const rendered = renderArchive({ competitionId: 7, competitionStatus: status, standings: [], matches: [] });
+    assert.match(rendered.summary, new RegExp(expectedLabel), status);
+    assert.doesNotMatch(rendered.summary, new RegExp(status, "i"), status);
+  }
+});
+
+test("archive renderer presents unknown competition lifecycle statuses with a Chinese fallback", () => {
+  const rendered = renderArchive({ competitionId: 7, competitionStatus: "DRAFT", standings: [], matches: [] });
+  assert.match(rendered.summary, /未知状态/);
+  assert.doesNotMatch(rendered.summary, /DRAFT/);
+});
+
+test("archive loads the shared lifecycle mapping as browser scripts", () => {
+  const context = vm.createContext({ window: {} });
+  for (const file of ["presentation/competition-lifecycle-status.js", "archive/archive.js"]) {
+    vm.runInContext(fs.readFileSync(path.join(__dirname, "..", file), "utf8"), context);
+  }
+  const draft = context.window.CompetitionArchive.renderArchive({
+    competitionId: 7, competitionStatus: "draft", standings: [], matches: []
+  });
+  const unknown = context.window.CompetitionArchive.renderArchive({
+    competitionId: 8, competitionStatus: "DRAFT", standings: [], matches: []
+  });
+  assert.match(draft.summary, /草稿/);
+  assert.match(unknown.summary, /未知状态/);
+});
+
 test("archive presents all static user-visible copy in Simplified Chinese", () => {
   const html = fs.readFileSync(path.join(__dirname, "..", "archive", "index.html"), "utf8");
   assert.match(html, /<html lang="zh-CN">/);
   assert.match(html, /赛事档案/);
+  assert.match(html, /<script src="\/presentation\/competition-lifecycle-status\.js"><\/script>[\s\S]*<script src="\/archive\/archive\.js"><\/script>/);
   assert.doesNotMatch(html, />\s*(Competition|Official|Standings|Open archive|Final table)\b/);
 });
 
