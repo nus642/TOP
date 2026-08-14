@@ -54,7 +54,10 @@ Without an M2 boundary, a Master may see individual match facts but still lack:
   attributable interruption or resumption facts.
 * **Participant** retains responsibility for participant-owned readiness facts.
 * **External competition authority** retains ownership of competition definitions,
-  rules, draw, and schedule authority.
+  rules, draw, and externally governed schedule-plan meaning.
+* **Scheduling** owns TOP-managed Match placement, Match–Court assignment,
+  reassignment, unassignment, and assignment-history facts. It does not own Court
+  condition or Match execution.
 * **Public spectator / data consumer** receives trusted projections only; it does not
   participate in coordination.
 
@@ -118,8 +121,9 @@ reassignment contract. The Master experience must never rewrite `courtId` direct
 
 | Fact or decision | Authority / responsible actor | M2 experience responsibility |
 |---|---|---|
-| Competition identity, draw, schedule, and rules | External or appropriately governed competition authority | Reference without redefining |
-| Court operating condition | Court Management boundary under Master's operational responsibility | Present and refresh the authoritative condition |
+| Competition identity, draw, externally governed schedule plan, and rules | External or appropriately governed competition authority | Reference without redefining |
+| TOP-managed Match placement and Match–Court assignment history | Scheduling | Present and request only Scheduling-authorized changes; never rewrite locally |
+| Court operating condition | Attributable Court-resource condition authority; Master coordinates the tournament effect through Court Management | Present and refresh the authoritative condition; Master observation or UI action does not create the fact |
 | Match operating state | Match Operations | Present; never infer or advance locally |
 | Match–Court operating relationship | Established competition/scheduling reference plus Court and Match authorities | Relate the facts without becoming scheduling authority |
 | Referee responsibility and execution facts | Match Operations and assigned Referee | Show attribution and hand-off state |
@@ -137,8 +141,9 @@ not grant domain authority.
 2. Ordinary, waiting, in-progress, completed, and attention-requiring conditions are
    distinguishable from backend-owned facts; unknown or conflicting facts remain
    explicit.
-3. A Court becomes temporarily unavailable. The owning boundary records or returns
-   that condition with actor and time attribution.
+3. A Court becomes temporarily unavailable. The attributable Court-condition
+   authority records or returns that condition with actor and time attribution;
+   Master observation alone does not establish it.
 4. The Master sees the affected Court and any related Match. The product explains why
    attention is required and who currently owns the next action.
 5. If the affected Match is in play, the assigned Referee supplies the attributable
@@ -162,8 +167,9 @@ not grant domain authority.
 ## 8. In scope
 
 * One active competition with at least two scheduled matches.
-* At least two Courts, or one unavailable Court plus one already-authorized
-  alternative Court, sufficient to prove cross-resource coordination.
+* At least two Courts represented in the operating picture, sufficient to prove
+  multi-resource understanding. The affected Match may recover on its original Court;
+  alternative-Court reassignment is not required for M2 completion.
 * A Master operating picture derived from authoritative Match, Court, referee,
   readiness, and trusted-record facts.
 * Clear Match–Court relationships and attention conditions.
@@ -220,9 +226,10 @@ not grant domain authority.
 
 * **M2-AC-07:** The Master can explicitly defer the affected work while retaining a
   known Match and Court condition.
-* **M2-AC-08:** Relating an affected Match to another Court succeeds only when the
-  owning authority permits the referenced relationship; otherwise the backend
-  returns an actionable rejection.
+* **M2-AC-08:** If alternative-Court reassignment is exposed, it succeeds only through
+  Scheduling authority with preserved assignment history; otherwise the capability
+  remains absent or the backend returns an actionable rejection. M2 completion does
+  not require this optional path.
 * **M2-AC-09:** Stale or conflicting coordination attempts fail without partial or
   UI-authored state advancement and reload current authority.
 * **M2-AC-10:** Resumption requires the necessary current Court, Match, and Referee
@@ -256,7 +263,8 @@ rehearsal must demonstrate:
 4. the affected Match remaining explicitly waiting or interrupted rather than being
    silently advanced;
 5. one invalid or stale coordination attempt being rejected without partial change;
-6. one valid defer or already-authorized alternative-Court response;
+6. one valid explicit deferment; an alternative-Court response is additional evidence
+   only if Engineering Readiness admits the conditional Scheduling capability;
 7. explicit recovery or an explicit remaining deferred condition;
 8. chronological, attributable exception and recovery facts after restart/refresh;
 9. unchanged M1 trusted Official Record and public/archive behavior;
