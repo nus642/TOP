@@ -205,8 +205,7 @@ A Master report:
 
 **Decision:** Add assigned-Referee Match Operations:
 
-- interrupt: `playing → interrupted`; requires the Court to be constrained or
-  uncertain, or another explicitly governed execution blocker;
+- interrupt: `playing → interrupted`; requires the assigned Court to be constrained or uncertain;
 - resume: `interrupted → playing`; requires the assigned Court to be available.
 
 Interrupt does not release the Court as generally available. The Court remains
