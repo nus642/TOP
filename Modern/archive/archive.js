@@ -1,8 +1,11 @@
 (function expose(factory) {
-  const archive = factory();
+  const lifecycleStatus = typeof module !== "undefined" && module.exports
+    ? require("../presentation/competition-lifecycle-status")
+    : window.CompetitionLifecycleStatus;
+  const archive = factory(lifecycleStatus);
   if (typeof module !== "undefined" && module.exports) module.exports = archive;
   if (typeof window !== "undefined") window.CompetitionArchive = archive;
-})(function createModule() {
+})(function createModule({ competitionLifecycleStatusLabel }) {
   function escapeHtml(value) {
     return String(value ?? "").replace(/[&<>'"]/g, (character) => ({
       "&": "&amp;", "<": "&lt;", ">": "&gt;", "'": "&#39;", '"': "&quot;"
@@ -39,7 +42,7 @@
     const standings = Array.isArray(data.standings) ? data.standings : [];
     const matches = Array.isArray(data.matches) ? data.matches : [];
     return {
-      summary: `<p class="archive-number">比赛 ${escapeHtml(data.competitionId)}</p><span class="completion-state">${escapeHtml(label(data.competitionStatus, "已结束"))}</span>`,
+      summary: `<p class="archive-number">比赛 ${escapeHtml(data.competitionId)}</p><span class="completion-state">${escapeHtml(competitionLifecycleStatusLabel(data.competitionStatus))}</span>`,
       standings: renderStandings(standings),
       results: renderResults(matches)
     };
