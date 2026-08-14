@@ -88,7 +88,7 @@ six exclusions, eight constraints, exact input baselines, decision authority, re
 results, approval, and history. ERA-M2-TC-001 covers every entry and introduces no
 outcome.
 
-**Evidence:** PS-M2-TC-001 §§1–12. **Covered entries:** M2-PSI-001–005,
+**Evidence:** PS-M2-TC-001 §§1–13. **Covered entries:** M2-PSI-001–005,
 M2-PSE-001–006. **Findings:** None. **Reviewer/date:** Engineering Governance /
 2026-08-14.
 
