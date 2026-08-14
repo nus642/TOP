@@ -38,13 +38,14 @@ Alternative-Court reassignment is explicitly excluded from required M2 completio
 A later Product Scope version may reconsider it only after authoritative Scheduling
 meaning and history are governed.
 
-The Approved Product Scope makes M2 eligible for formal Engineering Readiness. It
-does not authorize Engineering Design, implementation issues, a Milestone, roadmap
-placement, release assignment, or delivery work.
+The M2 Engineering Readiness assessment is `Ready` for the exact Approved Product
+Scope Version 1.0 baseline. This authorizes entry into governed Engineering Design
+only; it does not authorize implementation issues, a Milestone, roadmap placement,
+release assignment, or delivery work.
 
-Version: 1.2
+Version: 1.3
 
-Status: Product Map — M1 delivered; M2 Product Scope approved; Engineering Readiness pending
+Status: Product Map — M1 delivered; M2 Product Scope approved; Engineering Readiness ready; Engineering Design next
 
 Last Update: 2026-08-14
 
