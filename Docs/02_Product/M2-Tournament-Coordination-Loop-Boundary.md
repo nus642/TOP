@@ -2,7 +2,7 @@
 
 | Field | Value |
 |---|---|
-| Status | Product Decision Confirmed — Canon Review Pending |
+| Status | Canon Review Passed — Engineering Readiness Pending |
 | Discovery issue | #122 |
 | Proposed milestone | M2 — Tournament Coordination Loop |
 | Implementation status | Not authorized |
@@ -293,7 +293,7 @@ review:
    Match context, Master response, and recovery/deferred disposition enter chronology.
    A transient observation with no operational effect need not become a durable event.
 
-These decisions approve the Product Boundary for Canon review. They do not authorize
+These decisions define the Canon-approved Product Boundary. They do not authorize
 implementation. Engineering Readiness must assess the missing Court-condition,
 Match-interruption/resumption, Scheduling-reassignment, and Event Timeline contracts
 without presuming a database, API, service, or workflow design.
