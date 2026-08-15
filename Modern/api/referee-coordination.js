@@ -95,10 +95,12 @@ router.get("/:competitionId/matches/:matchId/available-candidates", async (req, 
       error.code = "FORBIDDEN";
       throw error;
     }
+    const excludeMatchId = req.query.excludeMatchId ? Number(req.query.excludeMatchId) : null;
     res.json(await refereeCoordinationService.listAvailableCandidates(
       req.params.competitionId,
       req.params.matchId,
-      req.actor
+      req.actor,
+      excludeMatchId
     ));
   } catch (error) {
     const statuses = { VALIDATION_ERROR: 400, NOT_FOUND: 404, FORBIDDEN: 403 };

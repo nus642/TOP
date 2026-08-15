@@ -99,14 +99,16 @@ test("master workflow reports errors and does not invent assignment state", asyn
     view: {
       loading() {}, busy() {},
       matches: (matches) => rendered.push(matches), courts() {},
-      error: (message) => errors.push(message)
+      error: (err) => errors.push(err)
     }
   });
 
   await workflow.start(3);
   await workflow.assign({ matchId: 9, refereeId: "referee-7" });
 
-  assert.deepEqual(errors, ["Match is already playing"]);
+  assert.equal(errors.length, 1);
+  assert.ok(errors[0] instanceof Error);
+  assert.equal(errors[0].message, "Match is already playing");
   assert.deepEqual(rendered, [[]]);
 });
 

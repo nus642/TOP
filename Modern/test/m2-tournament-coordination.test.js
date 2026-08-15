@@ -137,5 +137,6 @@ test("M2 operator UI exposes the bounded Master and Referee recovery course", ()
   assert.match(referee, /data-action="interrupt"/);
   assert.match(referee, /data-action="resume"/);
   assert.match(referee, /等待主控报告场地恢复/);
-  assert.doesNotMatch(master + referee, /reassign|重新分配场地/i);
+  // Issue #139 adds referee reassignment (换派) to Master UI, but no generic court reassignment
+  assert.doesNotMatch(master + referee, /重新分配场地/);
 });

@@ -30,7 +30,7 @@
         view.matches(result.matches);
         view.courts(coordination.courts || []);
       } catch (error) {
-        view.error(error.message);
+        view.error(error);
       }
     }
 
@@ -41,8 +41,54 @@
         await api.assignReferee(competitionId, matchId, refereeId);
         await refresh();
       } catch (error) {
-        view.error(error.message);
+        view.error(error);
       }
+    }
+
+    async function dispatchMatch({ matchId, courtId, refereeId, expectedVersion }) {
+      view.busy(matchId);
+      try {
+        if (accountabilityFlow) accountabilityFlow.verify(accountability);
+        await api.dispatch(competitionId, matchId, {
+          courtId, refereeId, expectedVersion, correlationId: crypto.randomUUID()
+        });
+        await refresh();
+      } catch (error) {
+        view.error(error);
+        await refresh();
+      }
+    }
+
+    async function withdraw({ matchId, expectedVersion }) {
+      view.busy(matchId);
+      try {
+        if (accountabilityFlow) accountabilityFlow.verify(accountability);
+        await api.withdraw(competitionId, matchId, {
+          expectedVersion, correlationId: crypto.randomUUID()
+        });
+        await refresh();
+      } catch (error) {
+        view.error(error);
+        await refresh();
+      }
+    }
+
+    async function reassign({ matchId, newRefereeId, expectedVersion }) {
+      view.busy(matchId);
+      try {
+        if (accountabilityFlow) accountabilityFlow.verify(accountability);
+        await api.reassign(competitionId, matchId, {
+          newRefereeId, expectedVersion, correlationId: crypto.randomUUID()
+        });
+        await refresh();
+      } catch (error) {
+        view.error(error);
+        await refresh();
+      }
+    }
+
+    async function loadCandidates(matchId, excludeMatchId) {
+      return api.availableCandidates(competitionId, matchId, excludeMatchId);
     }
 
     async function confirm(matchId) {
@@ -52,7 +98,7 @@
         await api.confirmResult(competitionId, matchId);
         await refresh();
       } catch (error) {
-        view.error(error.message);
+        view.error(error);
       }
     }
 
@@ -62,7 +108,7 @@
         if (accountabilityFlow) accountabilityFlow.verify(accountability);
         await api.reportCourt(competitionId, courtId, { condition, expectedVersion, affectedMatchId });
         await refresh();
-      } catch (error) { view.error(error.message); }
+      } catch (error) { view.error(error); }
     }
 
     async function deferCourt({ courtId, expectedVersion }) {
@@ -71,7 +117,7 @@
         if (accountabilityFlow) accountabilityFlow.verify(accountability);
         await api.deferCourt(competitionId, courtId, expectedVersion);
         await refresh();
-      } catch (error) { view.error(error.message); }
+      } catch (error) { view.error(error); }
     }
 
     return {
@@ -81,6 +127,10 @@
         return refresh();
       },
       assign,
+      dispatchMatch,
+      withdraw,
+      reassign,
+      loadCandidates,
       confirm,
       reportCourt,
       deferCourt,

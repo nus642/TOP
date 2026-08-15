@@ -239,6 +239,30 @@ async function findActiveReservationByReferee(refereeId, competitionId, connecti
   return mapReservation(rows[0]);
 }
 
+// Read-only variant for candidate filtering (no FOR UPDATE).
+// Excludes reservations for a specific match to support reassign scenarios.
+async function findActiveReservationByRefereeExcluding(refereeId, competitionId, excludeMatchId, connection = db) {
+  const conditions = [
+    "r.referee_id = ?",
+    "r.competition_id = ?",
+    "r.rejected_at IS NULL",
+    "m.status NOT IN ('scored', 'awaiting_confirmation', 'confirmed', 'finished')"
+  ];
+  const values = [refereeId, competitionId];
+  if (excludeMatchId != null) {
+    conditions.push("r.match_id != ?");
+    values.push(excludeMatchId);
+  }
+  const [rows] = await connection.query(
+    `SELECT r.* FROM referee_dispatch_reservations r
+     JOIN matches m ON r.match_id = m.id
+     WHERE ${conditions.join(" AND ")}
+     LIMIT 1`,
+    values
+  );
+  return mapReservation(rows[0]);
+}
+
 module.exports = {
   // Competition Referee Roster
   createRoster,
@@ -257,5 +281,6 @@ module.exports = {
   deleteReservation,
   // Active reservation conflict checks
   findActiveReservationByCourt,
-  findActiveReservationByReferee
+  findActiveReservationByReferee,
+  findActiveReservationByRefereeExcluding
 };

@@ -12,7 +12,10 @@
       const response = await fetchImpl(`${baseUrl}${path}`, requestOptions);
       const body = await response.json().catch(() => ({}));
       if (!response.ok) {
-        throw new Error(body.error || "主控操作无法完成该请求");
+        const error = new Error(body.error || "主控操作无法完成该请求");
+        error.errorCode = body.errorCode || null;
+        error.statusCode = response.status;
+        throw error;
       }
       return body;
     }
@@ -48,6 +51,28 @@
       confirmResult(competitionId, matchId) {
         return request(`/master-workflow/${encodeURIComponent(competitionId)}/matches/${encodeURIComponent(matchId)}/confirm-result`, {
           method: "POST", headers: { "Content-Type": "application/json" }, body: "{}"
+        });
+      },
+      availableCandidates(competitionId, matchId, excludeMatchId) {
+        const query = excludeMatchId ? `?excludeMatchId=${encodeURIComponent(excludeMatchId)}` : "";
+        return request(`/referee-coordination/${encodeURIComponent(competitionId)}/matches/${encodeURIComponent(matchId)}/available-candidates${query}`);
+      },
+      dispatch(competitionId, matchId, data) {
+        return request(`/master-workflow/${encodeURIComponent(competitionId)}/matches/${encodeURIComponent(matchId)}/dispatch`, {
+          method: "POST", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(data)
+        });
+      },
+      withdraw(competitionId, matchId, data) {
+        return request(`/master-workflow/${encodeURIComponent(competitionId)}/matches/${encodeURIComponent(matchId)}/withdraw`, {
+          method: "POST", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(data)
+        });
+      },
+      reassign(competitionId, matchId, data) {
+        return request(`/master-workflow/${encodeURIComponent(competitionId)}/matches/${encodeURIComponent(matchId)}/reassign`, {
+          method: "POST", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(data)
         });
       }
     };

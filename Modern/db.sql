@@ -279,6 +279,8 @@ SELECT
     m.status AS operation_status,
     m.assigned_at,
     m.responsibility_accepted_at,
+    m.dispatch_id,
+    m.dispatch_version,
     m.result_confirmed_at
 FROM matches m
 JOIN tournaments t ON t.id = m.tournament_id
