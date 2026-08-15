@@ -4,6 +4,8 @@ const path = require("node:path");
 const test = require("node:test");
 
 const matchOperationsService = require("../services/match-operations.service");
+const dispatchService = require("../services/dispatch.service");
+const courtRepository = require("../repositories/court-coordination.repository");
 const masterWorkflowService = require("../services/master-workflow.service");
 const router = require("../api/master-workflow");
 
@@ -21,35 +23,42 @@ function response() {
   };
 }
 
-test("master assignment delegates once to Match Operations", async (t) => {
-  const original = matchOperationsService.assignMatch;
-  t.after(() => { matchOperationsService.assignMatch = original; });
+test("master assignment delegates once to the authoritative dispatch service", async (t) => {
+  const origDispatch = dispatchService.dispatch;
+  const origCourt = courtRepository.findScheduledCourt;
+  t.after(() => { dispatchService.dispatch = origDispatch; courtRepository.findScheduledCourt = origCourt; });
 
   const calls = [];
-  matchOperationsService.assignMatch = async (...args) => {
+  courtRepository.findScheduledCourt = async () => "court-1";
+  dispatchService.dispatch = async (...args) => {
     calls.push(args);
     return { match: { id: 9, tournamentId: 3, refereeId: "referee-7", status: "assigned" } };
   };
 
+  const actor = { actorId: "master-1", actorType: "master" };
   const result = await masterWorkflowService.assignReferee("3", "9", {
-    refereeId: " referee-7 "
-  });
+    refereeId: " referee-7 ", expectedVersion: 0
+  }, actor);
 
-  assert.deepEqual(calls, [[3, 9, { refereeId: "referee-7" }]]);
+  assert.equal(calls.length, 1);
+  assert.equal(calls[0][0], 3); // competitionId
+  assert.equal(calls[0][1], 9); // matchId
+  assert.equal(calls[0][2].refereeId, "referee-7");
+  assert.equal(calls[0][2].courtId, "court-1");
   assert.equal(result.match.refereeId, "referee-7");
   assert.equal(result.match.status, "assigned");
 });
 
 test("master service validates its request boundary before delegation", async (t) => {
-  const original = matchOperationsService.assignMatch;
-  t.after(() => { matchOperationsService.assignMatch = original; });
-  matchOperationsService.assignMatch = async () => assert.fail("must not delegate invalid input");
+  const origDispatch = dispatchService.dispatch;
+  t.after(() => { dispatchService.dispatch = origDispatch; });
+  dispatchService.dispatch = async () => assert.fail("must not delegate invalid input");
 
   const invalidRequests = [
-    ["bad", 9, { refereeId: "referee-7" }],
-    [3, 0, { refereeId: "referee-7" }],
-    [3, 9, {}],
-    [3, 9, { refereeId: "  " }]
+    ["bad", 9, { refereeId: "referee-7", expectedVersion: 0 }],
+    [3, 0, { refereeId: "referee-7", expectedVersion: 0 }],
+    [3, 9, {}, undefined],
+    [3, 9, { refereeId: "  " }, undefined]
   ];
   for (const request of invalidRequests) {
     await assert.rejects(
@@ -87,8 +96,8 @@ test("master workflow has no repository or persistence authority", () => {
     path.join(__dirname, "..", "services", "master-workflow.service.js"),
     "utf8"
   );
-  assert.match(source, /matchOperationsService\.assignMatch/);
-  assert.doesNotMatch(source, /repositories|database\/db|UPDATE\s+matches/i);
+  assert.match(source, /dispatchService\.dispatch/);
+  assert.doesNotMatch(source, /database\/db|UPDATE\s+matches/i);
 
   const schema = fs.readFileSync(path.join(__dirname, "..", "db.sql"), "utf8");
   assert.doesNotMatch(schema, /CREATE TABLE\s+(master_actions|master_assignments|operational_tasks|workflow_events)/i);

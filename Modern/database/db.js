@@ -73,3 +73,7 @@ module.exports = pool;
 module.exports.initDB = initDB;
 
 module.exports.withTransaction = withTransaction;
+
+module.exports.close = async () => {
+    await pool.end();
+};

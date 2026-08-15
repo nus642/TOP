@@ -58,7 +58,10 @@ test("M2 authenticated routes expose only the bounded coordination operations", 
   assert.ok(masterPaths.includes("/:competitionId/courts/:courtId/defer"));
   assert.ok(refereePaths.includes("/:tournamentId/referees/:refereeId/matches/:matchId/interrupt"));
   assert.ok(refereePaths.includes("/:tournamentId/referees/:refereeId/matches/:matchId/resume"));
-  assert.equal(masterPaths.some((route) => /reassign|move/.test(route)), false);
+  // Issue #138 adds dispatch, withdraw, and reassign operations for Master
+  assert.ok(masterPaths.includes("/:competitionId/matches/:matchId/dispatch"));
+  assert.ok(masterPaths.includes("/:competitionId/matches/:matchId/withdraw"));
+  assert.ok(masterPaths.includes("/:competitionId/matches/:matchId/reassign"));
 });
 
 test("M2 schema is additive and preserves separate Court, disruption, chronology, and Official Result truth", () => {

@@ -48,7 +48,9 @@ test("repository queries schedule, court, referee, and status visibility from th
         operation_status: "playing",
         assigned_at: null,
         responsibility_accepted_at: null,
-        result_confirmed_at: null
+        result_confirmed_at: null,
+        dispatch_id: null,
+        dispatch_version: null
       }]];
     }
   };
@@ -60,7 +62,8 @@ test("repository queries schedule, court, referee, and status visibility from th
     scheduledAt: "2026-09-12T10:30:00.000Z", courtId: "court-2"
   });
   assert.deepEqual(matches[0].referee, {
-    refereeId: "referee-4", assignedAt: null, responsibilityAcceptedAt: null
+    refereeId: "referee-4", assignedAt: null, responsibilityAcceptedAt: null,
+    dispatchId: null, dispatchVersion: null
   });
   assert.equal(matches[0].operationStatus, "playing");
 });
