@@ -114,6 +114,7 @@ function createMockConnection(data) {
           }
           if (sql.includes("referee_id =") && sql.includes("dispatch_version = dispatch_version + 1")) {
             match.referee_id = params[0];
+            match.dispatch_id = params[1];
           }
         }
         return [{ affectedRows: 1 }];

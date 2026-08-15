@@ -446,8 +446,8 @@ async function reassignDispatch(competitionValue, matchValue, newRefereeId, acto
       competitionId
     }, connection);
     
-    // 7. Update match with new referee and dispatch version
-    const updatedMatch = await repository.reassignDispatch(competitionId, matchId, newRefereeId, connection);
+    // 7. Update match with new referee, new dispatch_id, and dispatch version
+    const updatedMatch = await repository.reassignDispatch(competitionId, matchId, newRefereeId, newDispatchId, connection);
     
     // 8. Write chronology event
     await courtRepository.appendEvent({

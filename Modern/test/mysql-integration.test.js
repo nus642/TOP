@@ -23,6 +23,7 @@
  *   MYSQL_USER (default: root)
  *   MYSQL_PASS (default: 123456)
  *   MYSQL_DB   (default: nhpa_test — uses a dedicated test DB to avoid polluting production)
+ *   MYSQL_FORCE (set to "true" to allow running against non-test databases — USE WITH CAUTION)
  */
 
 const { test } = require("node:test");
@@ -31,12 +32,26 @@ const mysql = require("mysql2/promise");
 const fs = require("node:fs");
 const path = require("node:path");
 
+const TARGET_DB = process.env.MYSQL_DB || "nhpa_test";
+
+// Safety guard: refuse to run against non-test databases unless explicitly forced
+const TEST_DB_PATTERNS = ["test", "sandbox", "dev", "staging", "tmp"];
+const isTestDb = TEST_DB_PATTERNS.some(p => TARGET_DB.toLowerCase().includes(p));
+const forceRun = process.env.MYSQL_FORCE === "true";
+
+if (!isTestDb && !forceRun) {
+  console.error(`\nERROR: Refusing to run integration tests against database "${TARGET_DB}".`);
+  console.error(`The database name must contain one of: ${TEST_DB_PATTERNS.join(", ")}`);
+  console.error(`Set MYSQL_DB=nhpa_test or set MYSQL_FORCE=true to override.\n`);
+  process.exit(1);
+}
+
 const DB_CONFIG = {
   host: process.env.MYSQL_HOST || "localhost",
   port: parseInt(process.env.MYSQL_PORT) || 3306,
   user: process.env.MYSQL_USER || "root",
   password: process.env.MYSQL_PASS || "123456",
-  database: process.env.MYSQL_DB || "nhpa",
+  database: TARGET_DB,
   multipleStatements: true
 };
 
@@ -417,7 +432,70 @@ test("MySQL: dispatch → withdraw succeeds with independent chronology", async 
   } finally { await env.cleanup(); }
 });
 
-// --- Test 8: Migration re-run safety ---
+// --- Test 8: dispatch → reassign → accept (new referee can accept) ---
+test("MySQL: dispatch A → reassign B → B accepts successfully", async (t) => {
+  if (!mysqlAvailable) { t.skip("MySQL not available"); return; }
+  const env = await createTestEnv("reassign");
+  try {
+    const [m1] = env.matchIds;
+
+    // Dispatch to referee A
+    await dispatchService.dispatch(env.competitionId, m1, {
+      courtId: env.courts[0], refereeId: env.refereeIds[0],
+      correlationId: `ra-dispatch-a`, expectedVersion: 0
+    }, masterActor());
+
+    const [afterDispatch] = await pool.query("SELECT * FROM matches WHERE id = ?", [m1]);
+    assert.equal(afterDispatch[0].status, "assigned");
+    assert.equal(afterDispatch[0].referee_id, env.refereeIds[0]);
+    const versionAfterDispatch = afterDispatch[0].dispatch_version;
+
+    // Reassign to referee B
+    const reassignResult = await dispatchService.reassignDispatch(env.competitionId, m1,
+      env.refereeIds[1], masterActor(), {
+        reason: "reassign test", expectedVersion: versionAfterDispatch, correlationId: "ra-reassign"
+      });
+    assert.equal(reassignResult.match.refereeId, env.refereeIds[1]);
+
+    // Verify match.dispatch_id now matches the NEW reservation's dispatch_id
+    const [afterReassign] = await pool.query("SELECT * FROM matches WHERE id = ?", [m1]);
+    const newDispatchId = afterReassign[0].dispatch_id;
+    const versionAfterReassign = afterReassign[0].dispatch_version;
+    assert.ok(newDispatchId, "match must have a dispatch_id after reassign");
+
+    // Verify the new reservation's dispatch_id matches the match's dispatch_id
+    const [newRes] = await pool.query(
+      "SELECT * FROM referee_dispatch_reservations WHERE match_id = ? AND rejected_at IS NULL",
+      [m1]);
+    assert.equal(newRes.length, 1, "One active reservation after reassign");
+    assert.equal(newRes[0].dispatch_id, newDispatchId,
+      "match.dispatch_id must match the new reservation's dispatch_id");
+    assert.equal(newRes[0].referee_id, env.refereeIds[1],
+      "New reservation must be for referee B");
+
+    // Referee B accepts — this MUST succeed
+    const acceptResult = await dispatchService.acceptDispatch(env.competitionId, m1,
+      refereeActor(env.refereeIds[1]),
+      { expectedVersion: versionAfterReassign, correlationId: "ra-accept-b" }
+    );
+    assert.equal(acceptResult.match.status, "accepted",
+      "Referee B must be able to accept after reassign");
+
+    // Verify independent chronology rows exist for all 3 actions
+    const [allChron] = await pool.query(
+      "SELECT event_type, correlation_id FROM tournament_coordination_chronology WHERE tournament_id = ? ORDER BY id",
+      [env.competitionId]);
+    const eventTypes = allChron.map(c => c.event_type);
+    assert.ok(eventTypes.includes("referee_dispatch"), "Must have dispatch chronology");
+    assert.ok(eventTypes.includes("referee_reassign"), "Must have reassign chronology");
+    assert.ok(eventTypes.includes("referee_acceptance"), "Must have accept chronology");
+    // All must have unique correlation_ids
+    const corrIds = allChron.map(c => c.correlation_id);
+    assert.equal(new Set(corrIds).size, corrIds.length, "All chronology correlationIds must be unique");
+  } finally { await env.cleanup(); }
+});
+
+// --- Test 9: Migration re-run safety ---
 test("MySQL: migration SQL executes twice without error", async (t) => {
   if (!mysqlAvailable) { t.skip("MySQL not available"); return; }
 

@@ -165,11 +165,11 @@ async function withdrawDispatch(tournamentId, matchId, connection = db) {
   return findById(tournamentId, matchId, connection);
 }
 
-async function reassignDispatch(tournamentId, matchId, newRefereeId, connection = db) {
+async function reassignDispatch(tournamentId, matchId, newRefereeId, newDispatchId, connection = db) {
   const [result] = await connection.query(
-    `UPDATE matches SET referee_id = ?, dispatch_version = dispatch_version + 1
+    `UPDATE matches SET referee_id = ?, dispatch_id = ?, dispatch_version = dispatch_version + 1
      WHERE tournament_id = ? AND id = ? AND status = 'assigned' AND dispatch_id IS NOT NULL`,
-    [newRefereeId, tournamentId, matchId]
+    [newRefereeId, newDispatchId, tournamentId, matchId]
   );
   if (result.affectedRows === 0) {
     const error = new Error("Reassign failed: match state changed");
