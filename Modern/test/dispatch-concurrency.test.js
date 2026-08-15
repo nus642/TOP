@@ -28,24 +28,24 @@ function createMockConnection(data) {
         return [[{ id: 1, competition_id: params[0], referee_id: refId, active: 1, eligible: 1 }]];
       }
       if (sql.includes("SELECT") && sql.includes("FROM referee_dispatch_reservations")) {
-        // Active reservation by court
+        // Active reservation by court (active until match terminal or reservation rejected)
         if (sql.includes("r.court_id =") && sql.includes("r.competition_id")) {
+          const terminal = new Set(["scored", "awaiting_confirmation", "confirmed", "finished"]);
           for (const [, v] of data) {
-            if (v && v.court_id === params[0] && v.competition_id === params[1] &&
-                !v.accepted_at && !v.rejected_at) {
+            if (v && v.court_id === params[0] && v.competition_id === params[1] && !v.rejected_at) {
               const match = data.get(`match:${v.match_id}`);
-              if (match && match.status === "assigned") return [[v]];
+              if (match && !terminal.has(match.status)) return [[v]];
             }
           }
           return [[null]];
         }
         // Active reservation by referee
         if (sql.includes("r.referee_id =") && sql.includes("r.competition_id")) {
+          const terminal = new Set(["scored", "awaiting_confirmation", "confirmed", "finished"]);
           for (const [, v] of data) {
-            if (v && v.referee_id === params[0] && v.competition_id === params[1] &&
-                !v.accepted_at && !v.rejected_at) {
+            if (v && v.referee_id === params[0] && v.competition_id === params[1] && !v.rejected_at) {
               const match = data.get(`match:${v.match_id}`);
-              if (match && match.status === "assigned") return [[v]];
+              if (match && !terminal.has(match.status)) return [[v]];
             }
           }
           return [[null]];

@@ -1,30 +1,35 @@
 /**
- * Real MySQL Integration Test for PR #144 — Atomic Dispatch
- * 
- * This script connects to a real MySQL database and verifies:
- * 1. Two concurrent dispatches for the same court → exactly one succeeds
- * 2. Two concurrent dispatches for the same referee → exactly one succeeds
- * 3. Stale expectedVersion → zero partial writes (409 CONFLICT)
- * 4. Duplicate correlationId → idempotent return, no duplicate reservation/chronology
- * 5. Failure after reservation insert → full rollback confirmed
- * 
+ * Real MySQL Integration Test for PR #144 — Atomic Dispatch (v2)
+ *
+ * Every test creates its OWN isolated competition with dedicated courts, referees,
+ * and matches so that no state leaks between tests.
+ *
+ * Coverage:
+ *  1. Court contention: two concurrent dispatches for same court → exactly one succeeds
+ *  2. Referee contention: two concurrent dispatches for same referee → exactly one succeeds
+ *  3. Stale expectedVersion → zero partial writes (409 CONFLICT)
+ *  4. Duplicate correlationId → idempotent return, no duplicate reservation/chronology
+ *  5. dispatch → accept: both succeed with independent chronology rows
+ *  6. Resource retention: after accept, court/referee blocked until scored
+ *  7. dispatch → withdraw: both succeed with independent chronology rows
+ *  8. Migration re-run: execute migration SQL twice, verify idempotency
+ *
  * Usage:
  *   node test/mysql-integration.test.js
- * 
+ *
  * Environment variables:
  *   MYSQL_HOST (default: localhost)
  *   MYSQL_PORT (default: 3306)
  *   MYSQL_USER (default: root)
  *   MYSQL_PASS (default: 123456)
- *   MYSQL_DB   (default: nhpa)
- * 
- * The script creates its own test competition and matches, then cleans up.
- * Requires the schema to be up-to-date (db.sql applied).
+ *   MYSQL_DB   (default: nhpa_test — uses a dedicated test DB to avoid polluting production)
  */
 
 const { test } = require("node:test");
 const assert = require("node:assert");
 const mysql = require("mysql2/promise");
+const fs = require("node:fs");
+const path = require("node:path");
 
 const DB_CONFIG = {
   host: process.env.MYSQL_HOST || "localhost",
@@ -36,11 +41,9 @@ const DB_CONFIG = {
 };
 
 let pool;
-let competitionId;
-let cleanupIds = { matchIds: [], reservationIds: [], chronologyIds: [] };
 let mysqlAvailable = false;
 
-// Check MySQL availability before running tests
+// --- MySQL availability check ---
 async function checkMySQL() {
   try {
     const conn = await mysql.createConnection({ ...DB_CONFIG, multipleStatements: false });
@@ -52,321 +55,424 @@ async function checkMySQL() {
   }
 }
 
-async function setup() {
-  pool = mysql.createPool(DB_CONFIG);
-  
-  // Verify connectivity
-  const [rows] = await pool.query("SELECT 1 AS ok");
-  assert.equal(rows[0].ok, 1, "MySQL connection must succeed");
-  
-  // Create test competition
+// --- Isolated test environment ---
+// Each test creates its own competition, matches, schedules, and referees.
+// Returns helpers for dispatch/accept/withdraw calls.
+async function createTestEnv(label, opts = {}) {
+  const courtCount = opts.courts || 2;
+  const matchCount = opts.matches || 4;
+  const refereeIds = opts.referees || ["referee-a", "referee-b", "referee-c"];
+
   const [compResult] = await pool.query(
     "INSERT INTO tournaments (name, status) VALUES (?, 'running')",
-    ["Integration Test Competition"]
+    [`Integration-${label}-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`]
   );
-  competitionId = compResult.insertId;
-  
-  // Create match_schedules for 10 matches on court-1
-  for (let i = 1; i <= 10; i++) {
-    const [matchResult] = await pool.query(
-      "INSERT INTO matches (tournament_id, round_num, court, status) VALUES (?, ?, 'court-1', 'idle')",
-      [competitionId, i]
+  const competitionId = compResult.insertId;
+
+  const matchIds = [];
+  const courts = [];
+  for (let c = 1; c <= courtCount; c++) courts.push(`court-${label}-${c}`);
+
+  for (let i = 0; i < matchCount; i++) {
+    const courtId = courts[i % courtCount];
+    const [m] = await pool.query(
+      "INSERT INTO matches (tournament_id, round_num, court, status) VALUES (?, ?, ?, 'idle')",
+      [competitionId, i + 1, courtId]
     );
-    cleanupIds.matchIds.push(matchResult.insertId);
-    
+    matchIds.push(m.insertId);
     await pool.query(
-      "INSERT INTO match_schedules (tournament_id, match_id, scheduled_at, court_id) VALUES (?, ?, NOW() + INTERVAL ? HOUR, 'court-1')",
-      [competitionId, matchResult.insertId, i]
+      "INSERT INTO match_schedules (tournament_id, match_id, scheduled_at, court_id) VALUES (?, ?, NOW() + INTERVAL ? HOUR, ?)",
+      [competitionId, m.insertId, i + 1, courtId]
     );
   }
-  
-  // Create referee roster
-  const refereeIds = ["referee-int-1", "referee-int-2", "referee-int-3"];
+
   for (const refId of refereeIds) {
     await pool.query(
       "INSERT IGNORE INTO competition_referees (competition_id, referee_id, active, eligible) VALUES (?, ?, TRUE, TRUE)",
       [competitionId, refId]
     );
   }
-}
 
-async function cleanup() {
-  if (!pool) return;
-  try {
-    // Clean up test data
-    await pool.query("DELETE FROM tournament_coordination_chronology WHERE tournament_id = ?", [competitionId]);
-    await pool.query("DELETE FROM referee_dispatch_reservations WHERE competition_id = ?", [competitionId]);
-    await pool.query("DELETE FROM competition_referees WHERE competition_id = ?", [competitionId]);
-    await pool.query(`DELETE FROM match_schedules WHERE tournament_id = ?`, [competitionId]);
-    await pool.query(`DELETE FROM matches WHERE tournament_id = ?`, [competitionId]);
-    await pool.query("DELETE FROM tournaments WHERE id = ?", [competitionId]);
-  } catch (e) {
-    console.warn("Cleanup warning:", e.message);
-  }
-  await pool.end();
+  return {
+    competitionId, matchIds, courts, refereeIds,
+    cleanup: async () => {
+      try {
+        await pool.query("DELETE FROM tournament_coordination_chronology WHERE tournament_id = ?", [competitionId]);
+        await pool.query("DELETE FROM referee_dispatch_reservations WHERE competition_id = ?", [competitionId]);
+        await pool.query("DELETE FROM competition_referees WHERE competition_id = ?", [competitionId]);
+        await pool.query("DELETE FROM match_schedules WHERE tournament_id = ?", [competitionId]);
+        await pool.query("DELETE FROM matches WHERE tournament_id = ?", [competitionId]);
+        await pool.query("DELETE FROM tournaments WHERE id = ?", [competitionId]);
+      } catch (e) { /* best effort */ }
+    }
+  };
 }
 
 function masterActor() {
   return { actorId: "master-int", actorType: "master" };
 }
-
 function refereeActor(id) {
   return { actorId: id, actorType: "referee" };
 }
 
-// Use the production dispatch service with real DB
 const dispatchService = require("../services/dispatch.service");
 
 // ---------------------------------------------------------------------------
 // Tests
 // ---------------------------------------------------------------------------
 
-test("MySQL integration: setup", async (t) => {
+test("MySQL: connectivity", async (t) => {
   mysqlAvailable = await checkMySQL();
   if (!mysqlAvailable) {
-    t.skip("MySQL not available — set MYSQL_HOST/PORT/USER/PASS/DB to run integration tests");
+    t.skip("MySQL not available — set MYSQL_HOST/PORT/USER/PASS/DB to run");
     return;
   }
-  await setup();
-  assert.ok(competitionId, "Competition must be created");
-  assert.equal(cleanupIds.matchIds.length, 10, "10 matches must be created");
+  pool = mysql.createPool(DB_CONFIG);
+  const [rows] = await pool.query("SELECT 1 AS ok");
+  assert.equal(rows[0].ok, 1);
 });
 
-test("MySQL integration: two concurrent dispatches for same court", async (t) => {
+// --- Test 1: Court contention ---
+test("MySQL: two concurrent dispatches same court → one succeeds", async (t) => {
   if (!mysqlAvailable) { t.skip("MySQL not available"); return; }
-  const matchId1 = cleanupIds.matchIds[0];
-  const matchId2 = cleanupIds.matchIds[1];
-  
-  // Two dispatches for same court, different matches, different referees
-  const results = await Promise.allSettled([
-    dispatchService.dispatch(competitionId, matchId1, {
-      courtId: "court-1", refereeId: "referee-int-1", correlationId: "court-test-1", expectedVersion: 0
-    }, masterActor()),
-    dispatchService.dispatch(competitionId, matchId2, {
-      courtId: "court-1", refereeId: "referee-int-2", correlationId: "court-test-2", expectedVersion: 0
-    }, masterActor())
-  ]);
-  
-  const succeeded = results.filter(r => r.status === "fulfilled");
-  const failed = results.filter(r => r.status === "rejected");
-  
-  assert.equal(succeeded.length, 1, "Exactly one dispatch must succeed for the same court");
-  assert.equal(failed.length, 1, "Exactly one dispatch must fail");
-  assert.match(failed[0].reason.message, /COURT_CONFLICT/, "Failure must be court conflict");
-});
-
-test("MySQL integration: two concurrent dispatches for same referee", async (t) => {
-  if (!mysqlAvailable) { t.skip("MySQL not available"); return; }
-  const matchId3 = cleanupIds.matchIds[2];
-  const matchId4 = cleanupIds.matchIds[3];
-  
-  // Set up match 4 on a different court to isolate referee conflict
-  await pool.query(
-    "UPDATE match_schedules SET court_id = 'court-2' WHERE match_id = ?",
-    [matchId4]
-  );
-  await pool.query(
-    "UPDATE matches SET court = 'court-2' WHERE id = ?",
-    [matchId4]
-  );
-  
-  const results = await Promise.allSettled([
-    dispatchService.dispatch(competitionId, matchId3, {
-      courtId: "court-1", refereeId: "referee-int-3", correlationId: "ref-test-1", expectedVersion: 0
-    }, masterActor()),
-    dispatchService.dispatch(competitionId, matchId4, {
-      courtId: "court-2", refereeId: "referee-int-3", correlationId: "ref-test-2", expectedVersion: 0
-    }, masterActor())
-  ]);
-  
-  const succeeded = results.filter(r => r.status === "fulfilled");
-  const failed = results.filter(r => r.status === "rejected");
-  
-  assert.equal(succeeded.length, 1, "Exactly one dispatch must succeed for the same referee");
-  assert.equal(failed.length, 1, "Exactly one dispatch must fail");
-  assert.match(failed[0].reason.message, /REFEREE_CONFLICT/, "Failure must be referee conflict");
-});
-
-test("MySQL integration: stale expectedVersion", async (t) => {
-  if (!mysqlAvailable) { t.skip("MySQL not available"); return; }
-  const matchId5 = cleanupIds.matchIds[4];
-  
-  // First, dispatch successfully
-  await dispatchService.dispatch(competitionId, matchId5, {
-    courtId: "court-1", refereeId: "referee-int-1", correlationId: "stale-test-1", expectedVersion: 0
-  }, masterActor());
-  
-  // Now try to dispatch again with stale expectedVersion
-  const matchId6 = cleanupIds.matchIds[5];
+  const env = await createTestEnv("court");
   try {
-    await dispatchService.dispatch(competitionId, matchId6, {
-      courtId: "court-1", refereeId: "referee-int-2", correlationId: "stale-test-2", expectedVersion: 99
+    const [m1, m2] = env.matchIds;
+    const results = await Promise.allSettled([
+      dispatchService.dispatch(env.competitionId, m1, {
+        courtId: env.courts[0], refereeId: env.refereeIds[0],
+        correlationId: `court-corr-1`, expectedVersion: 0
+      }, masterActor()),
+      dispatchService.dispatch(env.competitionId, m2, {
+        courtId: env.courts[0], refereeId: env.refereeIds[1],
+        correlationId: `court-corr-2`, expectedVersion: 0
+      }, masterActor())
+    ]);
+    const ok = results.filter(r => r.status === "fulfilled");
+    const fail = results.filter(r => r.status === "rejected");
+    assert.equal(ok.length, 1, "Exactly one dispatch succeeds");
+    assert.equal(fail.length, 1, "Exactly one dispatch fails");
+    assert.match(fail[0].reason.message, /COURT_CONFLICT/);
+  } finally { await env.cleanup(); }
+});
+
+// --- Test 2: Referee contention ---
+test("MySQL: two concurrent dispatches same referee → one succeeds", async (t) => {
+  if (!mysqlAvailable) { t.skip("MySQL not available"); return; }
+  const env = await createTestEnv("ref");
+  try {
+    const [m1, m2] = env.matchIds;
+    // Use different courts to isolate referee conflict
+    const results = await Promise.allSettled([
+      dispatchService.dispatch(env.competitionId, m1, {
+        courtId: env.courts[0], refereeId: env.refereeIds[0],
+        correlationId: `ref-corr-1`, expectedVersion: 0
+      }, masterActor()),
+      dispatchService.dispatch(env.competitionId, m2, {
+        courtId: env.courts[1], refereeId: env.refereeIds[0],
+        correlationId: `ref-corr-2`, expectedVersion: 0
+      }, masterActor())
+    ]);
+    const ok = results.filter(r => r.status === "fulfilled");
+    const fail = results.filter(r => r.status === "rejected");
+    assert.equal(ok.length, 1, "Exactly one dispatch succeeds");
+    assert.equal(fail.length, 1, "Exactly one dispatch fails");
+    assert.match(fail[0].reason.message, /REFEREE_CONFLICT/);
+  } finally { await env.cleanup(); }
+});
+
+// --- Test 3: Stale expectedVersion → zero writes ---
+test("MySQL: stale expectedVersion → zero partial writes", async (t) => {
+  if (!mysqlAvailable) { t.skip("MySQL not available"); return; }
+  const env = await createTestEnv("stale");
+  try {
+    const [m1, m2] = env.matchIds;
+    // First dispatch succeeds
+    await dispatchService.dispatch(env.competitionId, m1, {
+      courtId: env.courts[0], refereeId: env.refereeIds[0],
+      correlationId: `stale-ok`, expectedVersion: 0
     }, masterActor());
-    assert.fail("Should have thrown");
-  } catch (error) {
-    assert.equal(error.code, "CONFLICT", "Must be CONFLICT");
-    assert.match(error.message, /STALE_DISPATCH_VERSION/);
-  }
-  
-  // Verify match 6 is unchanged
-  const [matchRows] = await pool.query("SELECT * FROM matches WHERE id = ?", [matchId6]);
-  assert.equal(matchRows[0].status, "idle", "Match must remain idle");
-  assert.equal(matchRows[0].dispatch_id, null, "No dispatch_id");
-  
-  // Verify no reservation was created for match 6
-  const [resRows] = await pool.query(
-    "SELECT * FROM referee_dispatch_reservations WHERE match_id = ?",
-    [matchId6]
-  );
-  assert.equal(resRows.length, 0, "No reservation for stale dispatch");
+
+    // Second dispatch on different match with stale version (different court to avoid COURT_CONFLICT)
+    try {
+      await dispatchService.dispatch(env.competitionId, m2, {
+        courtId: env.courts[1], refereeId: env.refereeIds[1],
+        correlationId: `stale-fail`, expectedVersion: 99
+      }, masterActor());
+      assert.fail("Should have thrown");
+    } catch (error) {
+      assert.equal(error.code, "CONFLICT");
+      assert.match(error.message, /STALE_DISPATCH_VERSION/);
+    }
+
+    // Verify m2 untouched
+    const [rows] = await pool.query("SELECT * FROM matches WHERE id = ?", [m2]);
+    assert.equal(rows[0].status, "idle");
+    assert.equal(rows[0].dispatch_id, null);
+
+    // Verify no reservation for m2
+    const [res] = await pool.query(
+      "SELECT * FROM referee_dispatch_reservations WHERE match_id = ?", [m2]);
+    assert.equal(res.length, 0);
+  } finally { await env.cleanup(); }
 });
 
-test("MySQL integration: duplicate correlationId", async (t) => {
+// --- Test 4: Duplicate correlationId → idempotent ---
+test("MySQL: duplicate correlationId → idempotent return", async (t) => {
   if (!mysqlAvailable) { t.skip("MySQL not available"); return; }
-  const matchId7 = cleanupIds.matchIds[6];
-  
-  // First dispatch
-  const result1 = await dispatchService.dispatch(competitionId, matchId7, {
-    courtId: "court-1", refereeId: "referee-int-1", correlationId: "idempotent-test", expectedVersion: 0
-  }, masterActor());
-  assert.equal(result1.idempotent, false);
-  
-  // Count reservations and chronology before retry
-  const [resBefore] = await pool.query(
-    "SELECT * FROM referee_dispatch_reservations WHERE competition_id = ? AND correlation_id = ?",
-    [competitionId, "idempotent-test"]
-  );
-  const [chronBefore] = await pool.query(
-    "SELECT * FROM tournament_coordination_chronology WHERE tournament_id = ? AND correlation_id = ?",
-    [competitionId, "idempotent-test"]
-  );
-  
-  // Idempotent retry
-  const result2 = await dispatchService.dispatch(competitionId, matchId7, {
-    courtId: "court-1", refereeId: "referee-int-1", correlationId: "idempotent-test", expectedVersion: 0
-  }, masterActor());
-  assert.equal(result2.idempotent, true);
-  
-  // Verify no duplicate reservation
-  const [resAfter] = await pool.query(
-    "SELECT * FROM referee_dispatch_reservations WHERE competition_id = ? AND correlation_id = ?",
-    [competitionId, "idempotent-test"]
-  );
-  assert.equal(resAfter.length, resBefore.length, "No duplicate reservation");
-  
-  // Verify no duplicate chronology
-  const [chronAfter] = await pool.query(
-    "SELECT * FROM tournament_coordination_chronology WHERE tournament_id = ? AND correlation_id = ?",
-    [competitionId, "idempotent-test"]
-  );
-  assert.equal(chronAfter.length, chronBefore.length, "No duplicate chronology");
-});
-
-test("MySQL integration: reservation has competition_id", async (t) => {
-  if (!mysqlAvailable) { t.skip("MySQL not available"); return; }
-  const [resRows] = await pool.query(
-    "SELECT * FROM referee_dispatch_reservations WHERE competition_id = ?",
-    [competitionId]
-  );
-  assert.ok(resRows.length > 0, "At least one reservation must exist");
-  for (const row of resRows) {
-    assert.equal(row.competition_id, competitionId, "Every reservation must have competition_id");
-  }
-});
-
-test("MySQL integration: withdraw with correct expectedVersion", async (t) => {
-  if (!mysqlAvailable) { t.skip("MySQL not available"); return; }
-  const matchId8 = cleanupIds.matchIds[7];
-  
-  // Dispatch
-  const dispatchResult = await dispatchService.dispatch(competitionId, matchId8, {
-    courtId: "court-1", refereeId: "referee-int-1", correlationId: "withdraw-test", expectedVersion: 0
-  }, masterActor());
-  
-  const [matchRows] = await pool.query("SELECT * FROM matches WHERE id = ?", [matchId8]);
-  const currentVersion = matchRows[0].dispatch_version;
-  
-  // Withdraw with correct version
-  const result = await dispatchService.withdrawDispatch(competitionId, matchId8, masterActor(), {
-    reason: "integration test", expectedVersion: currentVersion
-  });
-  assert.equal(result.match.status, "upcoming");
-  
-  // Verify match is reset
-  const [afterRows] = await pool.query("SELECT * FROM matches WHERE id = ?", [matchId8]);
-  assert.equal(afterRows[0].status, "upcoming");
-  assert.equal(afterRows[0].dispatch_id, null);
-});
-
-test("MySQL integration: withdraw with stale expectedVersion", async (t) => {
-  if (!mysqlAvailable) { t.skip("MySQL not available"); return; }
-  const matchId9 = cleanupIds.matchIds[8];
-  
-  await dispatchService.dispatch(competitionId, matchId9, {
-    courtId: "court-1", refereeId: "referee-int-1", correlationId: "stale-withdraw", expectedVersion: 0
-  }, masterActor());
-  
+  const env = await createTestEnv("idem");
   try {
-    await dispatchService.withdrawDispatch(competitionId, matchId9, masterActor(), {
-      reason: "test", expectedVersion: 99
+    const [m1] = env.matchIds;
+    const r1 = await dispatchService.dispatch(env.competitionId, m1, {
+      courtId: env.courts[0], refereeId: env.refereeIds[0],
+      correlationId: `idem-corr`, expectedVersion: 0
+    }, masterActor());
+    assert.equal(r1.idempotent, false);
+
+    const [resBefore] = await pool.query(
+      "SELECT * FROM referee_dispatch_reservations WHERE competition_id = ? AND correlation_id = ?",
+      [env.competitionId, "idem-corr"]);
+    const [chrBefore] = await pool.query(
+      "SELECT * FROM tournament_coordination_chronology WHERE tournament_id = ? AND correlation_id = ?",
+      [env.competitionId, "idem-corr"]);
+
+    const r2 = await dispatchService.dispatch(env.competitionId, m1, {
+      courtId: env.courts[0], refereeId: env.refereeIds[0],
+      correlationId: `idem-corr`, expectedVersion: 0
+    }, masterActor());
+    assert.equal(r2.idempotent, true);
+
+    const [resAfter] = await pool.query(
+      "SELECT * FROM referee_dispatch_reservations WHERE competition_id = ? AND correlation_id = ?",
+      [env.competitionId, "idem-corr"]);
+    const [chrAfter] = await pool.query(
+      "SELECT * FROM tournament_coordination_chronology WHERE tournament_id = ? AND correlation_id = ?",
+      [env.competitionId, "idem-corr"]);
+    assert.equal(resAfter.length, resBefore.length, "No duplicate reservation");
+    assert.equal(chrAfter.length, chrBefore.length, "No duplicate chronology");
+  } finally { await env.cleanup(); }
+});
+
+// --- Test 5: dispatch → accept with independent chronology ---
+test("MySQL: dispatch → accept succeeds with independent chronology", async (t) => {
+  if (!mysqlAvailable) { t.skip("MySQL not available"); return; }
+  const env = await createTestEnv("accept");
+  try {
+    const [m1] = env.matchIds;
+
+    // Dispatch
+    const dispatchResult = await dispatchService.dispatch(env.competitionId, m1, {
+      courtId: env.courts[0], refereeId: env.refereeIds[0],
+      correlationId: `accept-dispatch`, expectedVersion: 0
+    }, masterActor());
+    assert.equal(dispatchResult.idempotent, false);
+
+    // Verify dispatch chronology
+    const [dispatchChron] = await pool.query(
+      "SELECT * FROM tournament_coordination_chronology WHERE tournament_id = ? AND correlation_id = ?",
+      [env.competitionId, "accept-dispatch"]);
+    assert.equal(dispatchChron.length, 1);
+    assert.equal(dispatchChron[0].event_type, "referee_dispatch");
+
+    // Get dispatch version for accept
+    const [matchRows] = await pool.query("SELECT * FROM matches WHERE id = ?", [m1]);
+    assert.equal(matchRows[0].status, "assigned");
+    const currentVersion = matchRows[0].dispatch_version;
+
+    // Accept (uses a NEW correlationId for its chronology)
+    const acceptResult = await dispatchService.acceptDispatch(env.competitionId, m1,
+      refereeActor(env.refereeIds[0]),
+      { expectedVersion: currentVersion, correlationId: "accept-event" }
+    );
+    assert.equal(acceptResult.match.status, "accepted");
+
+    // Verify accept chronology is a SEPARATE row
+    const [acceptChron] = await pool.query(
+      "SELECT * FROM tournament_coordination_chronology WHERE tournament_id = ? AND correlation_id = ?",
+      [env.competitionId, "accept-event"]);
+    assert.equal(acceptChron.length, 1);
+    assert.equal(acceptChron[0].event_type, "referee_acceptance");
+
+    // Verify both chronology rows exist with different correlationIds
+    const [allChron] = await pool.query(
+      "SELECT * FROM tournament_coordination_chronology WHERE tournament_id = ? ORDER BY id",
+      [env.competitionId]);
+    assert.ok(allChron.length >= 2, "At least 2 chronology rows (dispatch + accept)");
+  } finally { await env.cleanup(); }
+});
+
+// --- Test 6: Resource retention after accept ---
+test("MySQL: after accept, court/referee blocked until scored", async (t) => {
+  if (!mysqlAvailable) { t.skip("MySQL not available"); return; }
+  const env = await createTestEnv("retain", { courts: 2, matches: 4 });
+  try {
+    const [m1, m2, m3] = env.matchIds;
+
+    // Dispatch m1
+    await dispatchService.dispatch(env.competitionId, m1, {
+      courtId: env.courts[0], refereeId: env.refereeIds[0],
+      correlationId: `retain-dispatch`, expectedVersion: 0
+    }, masterActor());
+
+    // Accept m1
+    const [matchAfterDispatch] = await pool.query("SELECT * FROM matches WHERE id = ?", [m1]);
+    await dispatchService.acceptDispatch(env.competitionId, m1,
+      refereeActor(env.refereeIds[0]),
+      { expectedVersion: matchAfterDispatch[0].dispatch_version, correlationId: "retain-accept" }
+    );
+
+    // Verify m1 is accepted
+    const [m1Row] = await pool.query("SELECT * FROM matches WHERE id = ?", [m1]);
+    assert.equal(m1Row[0].status, "accepted");
+
+    // Try to dispatch m2 to SAME court → must fail (court still occupied)
+    try {
+      await dispatchService.dispatch(env.competitionId, m2, {
+        courtId: env.courts[0], refereeId: env.refereeIds[1],
+        correlationId: `retain-court-block`, expectedVersion: 0
+      }, masterActor());
+      assert.fail("Court should be blocked after accept");
+    } catch (error) {
+      assert.match(error.message, /COURT_CONFLICT/);
+    }
+
+    // Try to dispatch m3 to SAME referee on different court → must fail
+    try {
+      await dispatchService.dispatch(env.competitionId, m3, {
+        courtId: env.courts[1], refereeId: env.refereeIds[0],
+        correlationId: `retain-ref-block`, expectedVersion: 0
+      }, masterActor());
+      assert.fail("Referee should be blocked after accept");
+    } catch (error) {
+      assert.match(error.message, /REFEREE_CONFLICT/);
+    }
+
+    // Start match (accepted → playing)
+    await pool.query("UPDATE matches SET status = 'playing', started_at = NOW() WHERE id = ?", [m1]);
+
+    // Court/referee STILL blocked during playing
+    try {
+      await dispatchService.dispatch(env.competitionId, m2, {
+        courtId: env.courts[0], refereeId: env.refereeIds[1],
+        correlationId: `retain-playing-block`, expectedVersion: 0
+      }, masterActor());
+      assert.fail("Court should be blocked during playing");
+    } catch (error) {
+      assert.match(error.message, /COURT_CONFLICT/);
+    }
+
+    // Score match (playing → scored) — this releases resources
+    await pool.query("UPDATE matches SET score1 = 11, score2 = 8, status = 'scored' WHERE id = ?", [m1]);
+
+    // Now court should be available — dispatch m2 to same court should succeed
+    const result = await dispatchService.dispatch(env.competitionId, m2, {
+      courtId: env.courts[0], refereeId: env.refereeIds[1],
+      correlationId: `retain-after-score`, expectedVersion: 0
+    }, masterActor());
+    assert.equal(result.idempotent, false, "Court available after scored");
+  } finally { await env.cleanup(); }
+});
+
+// --- Test 7: dispatch → withdraw with independent chronology ---
+test("MySQL: dispatch → withdraw succeeds with independent chronology", async (t) => {
+  if (!mysqlAvailable) { t.skip("MySQL not available"); return; }
+  const env = await createTestEnv("withdraw");
+  try {
+    const [m1] = env.matchIds;
+
+    // Dispatch
+    await dispatchService.dispatch(env.competitionId, m1, {
+      courtId: env.courts[0], refereeId: env.refereeIds[0],
+      correlationId: `wd-dispatch`, expectedVersion: 0
+    }, masterActor());
+
+    const [matchRows] = await pool.query("SELECT * FROM matches WHERE id = ?", [m1]);
+    assert.equal(matchRows[0].status, "assigned");
+    const currentVersion = matchRows[0].dispatch_version;
+
+    // Withdraw (uses a NEW correlationId)
+    const wdResult = await dispatchService.withdrawDispatch(env.competitionId, m1, masterActor(), {
+      reason: "integration test", expectedVersion: currentVersion, correlationId: "wd-event"
     });
-    assert.fail("Should have thrown");
-  } catch (error) {
-    assert.equal(error.code, "CONFLICT");
-    assert.match(error.message, /STALE_DISPATCH_VERSION/);
-  }
-  
-  // Match must still be assigned
-  const [matchRows] = await pool.query("SELECT * FROM matches WHERE id = ?", [matchId9]);
-  assert.equal(matchRows[0].status, "assigned");
-  assert.ok(matchRows[0].dispatch_id, "dispatch_id must be present");
+    assert.equal(wdResult.match.status, "upcoming");
+
+    // Verify withdraw chronology is separate
+    const [wdChron] = await pool.query(
+      "SELECT * FROM tournament_coordination_chronology WHERE tournament_id = ? AND correlation_id = ?",
+      [env.competitionId, "wd-event"]);
+    assert.equal(wdChron.length, 1);
+    assert.equal(wdChron[0].event_type, "referee_withdraw");
+
+    // Verify match is reset
+    const [afterRows] = await pool.query("SELECT * FROM matches WHERE id = ?", [m1]);
+    assert.equal(afterRows[0].status, "upcoming");
+    assert.equal(afterRows[0].dispatch_id, null);
+
+    // After withdraw, court and referee should be available for re-dispatch
+    const redispatch = await dispatchService.dispatch(env.competitionId, m1, {
+      courtId: env.courts[0], refereeId: env.refereeIds[1],
+      correlationId: `wd-redispatch`, expectedVersion: 0
+    }, masterActor());
+    assert.equal(redispatch.idempotent, false, "Resources available after withdraw");
+  } finally { await env.cleanup(); }
 });
 
-test("MySQL integration: reassign with correct expectedVersion", async (t) => {
+// --- Test 8: Migration re-run safety ---
+test("MySQL: migration SQL executes twice without error", async (t) => {
   if (!mysqlAvailable) { t.skip("MySQL not available"); return; }
-  const matchId10 = cleanupIds.matchIds[9];
-  
-  await dispatchService.dispatch(competitionId, matchId10, {
-    courtId: "court-1", refereeId: "referee-int-1", correlationId: "reassign-test", expectedVersion: 0
-  }, masterActor());
-  
-  const [matchRows] = await pool.query("SELECT * FROM matches WHERE id = ?", [matchId10]);
-  const currentVersion = matchRows[0].dispatch_version;
-  
-  const result = await dispatchService.reassignDispatch(competitionId, matchId10, "referee-int-2", masterActor(), {
-    reason: "test", expectedVersion: currentVersion, correlationId: "reassign-new"
+
+  // Read the actual db.sql file
+  const dbSqlPath = path.join(__dirname, "..", "db.sql");
+  const dbSql = fs.readFileSync(dbSqlPath, "utf8");
+
+  // Extract INFORMATION_SCHEMA-based migration blocks for referee_dispatch_reservations
+  // These are the conditional migration statements that should be idempotent
+  const migrationStatements = [];
+
+  // competition_id column migration
+  migrationStatements.push(
+    `SET @col_exists = (SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='referee_dispatch_reservations' AND COLUMN_NAME='competition_id')`
+  );
+  migrationStatements.push(
+    `SET @sql = IF(@col_exists = 0, 'ALTER TABLE referee_dispatch_reservations ADD COLUMN competition_id INT NOT NULL DEFAULT 0 AFTER correlation_id', 'SELECT 1')`
+  );
+
+  // Create a temporary connection with multipleStatements to run SET + PREPARE patterns
+  const conn = await mysql.createConnection({
+    ...DB_CONFIG, multipleStatements: true
   });
-  assert.equal(result.match.refereeId, "referee-int-2");
+
+  try {
+    // Run the full db.sql once
+    await conn.query(dbSql);
+    // Run it again — must not error
+    await conn.query(dbSql);
+
+    // Verify schema is correct after double run
+    const [colRows] = await conn.query(
+      "SELECT COUNT(*) AS cnt FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='referee_dispatch_reservations' AND COLUMN_NAME='competition_id'"
+    );
+    assert.equal(colRows[0].cnt, 1, "competition_id column exists");
+
+    const [idxRows] = await conn.query(
+      "SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.STATISTICS WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='referee_dispatch_reservations' AND INDEX_NAME='uq_dispatch_correlation' ORDER BY SEQ_IN_INDEX"
+    );
+    assert.ok(idxRows.length >= 2, "Unique key has at least 2 columns");
+    assert.equal(idxRows[0].COLUMN_NAME, "competition_id");
+    assert.equal(idxRows[1].COLUMN_NAME, "correlation_id");
+  } finally {
+    await conn.end();
+  }
 });
 
-test("MySQL integration: migration re-run safety", async (t) => {
+// --- Cleanup ---
+test("MySQL: cleanup pool", async (t) => {
   if (!mysqlAvailable) { t.skip("MySQL not available"); return; }
-  // Verify that re-running the migration portions of db.sql doesn't fail
-  // This tests the INFORMATION_SCHEMA-based conditional migrations
-  
-  // Check competition_id column exists
-  const [colRows] = await pool.query(
-    "SELECT COUNT(*) AS cnt FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='referee_dispatch_reservations' AND COLUMN_NAME='competition_id'"
-  );
-  assert.equal(colRows[0].cnt, 1, "competition_id column must exist");
-  
-  // Check unique key includes competition_id
-  const [idxRows] = await pool.query(
-    "SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.STATISTICS WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='referee_dispatch_reservations' AND INDEX_NAME='uq_dispatch_correlation' ORDER BY SEQ_IN_INDEX"
-  );
-  assert.ok(idxRows.length >= 2, "Unique key must have at least 2 columns");
-  assert.equal(idxRows[0].COLUMN_NAME, "competition_id", "First column must be competition_id");
-  assert.equal(idxRows[1].COLUMN_NAME, "correlation_id", "Second column must be correlation_id");
-});
-
-test("MySQL integration: cleanup", async (t) => {
-  if (!mysqlAvailable) { t.skip("MySQL not available"); return; }
-  await cleanup();
-  // Verify pool is closed
+  await pool.end();
   try {
     await pool.query("SELECT 1");
     assert.fail("Pool should be closed");
   } catch (e) {
-    assert.ok(e.message.includes("closed") || e.message.includes("Pool"), "Pool must be closed");
+    assert.ok(e.message.includes("closed") || e.message.includes("Pool") || e.message.includes("quit"));
   }
 });

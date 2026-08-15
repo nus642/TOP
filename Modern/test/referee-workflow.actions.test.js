@@ -68,7 +68,7 @@ test("referee action API exposes accept and score submission entry points", asyn
   refereeWorkflowService.recordScore = async (...args) => { calls.push(args); return { action: "scored" }; };
 
   const paths = [
-    ["/:tournamentId/referees/:refereeId/matches/:matchId/accept", { expectedVersion: undefined }],
+    ["/:tournamentId/referees/:refereeId/matches/:matchId/accept", { expectedVersion: undefined, correlationId: undefined }],
     ["/:tournamentId/referees/:refereeId/matches/:matchId/start", {}],
     ["/:tournamentId/referees/:refereeId/matches/:matchId/score", { score1: 11, score2: 8 }]
   ];

@@ -210,13 +210,16 @@ async function deleteReservation(dispatchId, connection = db) {
 }
 
 // Active reservation conflict checks (FOR UPDATE within transaction)
+// Reservation is active until the match reaches a terminal state (scored/confirmed/finished)
+// or the reservation is explicitly rejected. This ensures court/referee remain
+// occupied from dispatch through accept, playing, and interruption.
 async function findActiveReservationByCourt(courtId, competitionId, connection) {
   const [rows] = await connection.query(
     `SELECT r.* FROM referee_dispatch_reservations r
      JOIN matches m ON r.match_id = m.id
      WHERE r.court_id = ? AND r.competition_id = ?
-       AND r.accepted_at IS NULL AND r.rejected_at IS NULL
-       AND m.status = 'assigned'
+       AND r.rejected_at IS NULL
+       AND m.status NOT IN ('scored', 'awaiting_confirmation', 'confirmed', 'finished')
      LIMIT 1 FOR UPDATE`,
     [courtId, competitionId]
   );
@@ -228,8 +231,8 @@ async function findActiveReservationByReferee(refereeId, competitionId, connecti
     `SELECT r.* FROM referee_dispatch_reservations r
      JOIN matches m ON r.match_id = m.id
      WHERE r.referee_id = ? AND r.competition_id = ?
-       AND r.accepted_at IS NULL AND r.rejected_at IS NULL
-       AND m.status = 'assigned'
+       AND r.rejected_at IS NULL
+       AND m.status NOT IN ('scored', 'awaiting_confirmation', 'confirmed', 'finished')
      LIMIT 1 FOR UPDATE`,
     [refereeId, competitionId]
   );

@@ -204,6 +204,8 @@ async function acceptDispatch(competitionValue, matchValue, actor, data = {}) {
   
   const refereeId = requireReferee(actor);
   const clientExpectedVersion = requireInteger(data.expectedVersion, "expectedVersion");
+  // Each action uses its own correlationId — never reuse the dispatch correlationId
+  const acceptCorrelationId = data.correlationId || randomUUID();
   
   return db.withTransaction(async (connection) => {
     // Lock order: tournaments → matches → referee_dispatch_reservations
@@ -267,9 +269,8 @@ async function acceptDispatch(competitionValue, matchValue, actor, data = {}) {
       updatedMatch = await repository.acceptResponsibility(competitionId, matchId, connection);
     }
     
-    // 5. Write chronology event
+    // 5. Write chronology event with a UNIQUE correlationId (never reuse dispatch correlationId)
     const courtId = reservation ? reservation.courtId : null;
-    const correlationId = reservation ? reservation.correlationId : randomUUID();
     await courtRepository.appendEvent({
       tournamentId: competitionId,
       courtId: courtId || "unassigned",
@@ -277,7 +278,7 @@ async function acceptDispatch(competitionValue, matchValue, actor, data = {}) {
       eventType: "referee_acceptance",
       sourceType: "referee_acceptance",
       actorId: refereeId,
-      correlationId,
+      correlationId: acceptCorrelationId,
       details: { dispatchId: reservation ? reservation.dispatchId : null }
     }, connection);
     
@@ -295,6 +296,8 @@ async function withdrawDispatch(competitionValue, matchValue, actor, data = {}) 
   const masterId = requireMaster(actor);
   const reason = data.reason || "withdrawn_by_master";
   const clientExpectedVersion = requireInteger(data.expectedVersion, "expectedVersion");
+  // Each action uses its own correlationId — never reuse the dispatch correlationId
+  const withdrawCorrelationId = data.correlationId || randomUUID();
   
   return db.withTransaction(async (connection) => {
     // Lock order: tournaments → matches → referee_dispatch_reservations
@@ -340,7 +343,7 @@ async function withdrawDispatch(competitionValue, matchValue, actor, data = {}) 
     // 4. Update match to upcoming (release court and referee reservations)
     const updatedMatch = await repository.withdrawDispatch(competitionId, matchId, connection);
     
-    // 5. Write chronology event
+    // 5. Write chronology event with a UNIQUE correlationId
     await courtRepository.appendEvent({
       tournamentId: competitionId,
       courtId: reservation.courtId,
@@ -348,7 +351,7 @@ async function withdrawDispatch(competitionValue, matchValue, actor, data = {}) 
       eventType: "referee_withdraw",
       sourceType: "master_dispatch",
       actorId: masterId,
-      correlationId: reservation.correlationId,
+      correlationId: withdrawCorrelationId,
       details: { dispatchId: reservation.dispatchId, reason }
     }, connection);
     

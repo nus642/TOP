@@ -54,12 +54,12 @@ router.post("/:competitionId/matches/:matchId/dispatch", async (req, res) => {
 // Withdraw dispatch: Master can withdraw an assigned dispatch
 router.post("/:competitionId/matches/:matchId/withdraw", async (req, res) => {
   try {
-    const { reason, expectedVersion } = req.body;
+    const { reason, expectedVersion, correlationId } = req.body;
     const result = await service.withdrawDispatch(
       req.params.competitionId,
       req.params.matchId,
       req.actor,
-      { reason, expectedVersion }
+      { reason, expectedVersion, correlationId }
     );
     res.json(result);
   } catch (error) {

@@ -24,7 +24,7 @@ function handler(action, operationData = () => ({})) {
 }
 
 router.post("/:tournamentId/referees/:refereeId/matches/:matchId/accept", handler("acceptMatch",
-  (req) => ({ expectedVersion: req.body.expectedVersion })
+  (req) => ({ expectedVersion: req.body.expectedVersion, correlationId: req.body.correlationId })
 ));
 router.post("/:tournamentId/referees/:refereeId/matches/:matchId/start", handler("startMatch"));
 router.post("/:tournamentId/referees/:refereeId/matches/:matchId/interrupt", handler(

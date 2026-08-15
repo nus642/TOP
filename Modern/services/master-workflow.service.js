@@ -69,7 +69,8 @@ function withdrawDispatch(competitionValue, matchValue, actor, data = {}) {
 
   return dispatchService.withdrawDispatch(competitionId, matchId, actor, {
     reason: data.reason,
-    expectedVersion: data.expectedVersion
+    expectedVersion: data.expectedVersion,
+    correlationId: data.correlationId
   });
 }
 
