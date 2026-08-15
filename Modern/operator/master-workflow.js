@@ -30,7 +30,7 @@
         view.matches(result.matches);
         view.courts(coordination.courts || []);
       } catch (error) {
-        view.error(error.message);
+        view.error(error);
       }
     }
 
@@ -41,7 +41,7 @@
         await api.assignReferee(competitionId, matchId, refereeId);
         await refresh();
       } catch (error) {
-        view.error(error.message);
+        view.error(error);
       }
     }
 
@@ -54,7 +54,7 @@
         });
         await refresh();
       } catch (error) {
-        view.error(error.message);
+        view.error(error);
         await refresh();
       }
     }
@@ -68,7 +68,7 @@
         });
         await refresh();
       } catch (error) {
-        view.error(error.message);
+        view.error(error);
         await refresh();
       }
     }
@@ -82,13 +82,13 @@
         });
         await refresh();
       } catch (error) {
-        view.error(error.message);
+        view.error(error);
         await refresh();
       }
     }
 
-    async function loadCandidates(matchId) {
-      return api.availableCandidates(competitionId, matchId);
+    async function loadCandidates(matchId, excludeMatchId) {
+      return api.availableCandidates(competitionId, matchId, excludeMatchId);
     }
 
     async function confirm(matchId) {
@@ -98,7 +98,7 @@
         await api.confirmResult(competitionId, matchId);
         await refresh();
       } catch (error) {
-        view.error(error.message);
+        view.error(error);
       }
     }
 
@@ -108,7 +108,7 @@
         if (accountabilityFlow) accountabilityFlow.verify(accountability);
         await api.reportCourt(competitionId, courtId, { condition, expectedVersion, affectedMatchId });
         await refresh();
-      } catch (error) { view.error(error.message); }
+      } catch (error) { view.error(error); }
     }
 
     async function deferCourt({ courtId, expectedVersion }) {
@@ -117,7 +117,7 @@
         if (accountabilityFlow) accountabilityFlow.verify(accountability);
         await api.deferCourt(competitionId, courtId, expectedVersion);
         await refresh();
-      } catch (error) { view.error(error.message); }
+      } catch (error) { view.error(error); }
     }
 
     return {

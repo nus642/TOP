@@ -53,8 +53,9 @@
           method: "POST", headers: { "Content-Type": "application/json" }, body: "{}"
         });
       },
-      availableCandidates(competitionId, matchId) {
-        return request(`/referee-coordination/${encodeURIComponent(competitionId)}/matches/${encodeURIComponent(matchId)}/available-candidates`);
+      availableCandidates(competitionId, matchId, excludeMatchId) {
+        const query = excludeMatchId ? `?excludeMatchId=${encodeURIComponent(excludeMatchId)}` : "";
+        return request(`/referee-coordination/${encodeURIComponent(competitionId)}/matches/${encodeURIComponent(matchId)}/available-candidates${query}`);
       },
       dispatch(competitionId, matchId, data) {
         return request(`/master-workflow/${encodeURIComponent(competitionId)}/matches/${encodeURIComponent(matchId)}/dispatch`, {

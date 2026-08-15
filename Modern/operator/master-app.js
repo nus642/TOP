@@ -87,7 +87,7 @@ contextForm.addEventListener("submit", async (event) => {
   event.preventDefault();
   try {
     await workflow.start(ResponsibilityContext.browser.current());
-  } catch (error) { view.error(error.message); }
+  } catch (error) { view.error(error); }
 });
 
 // Dispatch button: load candidates and show dispatch form
@@ -119,7 +119,7 @@ list.addEventListener("click", async (event) => {
       article.appendChild(form);
       dispatchBtn.remove();
     } catch (error) {
-      view.error(error.message);
+      view.error(error);
       dispatchBtn.disabled = false;
       dispatchBtn.textContent = "派单";
     }
@@ -161,7 +161,7 @@ list.addEventListener("click", async (event) => {
     reassignBtn.disabled = true;
     reassignBtn.textContent = "正在加载候选…";
     try {
-      const candidates = await workflow.loadCandidates(matchId);
+      const candidates = await workflow.loadCandidates(matchId, matchId);
       const referees = candidates.eligibleReferees || [];
       const article = reassignBtn.closest(".match");
       const form = document.createElement("div");
@@ -179,7 +179,7 @@ list.addEventListener("click", async (event) => {
       reassignBtn.disabled = false;
       reassignBtn.textContent = "换派";
     } catch (error) {
-      view.error(error.message);
+      view.error(error);
       reassignBtn.disabled = false;
       reassignBtn.textContent = "换派";
     }

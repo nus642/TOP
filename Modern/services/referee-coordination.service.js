@@ -47,7 +47,7 @@ async function updateRefereeStatus(competitionValue, refereeId, updates) {
 // Returns available referees for a specific match and court, based on the
 // competition referee roster and current match schedule authorization.
 
-async function listAvailableCandidates(competitionValue, matchValue, actor) {
+async function listAvailableCandidates(competitionValue, matchValue, actor, excludeMatchId = null) {
   const competitionId = positiveId(competitionValue, "competition id");
   const matchId = positiveId(matchValue, "match id");
   
@@ -61,14 +61,28 @@ async function listAvailableCandidates(competitionValue, matchValue, actor) {
   // Get the court authorized by match_schedules for this match
   const courtId = await courtRepository.findScheduledCourt(competitionId, matchId);
   
+  // Filter out referees with active dispatch reservations for OTHER matches.
+  // excludeMatchId allows the current match's own reservation to be ignored
+  // (e.g. reassign scenario where the current referee still holds a reservation
+  // for this same match and must remain selectable).
+  const availableReferees = [];
+  for (const r of eligibleReferees) {
+    const activeReservation = await competitionRefereeRepository.findActiveReservationByRefereeExcluding(
+      r.refereeId, competitionId, excludeMatchId
+    );
+    if (!activeReservation) {
+      availableReferees.push({
+        refereeId: r.refereeId,
+        active: r.active,
+        eligible: r.eligible
+      });
+    }
+  }
+  
   return {
     matchId,
     courtId,
-    eligibleReferees: eligibleReferees.map(r => ({
-      refereeId: r.refereeId,
-      active: r.active,
-      eligible: r.eligible
-    }))
+    eligibleReferees: availableReferees
   };
 }
 

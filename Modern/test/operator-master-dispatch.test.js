@@ -251,8 +251,12 @@ test("workflow loadCandidates: delegates to api.availableCandidates", async () =
   const workflow = createMasterWorkflow({ api, view: { loading() {}, busy() {}, error() {}, matches() {}, courts() {} } });
   await workflow.start(3);
   const result = await workflow.loadCandidates(1);
-  assert.deepEqual(calls[0], [3, 1]);
+  assert.deepEqual(calls[0], [3, 1, undefined]);
   assert.equal(result.courtId, "A1");
+  // With excludeMatchId
+  calls.length = 0;
+  await workflow.loadCandidates(1, 5);
+  assert.deepEqual(calls[0], [3, 1, 5]);
 });
 
 // ── 6. Non-master cannot perform dispatch operations ──
@@ -465,4 +469,200 @@ test("db schema does not add a separate dispatch_status column", () => {
   const path = require("node:path");
   const schema = fs.readFileSync(path.join(__dirname, "..", "db.sql"), "utf8");
   assert.doesNotMatch(schema, /dispatch_status/i, "no separate dispatch_status column should exist");
+});
+
+// ── 19. Blocking 1: Error metadata must propagate through workflow to view ──
+
+test("workflow passes full Error object (not error.message) to view.error", async () => {
+  const receivedErrors = [];
+  const api = {
+    matchOverview: async () => ({ matches: [] }),
+    liveCoordination: async () => ({ courts: [] }),
+    dispatch: async () => {
+      const e = new Error("COURT_CONFLICT: Court A1 already has an active dispatch reservation");
+      e.errorCode = "COURT_CONFLICT";
+      e.statusCode = 409;
+      throw e;
+    }
+  };
+  const workflow = createMasterWorkflow({
+    api,
+    view: {
+      loading() {}, busy() {},
+      error: (err) => receivedErrors.push(err),
+      matches() {}, courts() {}
+    }
+  });
+  await workflow.start(3);
+  receivedErrors.length = 0;
+  await workflow.dispatchMatch({ matchId: 1, courtId: "A1", refereeId: "R1", expectedVersion: 0 });
+  assert.equal(receivedErrors.length, 1, "view.error must be called exactly once");
+  const err = receivedErrors[0];
+  assert.ok(err instanceof Error, "view.error must receive an Error object, not a string");
+  assert.equal(err.errorCode, "COURT_CONFLICT", "errorCode must be preserved");
+  assert.equal(err.statusCode, 409, "statusCode must be preserved");
+  // UiText.userFacingError must produce Chinese-only output from this Error
+  const userMsg = UiText.userFacingError(err);
+  assert.match(userMsg, /场地冲突/, "user-facing message must be Chinese");
+  assert.doesNotMatch(userMsg, /COURT_CONFLICT/, "user-facing message must not leak English error code");
+  assert.doesNotMatch(userMsg, /Court A1/, "user-facing message must not leak English backend detail");
+});
+
+test("workflow withdraw passes full Error to view.error for stale version", async () => {
+  const receivedErrors = [];
+  const api = {
+    matchOverview: async () => ({ matches: [] }),
+    liveCoordination: async () => ({ courts: [] }),
+    withdraw: async () => {
+      const e = new Error("STALE_DISPATCH_VERSION: Dispatch version mismatch");
+      e.errorCode = "STALE_DISPATCH_VERSION";
+      e.statusCode = 409;
+      throw e;
+    }
+  };
+  const workflow = createMasterWorkflow({
+    api,
+    view: {
+      loading() {}, busy() {},
+      error: (err) => receivedErrors.push(err),
+      matches() {}, courts() {}
+    }
+  });
+  await workflow.start(3);
+  receivedErrors.length = 0;
+  await workflow.withdraw({ matchId: 1, expectedVersion: 0 });
+  const err = receivedErrors[0];
+  assert.ok(err instanceof Error);
+  assert.equal(err.errorCode, "STALE_DISPATCH_VERSION");
+  const userMsg = UiText.userFacingError(err);
+  assert.match(userMsg, /刷新/);
+  assert.doesNotMatch(userMsg, /STALE_DISPATCH_VERSION/);
+});
+
+// ── 20. Blocking 2: Candidates must be truly available ──
+
+test("listAvailableCandidates excludes referee with active reservation for another match", async () => {
+  const service = require("../services/referee-coordination.service");
+  const repo = require("../repositories/competition-referee.repository");
+  const courtRepo = require("../repositories/court-coordination.repository");
+
+  const origList = repo.listEligibleReferees;
+  const origCourt = courtRepo.findScheduledCourt;
+  const origActive = repo.findActiveReservationByRefereeExcluding;
+  test.after(() => {
+    repo.listEligibleReferees = origList;
+    courtRepo.findScheduledCourt = origCourt;
+    repo.findActiveReservationByRefereeExcluding = origActive;
+  });
+
+  repo.listEligibleReferees = async () => [
+    { refereeId: "R1", active: true, eligible: true },
+    { refereeId: "R2", active: true, eligible: true }
+  ];
+  courtRepo.findScheduledCourt = async () => "A1";
+  // R1 has active reservation for match 99 (another match)
+  // R2 has no active reservation
+  repo.findActiveReservationByRefereeExcluding = async (refereeId, compId, excludeMatchId) => {
+    if (refereeId === "R1") return { matchId: 99, refereeId: "R1" };
+    return null;
+  };
+
+  const result = await service.listAvailableCandidates(1, 1, { actorType: "master" });
+  assert.equal(result.eligibleReferees.length, 1, "only R2 should be available");
+  assert.equal(result.eligibleReferees[0].refereeId, "R2");
+});
+
+test("listAvailableCandidates includes referee whose reservation was rejected or match ended", async () => {
+  const service = require("../services/referee-coordination.service");
+  const repo = require("../repositories/competition-referee.repository");
+  const courtRepo = require("../repositories/court-coordination.repository");
+
+  const origList = repo.listEligibleReferees;
+  const origCourt = courtRepo.findScheduledCourt;
+  const origActive = repo.findActiveReservationByRefereeExcluding;
+  test.after(() => {
+    repo.listEligibleReferees = origList;
+    courtRepo.findScheduledCourt = origCourt;
+    repo.findActiveReservationByRefereeExcluding = origActive;
+  });
+
+  repo.listEligibleReferees = async () => [
+    { refereeId: "R1", active: true, eligible: true },
+    { refereeId: "R2", active: true, eligible: true }
+  ];
+  courtRepo.findScheduledCourt = async () => "A1";
+  // Neither referee has an active reservation
+  // (R1's was rejected, R2's match ended — both are resolved)
+  repo.findActiveReservationByRefereeExcluding = async () => null;
+
+  const result = await service.listAvailableCandidates(1, 1, { actorType: "master" });
+  assert.equal(result.eligibleReferees.length, 2, "both referees should be available after reservations resolved");
+});
+
+test("listAvailableCandidates with excludeMatchId: current match's own reservation does not exclude referee", async () => {
+  const service = require("../services/referee-coordination.service");
+  const repo = require("../repositories/competition-referee.repository");
+  const courtRepo = require("../repositories/court-coordination.repository");
+
+  const origList = repo.listEligibleReferees;
+  const origCourt = courtRepo.findScheduledCourt;
+  const origActive = repo.findActiveReservationByRefereeExcluding;
+  const excludeMatchIds = [];
+  test.after(() => {
+    repo.listEligibleReferees = origList;
+    courtRepo.findScheduledCourt = origCourt;
+    repo.findActiveReservationByRefereeExcluding = origActive;
+  });
+
+  repo.listEligibleReferees = async () => [
+    { refereeId: "R1", active: true, eligible: true },
+    { refereeId: "R2", active: true, eligible: true }
+  ];
+  courtRepo.findScheduledCourt = async () => "A1";
+  // R1 has a reservation for match 1 (the current match) — should NOT exclude when excludeMatchId=1
+  // R2 has a reservation for match 99 (another match) — should exclude
+  repo.findActiveReservationByRefereeExcluding = async (refereeId, compId, excludeMatchId) => {
+    excludeMatchIds.push(excludeMatchId);
+    if (refereeId === "R1") {
+      // R1's reservation is for match 1; if excludeMatchId=1, this returns null
+      if (excludeMatchId === 1) return null;
+      return { matchId: 1, refereeId: "R1" };
+    }
+    if (refereeId === "R2") {
+      // R2's reservation is for match 99; not excluded by excludeMatchId=1
+      return { matchId: 99, refereeId: "R2" };
+    }
+    return null;
+  };
+
+  const result = await service.listAvailableCandidates(1, 1, { actorType: "master" }, 1);
+  // excludeMatchId must have been passed through
+  assert.ok(excludeMatchIds.every(id => id === 1), "excludeMatchId must be passed to reservation check");
+  // R1 available (own match excluded), R2 excluded (active for another match)
+  assert.equal(result.eligibleReferees.length, 1, "only R1 should be available for reassign");
+  assert.equal(result.eligibleReferees[0].refereeId, "R1");
+});
+
+// ── 21. API client: availableCandidates passes excludeMatchId as query param ──
+
+test("master API client: availableCandidates includes excludeMatchId query parameter", async () => {
+  const calls = [];
+  const fetchImpl = async (url, options = {}) => {
+    calls.push(url);
+    return { ok: true, json: async () => ({ matchId: 1, courtId: "A1", eligibleReferees: [] }) };
+  };
+  const api = createMasterApi({ fetchImpl });
+  await api.availableCandidates("c1", "m1", 42);
+  assert.match(calls[0], /excludeMatchId=42/, "URL must include excludeMatchId query parameter");
+});
+
+test("master API client: availableCandidates omits query when no excludeMatchId", async () => {
+  const calls = [];
+  const fetchImpl = async (url) => {
+    calls.push(url);
+    return { ok: true, json: async () => ({}) };
+  };
+  const api = createMasterApi({ fetchImpl });
+  await api.availableCandidates("c1", "m1");
+  assert.doesNotMatch(calls[0], /\?/, "URL must not include query string when excludeMatchId is omitted");
 });
