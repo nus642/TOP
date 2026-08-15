@@ -15,15 +15,29 @@ function matchCard(match) {
   const referee = match.referee || {};
   const team1 = escapeHtml(match.sides?.one || "一方");
   const team2 = escapeHtml(match.sides?.two || "另一方");
-  const action = match.operationStatus === "scored"
-    ? `<button type="button" data-action="confirm-result">确认已提交赛果</button>`
-    : `<form class="assignment-form"><label>裁判 ID<input name="refereeId" value="${escapeHtml(referee.refereeId || "")}" required></label><button>分配裁判</button></form>`;
+  const dispatchStatus = UiText.deriveDispatchStatus(match);
+  const dispatchLabel = UiText.dispatchStatusLabel(dispatchStatus);
+  const nextAction = UiText.nextActionLabel(dispatchStatus);
+  const version = referee.dispatchVersion ?? 0;
 
-  return `<article class="match" data-match-id="${escapeHtml(match.matchId)}">
-    <header><div><span class="eyebrow">第 ${escapeHtml(match.roundNumber || "—")} 轮</span><h2>${team1} <span>对</span> ${team2}</h2></div><span class="status">${escapeHtml(UiText.statusLabel(match.operationStatus))}</span></header>
+  let actionHtml = "";
+
+  if (dispatchStatus === "not_dispatched") {
+    actionHtml = `<button type="button" class="btn-dispatch" data-action="dispatch" data-match-id="${escapeHtml(match.matchId)}" data-version="${escapeHtml(version)}" data-court="${escapeHtml(schedule.courtId || "")}">派单</button>`;
+  } else if (dispatchStatus === "waiting_acceptance") {
+    actionHtml = `<div class="dispatch-actions">
+      <button type="button" class="btn-withdraw" data-action="withdraw" data-match-id="${escapeHtml(match.matchId)}" data-version="${escapeHtml(version)}">撤回</button>
+      <button type="button" class="btn-reassign" data-action="reassign" data-match-id="${escapeHtml(match.matchId)}" data-version="${escapeHtml(version)}">换派</button>
+    </div>`;
+  } else if (dispatchStatus === "scored") {
+    actionHtml = `<button type="button" data-action="confirm-result" data-match-id="${escapeHtml(match.matchId)}">确认已提交赛果</button>`;
+  }
+
+  return `<article class="match" data-match-id="${escapeHtml(match.matchId)}" data-dispatch-status="${escapeHtml(dispatchStatus)}">
+    <header><div><span class="eyebrow">第 ${escapeHtml(match.roundNumber || "—")} 轮</span><h2>${team1} <span>对</span> ${team2}</h2></div><span class="status">${escapeHtml(dispatchLabel)}</span></header>
     <div class="meta"><span>⌖ ${escapeHtml(schedule.courtId || "场地待定")}</span><span>◷ ${schedule.scheduledAt ? escapeHtml(new Date(schedule.scheduledAt).toLocaleString("zh-CN")) : "时间待定"}</span></div>
-    <p class="assignment">已分配裁判： <strong>${escapeHtml(referee.refereeId || "未分配")}</strong></p>
-    ${action}
+    <p class="assignment">裁判：<strong>${escapeHtml(referee.refereeId || "未分配")}</strong> · 派单版本 ${escapeHtml(version)} · 下一步：${escapeHtml(nextAction)}</p>
+    ${actionHtml}
   </article>`;
 }
 
@@ -67,24 +81,145 @@ const view = {
 };
 
 const workflow = MasterWorkflow.createMasterWorkflow({ api, view, accountabilityFlow: WorkflowAccountability.browser });
+
+// Context form: open master workspace
 contextForm.addEventListener("submit", async (event) => {
   event.preventDefault();
   try {
     await workflow.start(ResponsibilityContext.browser.current());
   } catch (error) { view.error(error.message); }
 });
+
+// Dispatch button: load candidates and show dispatch form
+list.addEventListener("click", async (event) => {
+  const dispatchBtn = event.target.closest('button[data-action="dispatch"]');
+  if (dispatchBtn) {
+    const matchId = dispatchBtn.dataset.matchId;
+    const courtId = dispatchBtn.dataset.court;
+    const version = Number(dispatchBtn.dataset.version);
+    dispatchBtn.disabled = true;
+    dispatchBtn.textContent = "正在加载候选…";
+    try {
+      const candidates = await workflow.loadCandidates(matchId);
+      const referees = candidates.eligibleReferees || [];
+      const article = dispatchBtn.closest(".match");
+      const form = document.createElement("div");
+      form.className = "dispatch-form";
+      form.innerHTML = `<form class="inline-dispatch-form" data-match-id="${escapeHtml(matchId)}">
+        <p>授权场地：<strong>${escapeHtml(candidates.courtId || courtId || "未知")}</strong></p>
+        <label>选择裁判 <select name="refereeId" required>
+          <option value="">请选择裁判</option>
+          ${referees.map(r => `<option value="${escapeHtml(r.refereeId)}">${escapeHtml(r.refereeId)}</option>`).join("")}
+        </select></label>
+        ${referees.length === 0 ? `<p class="notice error">当前无可用裁判候选。</p>` : ""}
+        <input type="hidden" name="courtId" value="${escapeHtml(candidates.courtId || courtId || "")}">
+        <input type="hidden" name="expectedVersion" value="${escapeHtml(version)}">
+        <div><button type="submit" ${referees.length === 0 ? "disabled" : ""}>确认派单</button> <button type="button" data-action="cancel-dispatch">取消</button></div>
+      </form>`;
+      article.appendChild(form);
+      dispatchBtn.remove();
+    } catch (error) {
+      view.error(error.message);
+      dispatchBtn.disabled = false;
+      dispatchBtn.textContent = "派单";
+    }
+    return;
+  }
+
+  // Cancel dispatch form
+  const cancelBtn = event.target.closest('button[data-action="cancel-dispatch"]');
+  if (cancelBtn) {
+    const form = cancelBtn.closest(".dispatch-form");
+    if (form) form.remove();
+    return;
+  }
+
+  // Confirm result
+  const confirmBtn = event.target.closest('button[data-action="confirm-result"]');
+  if (confirmBtn) {
+    workflow.confirm(confirmBtn.dataset.matchId);
+    return;
+  }
+
+  // Withdraw
+  const withdrawBtn = event.target.closest('button[data-action="withdraw"]');
+  if (withdrawBtn) {
+    if (confirm("确认撤回该派单？")) {
+      workflow.withdraw({
+        matchId: withdrawBtn.dataset.matchId,
+        expectedVersion: Number(withdrawBtn.dataset.version)
+      });
+    }
+    return;
+  }
+
+  // Reassign
+  const reassignBtn = event.target.closest('button[data-action="reassign"]');
+  if (reassignBtn) {
+    const matchId = reassignBtn.dataset.matchId;
+    const version = Number(reassignBtn.dataset.version);
+    reassignBtn.disabled = true;
+    reassignBtn.textContent = "正在加载候选…";
+    try {
+      const candidates = await workflow.loadCandidates(matchId);
+      const referees = candidates.eligibleReferees || [];
+      const article = reassignBtn.closest(".match");
+      const form = document.createElement("div");
+      form.className = "dispatch-form";
+      form.innerHTML = `<form class="inline-reassign-form" data-match-id="${escapeHtml(matchId)}">
+        <p>选择新裁判：</p>
+        <label><select name="newRefereeId" required>
+          <option value="">请选择裁判</option>
+          ${referees.map(r => `<option value="${escapeHtml(r.refereeId)}">${escapeHtml(r.refereeId)}</option>`).join("")}
+        </select></label>
+        <input type="hidden" name="expectedVersion" value="${escapeHtml(version)}">
+        <div><button type="submit">确认换派</button> <button type="button" data-action="cancel-dispatch">取消</button></div>
+      </form>`;
+      article.appendChild(form);
+      reassignBtn.disabled = false;
+      reassignBtn.textContent = "换派";
+    } catch (error) {
+      view.error(error.message);
+      reassignBtn.disabled = false;
+      reassignBtn.textContent = "换派";
+    }
+    return;
+  }
+});
+
+// Submit dispatch form
 list.addEventListener("submit", (event) => {
-  if (!event.target.matches(".assignment-form")) return;
-  event.preventDefault();
-  workflow.assign({
-    matchId: event.target.closest(".match").dataset.matchId,
-    refereeId: new FormData(event.target).get("refereeId")
-  });
+  if (event.target.matches(".inline-dispatch-form")) {
+    event.preventDefault();
+    const formData = new FormData(event.target);
+    workflow.dispatchMatch({
+      matchId: event.target.dataset.matchId,
+      courtId: formData.get("courtId"),
+      refereeId: formData.get("refereeId"),
+      expectedVersion: Number(formData.get("expectedVersion"))
+    });
+    return;
+  }
+  if (event.target.matches(".inline-reassign-form")) {
+    event.preventDefault();
+    const formData = new FormData(event.target);
+    workflow.reassign({
+      matchId: event.target.dataset.matchId,
+      newRefereeId: formData.get("newRefereeId"),
+      expectedVersion: Number(formData.get("expectedVersion"))
+    });
+    return;
+  }
+  if (event.target.matches(".assignment-form")) {
+    event.preventDefault();
+    workflow.assign({
+      matchId: event.target.closest(".match").dataset.matchId,
+      refereeId: new FormData(event.target).get("refereeId")
+    });
+  }
 });
-list.addEventListener("click", (event) => {
-  const button = event.target.closest('button[data-action="confirm-result"]');
-  if (button) workflow.confirm(button.closest(".match").dataset.matchId);
-});
+
+// Court coordination
 courtList.addEventListener("submit", (event) => {
   if (!event.target.matches(".court-report-form")) return;
   event.preventDefault();
