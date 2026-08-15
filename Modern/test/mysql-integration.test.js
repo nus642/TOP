@@ -46,11 +46,26 @@ if (!isTestDb && !forceRun) {
   process.exit(1);
 }
 
+// Resolve full connection config
+const RESOLVED_HOST = process.env.MYSQL_HOST || "localhost";
+const RESOLVED_PORT = parseInt(process.env.MYSQL_PORT) || 3306;
+const RESOLVED_USER = process.env.MYSQL_USER || "root";
+const RESOLVED_PASS = process.env.MYSQL_PASS || "123456";
+
+// CRITICAL: Write ALL resolved config back to process.env BEFORE loading any
+// production module. database/db.js reads process.env at require-time to build
+// its connection pool. Without this, the production pool uses a different DB.
+process.env.MYSQL_HOST = RESOLVED_HOST;
+process.env.MYSQL_PORT = String(RESOLVED_PORT);
+process.env.MYSQL_USER = RESOLVED_USER;
+process.env.MYSQL_PASS = RESOLVED_PASS;
+process.env.MYSQL_DB = TARGET_DB;
+
 const DB_CONFIG = {
-  host: process.env.MYSQL_HOST || "localhost",
-  port: parseInt(process.env.MYSQL_PORT) || 3306,
-  user: process.env.MYSQL_USER || "root",
-  password: process.env.MYSQL_PASS || "123456",
+  host: RESOLVED_HOST,
+  port: RESOLVED_PORT,
+  user: RESOLVED_USER,
+  password: RESOLVED_PASS,
   database: TARGET_DB,
   multipleStatements: true
 };
@@ -130,13 +145,19 @@ function refereeActor(id) {
   return { actorId: id, actorType: "referee" };
 }
 
-const dispatchService = require("../services/dispatch.service");
+// NOTE: dispatch.service is loaded AFTER MySQL connectivity is confirmed and
+// both test/production DB assertions pass (see connectivity test below).
+// database/db.js reads process.env at require-time, so process.env.MYSQL_DB
+// must be set to TARGET_DB before that require happens.
 
 // ---------------------------------------------------------------------------
 // Tests
 // ---------------------------------------------------------------------------
 
-test("MySQL: connectivity", async (t) => {
+let dispatchService;
+
+test("MySQL: connectivity + DB assertions", async (t) => {
+  // 1. Check MySQL availability
   mysqlAvailable = await checkMySQL();
   if (!mysqlAvailable) {
     t.skip("MySQL not available — set MYSQL_HOST/PORT/USER/PASS/DB to run");
@@ -145,6 +166,22 @@ test("MySQL: connectivity", async (t) => {
   pool = mysql.createPool(DB_CONFIG);
   const [rows] = await pool.query("SELECT 1 AS ok");
   assert.equal(rows[0].ok, 1);
+
+  // 2. Assert test helper pool connects to the correct database
+  const [testDbRow] = await pool.query("SELECT DATABASE() AS db");
+  assert.equal(testDbRow[0].db, TARGET_DB,
+    `Test pool must connect to ${TARGET_DB}, got ${testDbRow[0].db}`);
+  console.log(`  ✓ Test helper pool → ${testDbRow[0].db}`);
+
+  // 3. Load production modules (database/db.js reads process.env.MYSQL_DB now = TARGET_DB)
+  dispatchService = require("../services/dispatch.service");
+  const productionPool = require("../database/db");
+
+  // 4. Assert production db pool also connects to the correct database
+  const [prodDbRow] = await productionPool.query("SELECT DATABASE() AS db");
+  assert.equal(prodDbRow[0].db, TARGET_DB,
+    `Production pool must connect to ${TARGET_DB}, got ${prodDbRow[0].db}`);
+  console.log(`  ✓ Production db pool → ${prodDbRow[0].db}`);
 });
 
 // --- Test 1: Court contention ---
