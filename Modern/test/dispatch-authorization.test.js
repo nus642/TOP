@@ -195,7 +195,7 @@ test("replaced referee cannot accept old dispatch", async (t) => {
   
   const match = {
     refereeId: "referee-2", // Reassigned to new referee
-    status: "waiting_acceptance"
+    status: "assigned"
   };
   
   const accept = (refereeId) => {

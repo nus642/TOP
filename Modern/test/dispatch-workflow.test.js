@@ -2,7 +2,7 @@ const { test } = require("node:test");
 const assert = require("node:assert");
 const { MatchOperation, MATCH_OPERATION_STATES } = require("../engine/operations/domain");
 
-test("state machine: idle → waiting_acceptance → accepted → playing", async (t) => {
+test("state machine: idle → assigned → accepted → playing", async (t) => {
   // Test the complete dispatch workflow state transitions
   
   const match = new MatchOperation({
@@ -11,14 +11,14 @@ test("state machine: idle → waiting_acceptance → accepted → playing", asyn
     status: "idle"
   });
   
-  // idle → waiting_acceptance
+  // idle → assigned (via dispatch)
   match.dispatch("referee-1", "dispatch-1", 0);
-  assert.equal(match.status, MATCH_OPERATION_STATES.WAITING_ACCEPTANCE);
+  assert.equal(match.status, MATCH_OPERATION_STATES.ASSIGNED);
   assert.equal(match.refereeId, "referee-1");
   assert.equal(match.dispatchId, "dispatch-1");
   assert.equal(match.dispatchVersion, 0);
   
-  // waiting_acceptance → accepted
+  // assigned → accepted
   match.acceptDispatch("referee-1", 0);
   assert.equal(match.status, MATCH_OPERATION_STATES.ACCEPTED);
   assert.equal(match.dispatchVersion, 0);
@@ -42,9 +42,9 @@ test("state machine: reject dispatch", async (t) => {
   });
   
   match.dispatch("referee-1", "dispatch-1", 0);
-  assert.equal(match.status, MATCH_OPERATION_STATES.WAITING_ACCEPTANCE);
+  assert.equal(match.status, MATCH_OPERATION_STATES.ASSIGNED);
   
-  // Simulate rejection by setting status to upcoming
+  // Simulate rejection by withdrawing dispatch
   match.withdrawDispatch();
   assert.equal(match.status, MATCH_OPERATION_STATES.UPCOMING);
   assert.equal(match.refereeId, null);
@@ -52,8 +52,8 @@ test("state machine: reject dispatch", async (t) => {
   assert.equal(match.dispatchVersion, null);
 });
 
-test("state machine: withdraw only from waiting_acceptance", async (t) => {
-  // Test that withdraw only works on waiting_acceptance status
+test("state machine: withdraw only from assigned with dispatch", async (t) => {
+  // Test that withdraw only works on assigned status with active dispatch
   
   const match = new MatchOperation({
     id: 1,
@@ -63,12 +63,12 @@ test("state machine: withdraw only from waiting_acceptance", async (t) => {
   
   assert.throws(
     () => match.withdrawDispatch(),
-    /waiting_acceptance/
+    /awaiting acceptance/
   );
 });
 
-test("state machine: reassign only from waiting_acceptance", async (t) => {
-  // Test that reassign only works on waiting_acceptance status
+test("state machine: reassign only from assigned with dispatch", async (t) => {
+  // Test that reassign only works on assigned status with active dispatch
   
   const match = new MatchOperation({
     id: 1,
@@ -78,12 +78,12 @@ test("state machine: reassign only from waiting_acceptance", async (t) => {
   
   assert.throws(
     () => match.reassignDispatch("referee-2", "dispatch-2", 1),
-    /waiting_acceptance/
+    /awaiting acceptance/
   );
 });
 
-test("state machine: withdraw from waiting_acceptance", async (t) => {
-  // Test withdraw from waiting_acceptance
+test("state machine: withdraw from assigned dispatch", async (t) => {
+  // Test withdraw from assigned dispatch
   
   const match = new MatchOperation({
     id: 1,
@@ -92,15 +92,15 @@ test("state machine: withdraw from waiting_acceptance", async (t) => {
   });
   
   match.dispatch("referee-1", "dispatch-1", 0);
-  assert.equal(match.status, MATCH_OPERATION_STATES.WAITING_ACCEPTANCE);
+  assert.equal(match.status, MATCH_OPERATION_STATES.ASSIGNED);
   
   match.withdrawDispatch();
   assert.equal(match.status, MATCH_OPERATION_STATES.UPCOMING);
   assert.equal(match.refereeId, null);
 });
 
-test("state machine: reassign from waiting_acceptance", async (t) => {
-  // Test reassign from waiting_acceptance
+test("state machine: reassign from assigned dispatch", async (t) => {
+  // Test reassign from assigned dispatch
   
   const match = new MatchOperation({
     id: 1,
@@ -109,7 +109,7 @@ test("state machine: reassign from waiting_acceptance", async (t) => {
   });
   
   match.dispatch("referee-1", "dispatch-1", 0);
-  assert.equal(match.status, MATCH_OPERATION_STATES.WAITING_ACCEPTANCE);
+  assert.equal(match.status, MATCH_OPERATION_STATES.ASSIGNED);
   
   match.reassignDispatch("referee-2", "dispatch-2", 0);
   assert.equal(match.refereeId, "referee-2");
@@ -131,7 +131,7 @@ test("state machine: accepted matches reject withdraw", async (t) => {
   
   assert.throws(
     () => match.withdrawDispatch(),
-    /waiting_acceptance/
+    /awaiting acceptance|not assigned/
   );
 });
 
@@ -149,7 +149,7 @@ test("state machine: accepted matches reject reassign", async (t) => {
   
   assert.throws(
     () => match.reassignDispatch("referee-2", "dispatch-2", 1),
-    /waiting_acceptance/
+    /awaiting acceptance|not assigned/
   );
 });
 
@@ -170,7 +170,7 @@ test("state machine: playing matches reject withdraw", async (t) => {
   
   assert.throws(
     () => match.withdrawDispatch(),
-    /waiting_acceptance/
+    /awaiting acceptance|not assigned/
   );
 });
 
@@ -185,7 +185,7 @@ test("state machine: scored matches reject withdraw", async (t) => {
   
   assert.throws(
     () => match.withdrawDispatch(),
-    /waiting_acceptance/
+    /awaiting acceptance|not assigned/
   );
 });
 
@@ -200,7 +200,7 @@ test("state machine: confirmed matches reject withdraw", async (t) => {
   
   assert.throws(
     () => match.withdrawDispatch(),
-    /waiting_acceptance/
+    /awaiting acceptance|not assigned/
   );
 });
 
@@ -215,7 +215,7 @@ test("state machine: dispatch from assigned status", async (t) => {
   });
   
   match.dispatch("referee-new", "dispatch-1", 0);
-  assert.equal(match.status, MATCH_OPERATION_STATES.WAITING_ACCEPTANCE);
+  assert.equal(match.status, MATCH_OPERATION_STATES.ASSIGNED);
   assert.equal(match.refereeId, "referee-new");
 });
 
@@ -229,7 +229,7 @@ test("state machine: dispatch from upcoming status", async (t) => {
   });
   
   match.dispatch("referee-1", "dispatch-1", 0);
-  assert.equal(match.status, MATCH_OPERATION_STATES.WAITING_ACCEPTANCE);
+  assert.equal(match.status, MATCH_OPERATION_STATES.ASSIGNED);
 });
 
 test("state machine: dispatch rejects playing status", async (t) => {
@@ -303,14 +303,14 @@ test("state machine: dispatch conflict detection", async (t) => {
   });
   
   match.dispatch("referee-1", "dispatch-1", 0);
-  assert.equal(match.status, MATCH_OPERATION_STATES.WAITING_ACCEPTANCE);
+  assert.equal(match.status, MATCH_OPERATION_STATES.ASSIGNED);
   
   // Try to dispatch again with different dispatchId - should fail
-  // because match is already in waiting_acceptance status
+  // because match already has an active dispatch
   try {
     match.dispatch("referee-2", "dispatch-2", 0);
-    assert.fail("Should have thrown INVALID_OPERATION_STATE");
+    assert.fail("Should have thrown DISPATCH_CONFLICT");
   } catch (error) {
-    assert.match(error.message, /idle.*upcoming.*assigned/i);
+    assert.match(error.message, /active dispatch|conflict/i);
   }
 });

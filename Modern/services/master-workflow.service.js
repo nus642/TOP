@@ -2,6 +2,7 @@ const matchOperationsService = require("./match-operations.service");
 const courtCoordinationService = require("./court-coordination.service");
 const dispatchService = require("./dispatch.service");
 const refereeCoordinationService = require("./referee-coordination.service");
+const courtRepository = require("../repositories/court-coordination.repository");
 
 function validationError(message) {
   const error = new Error(message);
@@ -24,19 +25,31 @@ function refereeId(value) {
   return String(value).trim();
 }
 
-// Master workflow is an operational entry point only. Match Operations owns
-// assignment rules, match state transitions, and persistence.
-function assignReferee(competitionValue, matchValue, data = {}) {
+// Master workflow is an operational entry point only.
+// Legacy /assign delegates to the authoritative dispatch service.
+async function assignReferee(competitionValue, matchValue, data = {}, actor) {
   const competitionId = positiveId(competitionValue, "competition id");
   const matchId = positiveId(matchValue, "match id");
+  const rid = refereeId(data.refereeId);
 
-  return matchOperationsService.assignMatch(competitionId, matchId, {
-    refereeId: refereeId(data.refereeId)
-  });
+  // Look up the court authorized by match_schedules
+  const courtId = await courtRepository.findScheduledCourt(competitionId, matchId);
+  if (!courtId) {
+    const error = new Error("No scheduled court found for this match");
+    error.code = "NOT_FOUND";
+    throw error;
+  }
+
+  return dispatchService.dispatch(competitionId, matchId, {
+    courtId,
+    refereeId: rid,
+    correlationId: data.correlationId,
+    expectedVersion: data.expectedVersion
+  }, actor);
 }
 
 // Atomic dispatch: Master submits matchId + courtId + refereeId + expectedVersion + correlationId
-// Returns waiting_acceptance status until referee accepts.
+// Returns assigned status until referee accepts.
 function dispatchReferee(competitionValue, matchValue, data, actor) {
   const competitionId = positiveId(competitionValue, "competition id");
   const matchId = positiveId(matchValue, "match id");
@@ -44,11 +57,12 @@ function dispatchReferee(competitionValue, matchValue, data, actor) {
   return dispatchService.dispatch(competitionId, matchId, {
     courtId: refereeId(data.courtId),
     refereeId: refereeId(data.refereeId),
-    correlationId: data.correlationId
+    correlationId: data.correlationId,
+    expectedVersion: data.expectedVersion
   }, actor);
 }
 
-// Withdraw dispatch: Master can withdraw a waiting_acceptance dispatch
+// Withdraw dispatch: Master can withdraw an assigned dispatch
 function withdrawDispatch(competitionValue, matchValue, actor, data = {}) {
   const competitionId = positiveId(competitionValue, "competition id");
   const matchId = positiveId(matchValue, "match id");

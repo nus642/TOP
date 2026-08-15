@@ -24,15 +24,15 @@ function requireReferee(actor) {
 }
 
 // Referee Draft Service
-// Provides referee view of waiting_acceptance assignments.
+// Provides referee view of assigned (awaiting acceptance) dispatch assignments.
 // This is a projection service that reads from the repository layer.
 
 async function getDraftAssignments(competitionValue, actor) {
   const competitionId = positiveId(competitionValue, "competition id");
   const refereeId = requireReferee(actor);
   
-  // Get all waiting_acceptance reservations for this referee
-  const reservations = await competitionRefereeRepository.findByReferee(refereeId, "waiting");
+  // Get all assigned dispatch reservations awaiting acceptance for this referee
+  const reservations = await competitionRefereeRepository.findReservationByReferee(refereeId, "waiting");
   
   // Filter by competition
   const competitionReservations = reservations.filter(r => r.tournamentId === competitionId);

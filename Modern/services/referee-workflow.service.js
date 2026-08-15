@@ -17,14 +17,14 @@ function refereeActor(value) {
   return value;
 }
 
+// Accept: unified authority through dispatch service.
+// Handles both dispatch-tracked and simple assign acceptance.
 function acceptMatch(tournamentId, refereeValue, matchId) {
   const actor = refereeActor(refereeValue);
-  return matchOperationsService.acceptRefereeResponsibility(tournamentId, matchId, {
-    refereeId: refereeId(actor.actorId)
-  });
+  return dispatchService.acceptDispatch(tournamentId, matchId, actor);
 }
 
-// Accept dispatch: Only the assigned Referee can accept a waiting_acceptance dispatch
+// Accept dispatch: same authority as acceptMatch (unified)
 function acceptDispatch(tournamentId, refereeValue, matchId) {
   const actor = refereeActor(refereeValue);
   return dispatchService.acceptDispatch(tournamentId, matchId, actor);

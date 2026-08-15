@@ -3,8 +3,7 @@ const { OperationsError } = require("./operations-error");
 const STATES = Object.freeze({
   IDLE: "idle",
   UPCOMING: "upcoming",
-  ASSIGNED: "assigned", // Referee responsibility is established.
-  WAITING_ACCEPTANCE: "waiting_acceptance", // Dispatch sent, waiting for referee acceptance.
+  ASSIGNED: "assigned", // Referee dispatched / assigned; awaiting acceptance or responsibility.
   ACCEPTED: "accepted", // The assigned Referee acknowledged responsibility.
   PLAYING: "playing", // Match execution is in progress.
   INTERRUPTED: "interrupted", // The assigned Referee explicitly paused execution.
@@ -45,7 +44,7 @@ class MatchOperation {
     return this;
   }
 
-  // Dispatch a match to a referee. The match enters waiting_acceptance status.
+  // Dispatch a match to a referee. The match enters assigned status with dispatch tracking.
   dispatch(refereeId, dispatchId, expectedVersion) {
     required(refereeId, "refereeId");
     required(dispatchId, "dispatchId");
@@ -58,15 +57,15 @@ class MatchOperation {
     this.refereeId = refereeId;
     this.dispatchId = dispatchId;
     this.dispatchVersion = expectedVersion;
-    this.status = STATES.WAITING_ACCEPTANCE;
+    this.status = STATES.ASSIGNED;
     return this;
   }
 
-  // Accept a waiting dispatch. Only the assigned referee can accept.
+  // Accept a dispatched assignment. Only the assigned referee can accept.
   acceptDispatch(refereeId, expectedVersion) {
     this.assertAssignedReferee(refereeId);
-    if (this.status !== STATES.WAITING_ACCEPTANCE) {
-      throw new OperationsError("INVALID_OPERATION_STATE", "Match is not waiting for acceptance");
+    if (this.status !== STATES.ASSIGNED || !this.dispatchId) {
+      throw new OperationsError("INVALID_OPERATION_STATE", "Match is not awaiting referee acceptance");
     }
     if (this.dispatchVersion !== expectedVersion) {
       throw new OperationsError("STALE_DISPATCH_VERSION", "Dispatch version mismatch");
@@ -75,10 +74,10 @@ class MatchOperation {
     return this;
   }
 
-  // Withdraw a waiting dispatch. Match returns to upcoming status.
+  // Withdraw a dispatched assignment. Match returns to upcoming status.
   withdrawDispatch() {
-    if (this.status !== STATES.WAITING_ACCEPTANCE) {
-      throw new OperationsError("INVALID_OPERATION_STATE", "Only waiting_acceptance matches can be withdrawn");
+    if (this.status !== STATES.ASSIGNED || !this.dispatchId) {
+      throw new OperationsError("INVALID_OPERATION_STATE", "Only dispatched matches awaiting acceptance can be withdrawn");
     }
     this.refereeId = null;
     this.dispatchId = null;
@@ -87,12 +86,12 @@ class MatchOperation {
     return this;
   }
 
-  // Reassign a waiting dispatch to a different referee.
+  // Reassign a dispatched assignment to a different referee.
   reassignDispatch(newRefereeId, newDispatchId, expectedVersion) {
     required(newRefereeId, "newRefereeId");
     required(newDispatchId, "newDispatchId");
-    if (this.status !== STATES.WAITING_ACCEPTANCE) {
-      throw new OperationsError("INVALID_OPERATION_STATE", "Only waiting_acceptance matches can be reassigned");
+    if (this.status !== STATES.ASSIGNED || !this.dispatchId) {
+      throw new OperationsError("INVALID_OPERATION_STATE", "Only dispatched matches awaiting acceptance can be reassigned");
     }
     if (this.dispatchVersion !== expectedVersion) {
       throw new OperationsError("STALE_DISPATCH_VERSION", "Dispatch version mismatch");
@@ -107,6 +106,9 @@ class MatchOperation {
     this.assertAssignedReferee(refereeId);
     if (this.status !== STATES.ASSIGNED) {
       throw new OperationsError("INVALID_OPERATION_STATE", "Assigned responsibility is not awaiting acceptance");
+    }
+    if (this.dispatchId) {
+      throw new OperationsError("INVALID_OPERATION_STATE", "Dispatched matches must use acceptDispatch with version verification");
     }
     this.status = STATES.ACCEPTED;
     return this;

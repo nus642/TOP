@@ -35,7 +35,7 @@ async function listEligibleReferees(competitionValue) {
 
 async function findByReferee(competitionValue, refereeId) {
   const competitionId = positiveId(competitionValue, "competition id");
-  return competitionRefereeRepository.findByReferee(competitionId, refereeId);
+  return competitionRefereeRepository.findByRefereeInRoster(competitionId, refereeId);
 }
 
 async function updateRefereeStatus(competitionValue, refereeId, updates) {

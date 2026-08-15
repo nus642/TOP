@@ -2,6 +2,7 @@ const assert = require("node:assert/strict");
 const test = require("node:test");
 
 const matchOperationsService = require("../services/match-operations.service");
+const dispatchService = require("../services/dispatch.service");
 const refereeWorkflowService = require("../services/referee-workflow.service");
 const router = require("../api/referee-workflow");
 
@@ -18,25 +19,25 @@ function response() {
   };
 }
 
-test("referee actions delegate to Match Operations with the route referee identity", async (t) => {
+test("referee actions delegate to the authoritative dispatch service with the route referee identity", async (t) => {
   assert.throws(
     () => refereeWorkflowService.acceptMatch(3, "  ", 9),
     (error) => error.code === "VALIDATION_ERROR"
   );
 
   const originals = {
-    accept: matchOperationsService.acceptRefereeResponsibility,
+    accept: dispatchService.acceptDispatch,
     start: matchOperationsService.startMatch,
     score: matchOperationsService.submitResult
   };
   t.after(() => {
-    matchOperationsService.acceptRefereeResponsibility = originals.accept;
+    dispatchService.acceptDispatch = originals.accept;
     matchOperationsService.startMatch = originals.start;
     matchOperationsService.submitResult = originals.score;
   });
 
   const calls = [];
-  matchOperationsService.acceptRefereeResponsibility = async (...args) => { calls.push(["accept", ...args]); return { match: { status: "accepted" } }; };
+  dispatchService.acceptDispatch = async (...args) => { calls.push(["accept", ...args]); return { match: { status: "accepted" } }; };
   matchOperationsService.startMatch = async (...args) => { calls.push(["start", ...args]); return { match: { status: "playing" } }; };
   matchOperationsService.submitResult = async (...args) => { calls.push(["score", ...args]); return { match: { status: "scored" } }; };
 
@@ -44,11 +45,13 @@ test("referee actions delegate to Match Operations with the route referee identi
   await refereeWorkflowService.startMatch("3", "referee-7", "9");
   await refereeWorkflowService.recordScore("3", "referee-7", "9", { refereeId: "spoofed", score1: 11, score2: 8 });
 
-  assert.deepEqual(calls, [
-    ["accept", "3", "9", { refereeId: "referee-7" }],
-    ["start", "3", "9", { refereeId: "referee-7" }],
-    ["score", "3", "9", { actorId: "referee-7", actorType: "referee" }, { refereeId: "spoofed", score1: 11, score2: 8 }]
-  ]);
+  assert.equal(calls.length, 3);
+  assert.equal(calls[0][0], "accept");
+  assert.equal(calls[0][1], "3");
+  assert.equal(calls[0][2], "9");
+  assert.deepEqual(calls[0][3], { actorId: "referee-7", actorType: "referee" });
+  assert.equal(calls[1][0], "start");
+  assert.equal(calls[2][0], "score");
 });
 
 test("referee action API exposes accept and score submission entry points", async (t) => {

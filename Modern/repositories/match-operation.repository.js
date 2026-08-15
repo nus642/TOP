@@ -9,6 +9,8 @@ function map(row) {
     score1: row.score1,
     score2: row.score2,
     assignedAt: row.assigned_at,
+    dispatchId: row.dispatch_id || null,
+    dispatchVersion: row.dispatch_version != null ? Number(row.dispatch_version) : null,
     responsibilityAcceptedAt: row.responsibility_accepted_at,
     resultConfirmedAt: row.result_confirmed_at,
     resultConfirmedBy: row.result_confirmed_by,
@@ -116,7 +118,7 @@ async function dispatch(tournamentId, matchId, data, connection = db) {
   const { dispatchId, dispatchVersion, refereeId } = data;
   await connection.query(
     `UPDATE matches SET referee_id = ?, assigned_at = CURRENT_TIMESTAMP, 
-       dispatch_id = ?, dispatch_version = ?, status = 'waiting_acceptance'
+       dispatch_id = ?, dispatch_version = ?, status = 'assigned'
      WHERE tournament_id = ? AND id = ?`,
     [refereeId, dispatchId, dispatchVersion, tournamentId, matchId]
   );
@@ -124,12 +126,17 @@ async function dispatch(tournamentId, matchId, data, connection = db) {
 }
 
 async function acceptDispatch(tournamentId, matchId, dispatchId, connection = db) {
-  await connection.query(
+  const [result] = await connection.query(
     `UPDATE matches SET dispatch_version = dispatch_version + 1,
        responsibility_accepted_at = CURRENT_TIMESTAMP, status = 'accepted'
-     WHERE tournament_id = ? AND id = ? AND dispatch_id = ?`,
+     WHERE tournament_id = ? AND id = ? AND dispatch_id = ? AND status = 'assigned'`,
     [tournamentId, matchId, dispatchId]
   );
+  if (result.affectedRows === 0) {
+    const error = new Error("Dispatch acceptance failed: match state changed");
+    error.code = "CONFLICT";
+    throw error;
+  }
   return findById(tournamentId, matchId, connection);
 }
 
@@ -137,7 +144,7 @@ async function withdrawDispatch(tournamentId, matchId, connection = db) {
   await connection.query(
     `UPDATE matches SET dispatch_id = NULL, dispatch_version = NULL,
        referee_id = NULL, assigned_at = NULL, status = 'upcoming'
-     WHERE tournament_id = ? AND id = ? AND status = 'waiting_acceptance'`,
+     WHERE tournament_id = ? AND id = ? AND status = 'assigned' AND dispatch_id IS NOT NULL`,
     [tournamentId, matchId]
   );
   return findById(tournamentId, matchId, connection);
@@ -146,7 +153,7 @@ async function withdrawDispatch(tournamentId, matchId, connection = db) {
 async function reassignDispatch(tournamentId, matchId, newRefereeId, connection = db) {
   await connection.query(
     `UPDATE matches SET referee_id = ?, dispatch_version = dispatch_version + 1
-     WHERE tournament_id = ? AND id = ? AND status = 'waiting_acceptance'`,
+     WHERE tournament_id = ? AND id = ? AND status = 'assigned' AND dispatch_id IS NOT NULL`,
     [newRefereeId, tournamentId, matchId]
   );
   return findById(tournamentId, matchId, connection);

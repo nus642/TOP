@@ -78,20 +78,31 @@ CREATE TABLE IF NOT EXISTS matches (
     started_at TIMESTAMP NULL DEFAULT NULL,
     result_confirmed_at TIMESTAMP NULL DEFAULT NULL,
     result_confirmed_by VARCHAR(100) DEFAULT NULL,
-    status ENUM('idle','upcoming','assigned','waiting_acceptance','accepted','playing','interrupted','scored','awaiting_confirmation','confirmed','finished') DEFAULT 'idle',
+    status ENUM('idle','upcoming','assigned','accepted','playing','interrupted','scored','awaiting_confirmation','confirmed','finished') DEFAULT 'idle',
     FOREIGN KEY (tournament_id) REFERENCES tournaments(id) ON DELETE CASCADE
 ) DEFAULT CHARSET=utf8mb4;
 
--- Additive upgrade for databases created before M2.
-ALTER TABLE matches MODIFY COLUMN status
-    ENUM('idle','upcoming','assigned','accepted','playing','interrupted','scored','awaiting_confirmation','confirmed','finished') DEFAULT 'idle';
-
 -- M2 Competition Referee Roster and Atomic Dispatch support.
 -- Upgrade path for databases created before dispatch coordination.
-ALTER TABLE matches 
-  MODIFY COLUMN status ENUM('idle','upcoming','assigned','waiting_acceptance','accepted','playing','interrupted','scored','awaiting_confirmation','confirmed','finished') DEFAULT 'idle',
-  ADD COLUMN IF NOT EXISTS dispatch_id VARCHAR(100) DEFAULT NULL AFTER assigned_at,
-  ADD COLUMN IF NOT EXISTS dispatch_version BIGINT DEFAULT NULL AFTER dispatch_id;
+-- Step 1: Migrate any legacy waiting_acceptance rows to assigned.
+SET @wa_count = (SELECT COUNT(*) FROM matches WHERE status = 'waiting_acceptance');
+SET @sql = IF(@wa_count > 0, 'UPDATE matches SET status = ''assigned'' WHERE status = ''waiting_acceptance''', 'SELECT 1');
+PREPARE stmt FROM @sql;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
+
+-- Step 2: Ensure dispatch columns exist (INFORMATION_SCHEMA compatible).
+SET @col_exists = (SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='matches' AND COLUMN_NAME='dispatch_id');
+SET @sql = IF(@col_exists = 0, 'ALTER TABLE matches ADD COLUMN dispatch_id VARCHAR(100) DEFAULT NULL AFTER assigned_at', 'SELECT 1');
+PREPARE stmt FROM @sql;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
+
+SET @col_exists = (SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='matches' AND COLUMN_NAME='dispatch_version');
+SET @sql = IF(@col_exists = 0, 'ALTER TABLE matches ADD COLUMN dispatch_version BIGINT DEFAULT NULL AFTER dispatch_id', 'SELECT 1');
+PREPARE stmt FROM @sql;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
 
 -- M2 Court Management authority. Schedule court references remain the source of
 -- known Courts; these rows contain only mutable operating truth.

@@ -16,7 +16,7 @@ router.get("/:competitionId/referees/roster", async (req, res) => {
     }
     res.json(await refereeCoordinationService.listRoster(req.params.competitionId));
   } catch (error) {
-    const statuses = { VALIDATION_ERROR: 400, NOT_FOUND: 404 };
+    const statuses = { VALIDATION_ERROR: 400, NOT_FOUND: 404, FORBIDDEN: 403 };
     res.status(statuses[error.code] || 500).json({ error: error.message });
   }
 });
@@ -37,7 +37,7 @@ router.post("/:competitionId/referees/roster", async (req, res) => {
     }
     res.json(await refereeCoordinationService.createRoster(req.params.competitionId, refereeIds));
   } catch (error) {
-    const statuses = { VALIDATION_ERROR: 400, NOT_FOUND: 404 };
+    const statuses = { VALIDATION_ERROR: 400, NOT_FOUND: 404, FORBIDDEN: 403 };
     res.status(statuses[error.code] || 500).json({ error: error.message });
   }
 });
@@ -52,7 +52,7 @@ router.get("/:competitionId/referees/eligible", async (req, res) => {
     }
     res.json(await refereeCoordinationService.listEligibleReferees(req.params.competitionId));
   } catch (error) {
-    const statuses = { VALIDATION_ERROR: 400, NOT_FOUND: 404 };
+    const statuses = { VALIDATION_ERROR: 400, NOT_FOUND: 404, FORBIDDEN: 403 };
     res.status(statuses[error.code] || 500).json({ error: error.message });
   }
 });
@@ -81,7 +81,7 @@ router.patch("/:competitionId/referees/:refereeId", async (req, res) => {
       updates
     ));
   } catch (error) {
-    const statuses = { VALIDATION_ERROR: 400, NOT_FOUND: 404 };
+    const statuses = { VALIDATION_ERROR: 400, NOT_FOUND: 404, FORBIDDEN: 403 };
     res.status(statuses[error.code] || 500).json({ error: error.message });
   }
 });
@@ -101,7 +101,7 @@ router.get("/:competitionId/matches/:matchId/available-candidates", async (req, 
       req.actor
     ));
   } catch (error) {
-    const statuses = { VALIDATION_ERROR: 400, NOT_FOUND: 404 };
+    const statuses = { VALIDATION_ERROR: 400, NOT_FOUND: 404, FORBIDDEN: 403 };
     res.status(statuses[error.code] || 500).json({ error: error.message });
   }
 });

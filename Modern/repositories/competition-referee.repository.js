@@ -64,7 +64,7 @@ async function listEligibleReferees(competitionId, connection = db) {
   return rows.map(map);
 }
 
-async function findByReferee(competitionId, refereeId, connection = db) {
+async function findByRefereeInRoster(competitionId, refereeId, connection = db) {
   const [rows] = await connection.query(
     `SELECT * FROM competition_referees 
      WHERE competition_id = ? AND referee_id = ?`,
@@ -86,14 +86,14 @@ async function updateRefereeStatus(competitionId, refereeId, updates, connection
     values.push(updates.eligible ? 1 : 0);
   }
   
-  if (sets.length === 0) return findByReferee(competitionId, refereeId, connection);
+  if (sets.length === 0) return findByRefereeInRoster(competitionId, refereeId, connection);
   
   await connection.query(
     `UPDATE competition_referees SET ${sets.join(", ")} 
      WHERE competition_id = ? AND referee_id = ?`,
     values
   );
-  return findByReferee(competitionId, refereeId, connection);
+  return findByRefereeInRoster(competitionId, refereeId, connection);
 }
 
 // --- Referee Dispatch Reservations ---
@@ -112,7 +112,7 @@ async function createReservation(dispatchId, data, connection = db) {
   } catch (error) {
     if (error.code === "ER_DUP_ENTRY") {
       const conflict = new Error("Dispatch correlation identity has already been used");
-      conflict.code = "VALIDATION_ERROR";
+      conflict.code = "FORBIDDEN";
       throw conflict;
     }
     throw error;
@@ -135,12 +135,15 @@ async function findByMatch(matchId, connection = db) {
   return mapReservation(rows[0]);
 }
 
-async function findByReferee(refereeId, status, connection = db) {
+async function findReservationByReferee(refereeId, status, connection = db) {
   const conditions = ["r.referee_id = ?"];
   const values = [refereeId];
   
   if (status === "waiting") {
-    conditions.push("m.status = 'waiting_acceptance'");
+    conditions.push("m.status = 'assigned'");
+    conditions.push("r.dispatch_id IS NOT NULL");
+    conditions.push("r.accepted_at IS NULL");
+    conditions.push("r.rejected_at IS NULL");
   } else if (status === "accepted") {
     conditions.push("m.status = 'accepted'");
   }
@@ -200,13 +203,13 @@ module.exports = {
   createRoster,
   listRoster,
   listEligibleReferees,
-  findByReferee,
+  findByRefereeInRoster,
   updateRefereeStatus,
   // Referee Dispatch Reservations
   createReservation,
   findByDispatchId,
   findByMatch,
-  findByReferee,
+  findReservationByReferee,
   markAccepted,
   markRejected,
   findByCorrelationId,

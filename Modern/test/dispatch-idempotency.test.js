@@ -1,257 +1,266 @@
 const { test } = require("node:test");
 const assert = require("node:assert");
 
-test("duplicate correlationId: idempotent return", async (t) => {
-  // Test that duplicate correlationId returns existing reservation without
-  // creating duplicate chronology events
-  
-  const existingReservation = {
-    dispatch_id: "dispatch-1",
-    match_id: 1,
-    court_id: "court-1",
-    referee_id: "referee-1",
-    correlation_id: "correlation-abc-123",
-    accepted_at: null,
-    rejected_at: null
-  };
-  
-  let reservationExists = false;
-  
-  const findByCorrelationId = async (correlationId) => {
-    if (reservationExists && correlationId === existingReservation.correlation_id) {
-      return existingReservation;
-    }
-    return null;
-  };
-  
-  const createReservation = async (correlationId) => {
-    reservationExists = true;
-    return {
-      dispatch_id: "dispatch-1",
-      correlation_id: correlationId
-    };
-  };
-  
-  const dispatch = async (correlationId) => {
-    const existing = await findByCorrelationId(correlationId);
-    if (existing) {
-      return {
-        match: { id: 1 },
-        reservation: existing,
-        idempotent: true
-      };
-    }
-    
-    // Create new reservation
-    const reservation = await createReservation(correlationId);
-    return {
-      match: { id: 1 },
-      reservation,
-      idempotent: false
-    };
-  };
-  
-  // First dispatch
-  const result1 = await dispatch("correlation-abc-123");
-  assert.equal(result1.idempotent, false);
-  
-  // Second dispatch with same correlationId
-  const result2 = await dispatch("correlation-abc-123");
-  assert.equal(result2.idempotent, true);
-  assert.equal(result2.reservation.dispatch_id, "dispatch-1");
-});
+// ---------------------------------------------------------------------------
+// Shared in-memory mock DB — same pattern as dispatch-concurrency.test.js
+// ---------------------------------------------------------------------------
 
-test("duplicate correlationId: safe reject", async (t) => {
-  // Test that duplicate correlationId can be safely rejected
-  
-  const correlationId = "correlation-duplicate-456";
-  
-  const createReservation = async (data) => {
-    // Simulate ER_DUP_ENTRY
-    if (data.correlationId === correlationId) {
-      const error = new Error("Dispatch correlation identity has already been used");
-      error.code = "ER_DUP_ENTRY";
-      throw error;
+const db = require("../database/db");
+
+function createMockConnection(data) {
+  return {
+    query: async (sql, params = []) => {
+      if (sql.includes("SELECT") && sql.includes("FROM tournaments")) {
+        return [[{ id: params[0], name: "Test", status: "running" }]];
+      }
+      if (sql.includes("SELECT") && sql.includes("FROM match_schedules")) {
+        return [[{ court_id: "court-1" }]];
+      }
+      if (sql.includes("SELECT") && sql.includes("FROM matches")) {
+        const match = data.get(`match:${params[1]}`);
+        return [[match || null]];
+      }
+      if (sql.includes("SELECT") && sql.includes("FROM competition_referees")) {
+        return [[{ id: 1, competition_id: params[0], referee_id: params[1], active: 1, eligible: 1 }]];
+      }
+      if (sql.includes("SELECT") && sql.includes("FROM referee_dispatch_reservations")) {
+        if (sql.includes("dispatch_id =")) {
+          const r = data.get(`reservation:${params[0]}`);
+          return [[r || null]];
+        }
+        if (sql.includes("match_id =")) {
+          for (const [, v] of data) {
+            if (v && v.match_id === params[0] && v.dispatch_id) return [[v]];
+          }
+          return [[null]];
+        }
+        if (sql.includes("correlation_id =")) {
+          for (const [, v] of data) {
+            if (v && v.correlation_id === params[0]) return [[v]];
+          }
+          return [[null]];
+        }
+      }
+      if (sql.includes("INSERT") && sql.includes("INTO referee_dispatch_reservations")) {
+        const [dispatchId, matchId, courtId, refereeId, expectedVersion, correlationId] = params;
+        data.set(`reservation:${dispatchId}`, {
+          dispatch_id: dispatchId, match_id: matchId, court_id: courtId,
+          referee_id: refereeId, expected_version: expectedVersion,
+          correlation_id: correlationId, accepted_at: null, rejected_at: null,
+          rejected_reason: null, created_at: new Date().toISOString()
+        });
+        return [{ insertId: 1 }];
+      }
+      if (sql.includes("INSERT") && sql.includes("INTO tournament_coordination_chronology")) {
+        data.chronologyEvents = data.chronologyEvents || [];
+        data.chronologyEvents.push({
+          tournamentId: params[0], courtId: params[1], matchId: params[2],
+          eventType: params[3], sourceType: params[4], actorId: params[5],
+          correlationId: params[6]
+        });
+        return [{ insertId: data.chronologyEvents.length }];
+      }
+      if (sql.includes("UPDATE") && sql.includes("matches") && sql.includes("SET")) {
+        const key = `match:${params[params.length - 1]}`;
+        const match = data.get(key);
+        if (match) {
+          if (sql.includes("status = 'assigned'")) {
+            match.status = "assigned";
+            match.referee_id = params[0];
+          }
+          if (sql.includes("dispatch_id =")) {
+            match.dispatch_id = params[1];
+            match.dispatch_version = params[2];
+          }
+        }
+        return [{ affectedRows: 1 }];
+      }
+      if (sql.includes("UPDATE") && sql.includes("referee_dispatch_reservations")) {
+        return [{ affectedRows: 1 }];
+      }
+      if (sql.includes("UPDATE") && sql.includes("court_operating_conditions")) {
+        return [{ affectedRows: 1 }];
+      }
+      return [[]];
     }
-    return { dispatch_id: "dispatch-2" };
   };
-  
-  await assert.rejects(
-    async () => createReservation({ correlationId }),
-    /already been used/
-  );
-});
+}
 
-test("different correlationIds: both succeed", async (t) => {
-  // Test that different correlationIds create separate reservations
-  
-  const reservations = [];
-  
-  const createReservation = async (data) => {
-    const reservation = {
-      dispatch_id: `dispatch-${reservations.length + 1}`,
-      correlation_id: data.correlationId
-    };
-    reservations.push(reservation);
-    return reservation;
-  };
-  
-  const result1 = await createReservation({ correlationId: "correlation-1" });
-  const result2 = await createReservation({ correlationId: "correlation-2" });
-  
-  assert.equal(reservations.length, 2);
-  assert.notEqual(result1.dispatch_id, result2.dispatch_id);
-});
+const originalWithTransaction = db.withTransaction;
 
-test("correlationId preserved through transaction", async (t) => {
-  // Test that correlationId is written to chronology event
-  
-  const chronologyEvents = [];
-  
-  const appendEvent = async (data) => {
-    chronologyEvents.push(data);
-    return 1;
-  };
-  
-  await appendEvent({
-    tournamentId: 1,
-    courtId: "court-1",
-    matchId: 1,
-    eventType: "referee_dispatch",
-    sourceType: "master_dispatch",
-    actorId: "master-1",
-    correlationId: "correlation-preserved",
-    details: { dispatchId: "dispatch-1" }
+// Shared data store
+let sharedData;
+
+function resetData(matchId = 1) {
+  sharedData = new Map();
+  sharedData.chronologyEvents = [];
+  sharedData.set(`match:${matchId}`, {
+    id: matchId, tournament_id: 1, referee_id: null, status: "idle",
+    score1: null, score2: null, dispatch_id: null, dispatch_version: null,
+    assigned_at: null, responsibility_accepted_at: null,
+    result_confirmed_at: null, result_confirmed_by: null
   });
-  
-  assert.equal(chronologyEvents.length, 1);
-  assert.equal(chronologyEvents[0].correlationId, "correlation-preserved");
-});
-
-test("no duplicate chronology on idempotent dispatch", async (t) => {
-  // Test that idempotent dispatch doesn't create duplicate chronology events
-  
-  const chronologyEvents = [];
-  
-  const dispatch = async (correlationId, isRetry = false) => {
-    // Check for existing reservation
-    const existing = chronologyEvents.find(e => e.correlationId === correlationId);
-    
-    if (existing && isRetry) {
-      // Idempotent: return existing without writing new chronology
-      return {
-        idempotent: true,
-        reservation: existing
-      };
-    }
-    
-    // Write chronology event
-    chronologyEvents.push({
-      correlationId,
-      eventType: "referee_dispatch",
-      timestamp: new Date().toISOString()
-    });
-    
-    return {
-      idempotent: false,
-      reservation: { correlationId }
-    };
+  // Patch withTransaction to use shared data
+  db.withTransaction = async (fn) => {
+    const connection = createMockConnection(sharedData);
+    return fn(connection);
   };
-  
-  // First dispatch
-  const result1 = await dispatch("correlation-unique", false);
+  return sharedData;
+}
+
+const dispatchService = require("../services/dispatch.service");
+const masterActor = { actorId: "master-1", actorType: "master" };
+
+// ---------------------------------------------------------------------------
+// Tests
+// ---------------------------------------------------------------------------
+
+test("duplicate correlationId: idempotent return without duplicate chronology", async () => {
+  resetData(1);
+
+  const result1 = await dispatchService.dispatch(1, 1, {
+    courtId: "court-1", refereeId: "referee-1", correlationId: "correlation-abc-123"
+  }, masterActor);
+
   assert.equal(result1.idempotent, false);
-  assert.equal(chronologyEvents.length, 1);
-  
-  // Idempotent retry
-  const result2 = await dispatch("correlation-unique", true);
+  const chronologyCountAfterFirst = sharedData.chronologyEvents.length;
+  assert.equal(chronologyCountAfterFirst, 1, "One chronology event after first dispatch");
+
+  // Second dispatch with same correlationId → idempotent
+  const result2 = await dispatchService.dispatch(1, 1, {
+    courtId: "court-1", refereeId: "referee-1", correlationId: "correlation-abc-123"
+  }, masterActor);
+
   assert.equal(result2.idempotent, true);
-  assert.equal(chronologyEvents.length, 1); // No duplicate
+  assert.equal(result2.reservation.correlationId, "correlation-abc-123");
+
+  // No duplicate chronology event
+  assert.equal(sharedData.chronologyEvents.length, chronologyCountAfterFirst,
+    "No duplicate chronology on idempotent return");
 });
 
-test("correlationId validation", async (t) => {
-  // Test that correlationId is required and non-empty
-  
-  const dispatch = async (data) => {
-    const correlationId = data.correlationId;
-    
-    if (!correlationId || String(correlationId).trim() === "") {
-      const error = new Error("Valid correlationId is required");
-      error.code = "VALIDATION_ERROR";
-      throw error;
-    }
-    
-    return { success: true };
+test("duplicate correlationId: ER_DUP_ENTRY safe reject", async () => {
+  resetData(2);
+
+  // First dispatch succeeds
+  await dispatchService.dispatch(1, 2, {
+    courtId: "court-1", refereeId: "referee-1", correlationId: "correlation-first"
+  }, masterActor);
+
+  // Simulate ER_DUP_ENTRY by patching createReservation
+  const repo = require("../repositories/competition-referee.repository");
+  const origCreate = repo.createReservation;
+  repo.createReservation = async () => {
+    const err = new Error("ER_DUP_ENTRY: Duplicate entry");
+    err.code = "ER_DUP_ENTRY";
+    throw err;
   };
-  
-  await assert.rejects(
-    async () => dispatch({ correlationId: null }),
-    (error) => error.code === "VALIDATION_ERROR"
-  );
-  
-  await assert.rejects(
-    async () => dispatch({ correlationId: "" }),
-    (error) => error.code === "VALIDATION_ERROR"
-  );
-  
-  const result = await dispatch({ correlationId: "valid-correlation-id" });
-  assert.equal(result.success, true);
+
+  try {
+    await assert.rejects(
+      () => dispatchService.dispatch(1, 2, {
+        courtId: "court-1", refereeId: "referee-1", correlationId: "correlation-dup"
+      }, masterActor),
+      /ER_DUP_ENTRY|already been used|Duplicate/
+    );
+  } finally {
+    repo.createReservation = origCreate;
+  }
 });
 
-test("correlationId uniqueness constraint", async (t) => {
-  // Test that UNIQUE KEY constraint on correlationId works
-  
-  const correlationIds = new Set();
-  
-  const createReservation = async (data) => {
-    if (correlationIds.has(data.correlationId)) {
-      const error = new Error("ER_DUP_ENTRY: Duplicate entry for key 'uq_dispatch_correlation'");
-      error.code = "ER_DUP_ENTRY";
-      throw error;
-    }
-    correlationIds.add(data.correlationId);
-    return { dispatch_id: `dispatch-${correlationIds.size}` };
-  };
-  
+test("different correlationIds: both succeed with separate reservations", async () => {
+  resetData(3);
+
+  // First dispatch on match 3
+  const result1 = await dispatchService.dispatch(1, 3, {
+    courtId: "court-1", refereeId: "referee-1", correlationId: "correlation-1"
+  }, masterActor);
+  assert.equal(result1.idempotent, false);
+
+  // Second dispatch on different match (match 4)
+  sharedData.set("match:4", {
+    id: 4, tournament_id: 1, referee_id: null, status: "idle",
+    score1: null, score2: null, dispatch_id: null, dispatch_version: null,
+    assigned_at: null, responsibility_accepted_at: null,
+    result_confirmed_at: null, result_confirmed_by: null
+  });
+
+  const result2 = await dispatchService.dispatch(1, 4, {
+    courtId: "court-1", refereeId: "referee-1", correlationId: "correlation-2"
+  }, masterActor);
+  assert.equal(result2.idempotent, false);
+
+  // Two separate reservations
+  let reservationCount = 0;
+  for (const [k] of sharedData) {
+    if (k.startsWith("reservation:")) reservationCount++;
+  }
+  assert.equal(reservationCount, 2);
+});
+
+test("correlationId preserved through chronology event", async () => {
+  resetData(5);
+
+  await dispatchService.dispatch(1, 5, {
+    courtId: "court-1", refereeId: "referee-1", correlationId: "correlation-preserved"
+  }, masterActor);
+
+  assert.equal(sharedData.chronologyEvents.length, 1);
+  assert.equal(sharedData.chronologyEvents[0].correlationId, "correlation-preserved");
+  assert.equal(sharedData.chronologyEvents[0].eventType, "referee_dispatch");
+  assert.equal(sharedData.chronologyEvents[0].sourceType, "master_dispatch");
+  assert.equal(sharedData.chronologyEvents[0].actorId, "master-1");
+});
+
+test("no duplicate chronology on idempotent retry", async () => {
+  resetData(6);
+
+  const result1 = await dispatchService.dispatch(1, 6, {
+    courtId: "court-1", refereeId: "referee-1", correlationId: "correlation-unique"
+  }, masterActor);
+  assert.equal(result1.idempotent, false);
+  assert.equal(sharedData.chronologyEvents.length, 1);
+
+  // Idempotent retry
+  const result2 = await dispatchService.dispatch(1, 6, {
+    courtId: "court-1", refereeId: "referee-1", correlationId: "correlation-unique"
+  }, masterActor);
+  assert.equal(result2.idempotent, true);
+  assert.equal(sharedData.chronologyEvents.length, 1, "No duplicate chronology");
+});
+
+test("correlationId uniqueness enforced by reservation table", async () => {
+  resetData(7);
+
   // First reservation succeeds
-  await createReservation({ correlationId: "unique-correlation-1" });
-  
-  // Duplicate fails
-  await assert.rejects(
-    async () => createReservation({ correlationId: "unique-correlation-1" }),
-    /ER_DUP_ENTRY/
-  );
-  
-  // Different correlationId succeeds
-  await createReservation({ correlationId: "unique-correlation-2" });
+  const result1 = await dispatchService.dispatch(1, 7, {
+    courtId: "court-1", refereeId: "referee-1", correlationId: "unique-correlation-1"
+  }, masterActor);
+  assert.equal(result1.idempotent, false);
+
+  // Same correlationId → idempotent (not a duplicate)
+  const result2 = await dispatchService.dispatch(1, 7, {
+    courtId: "court-1", refereeId: "referee-1", correlationId: "unique-correlation-1"
+  }, masterActor);
+  assert.equal(result2.idempotent, true);
+  assert.equal(result2.reservation.correlationId, "unique-correlation-1");
 });
 
-test("concurrent idempotent requests", async (t) => {
-  // Test that concurrent requests with same correlationId are handled correctly
-  
-  const correlationId = "concurrent-correlation";
-  let reservationCreated = false;
-  const waiters = [];
-  
-  const createOrWait = async (correlationId) => {
-    if (reservationCreated) {
-      // Wait for existing reservation
-      return { idempotent: true };
-    }
-    
-    reservationCreated = true;
-    return { idempotent: false, correlationId };
-  };
-  
-  const [result1, result2] = await Promise.allSettled([
-    createOrWait(correlationId),
-    createOrWait(correlationId)
-  ]);
-  
-  // One should create, one should be idempotent
-  const created = [result1, result2].filter(r => r.status === "fulfilled" && r.value.idempotent === false);
-  const idempotent = [result1, result2].filter(r => r.status === "fulfilled" && r.value.idempotent === true);
-  
-  assert.equal(created.length, 1, "Exactly one should create the reservation");
-  assert.equal(idempotent.length, 1, "Exactly one should be idempotent");
+test("concurrent idempotent requests: one creates, one returns existing", async () => {
+  resetData(8);
+
+  // Simulate two concurrent requests with same correlationId
+  // Since JS is single-threaded, we test sequential behavior
+  const result1 = await dispatchService.dispatch(1, 8, {
+    courtId: "court-1", refereeId: "referee-1", correlationId: "concurrent-correlation"
+  }, masterActor);
+
+  assert.equal(result1.idempotent, false, "First request creates reservation");
+
+  const result2 = await dispatchService.dispatch(1, 8, {
+    courtId: "court-1", refereeId: "referee-1", correlationId: "concurrent-correlation"
+  }, masterActor);
+
+  assert.equal(result2.idempotent, true, "Second request is idempotent");
+  assert.equal(result2.reservation.correlationId, "concurrent-correlation");
 });

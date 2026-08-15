@@ -12,6 +12,12 @@ function validationError(message) {
   return error;
 }
 
+function forbiddenError(message) {
+  const error = new Error(message);
+  error.code = "FORBIDDEN";
+  return error;
+}
+
 function positiveId(value, name) {
   const id = Number(value);
   if (!Number.isInteger(id) || id <= 0) {
@@ -22,14 +28,14 @@ function positiveId(value, name) {
 
 function requireMaster(actor) {
   if (actor?.actorType !== "master") {
-    throw validationError("Only a master may perform dispatch operations");
+    throw forbiddenError("Only a master may perform dispatch operations");
   }
   return actor.actorId;
 }
 
 function requireReferee(actor) {
   if (actor?.actorType !== "referee") {
-    throw validationError("Only a referee may accept a dispatch");
+    throw forbiddenError("Only a referee may accept a dispatch");
   }
   return actor.actorId;
 }
@@ -48,7 +54,7 @@ function requireReferee(actor) {
 async function dispatch(competitionValue, matchValue, data, actor) {
   const competitionId = positiveId(competitionValue, "competition id");
   const matchId = positiveId(matchValue, "match id");
-  const { courtId, refereeId, correlationId } = data;
+  const { courtId, refereeId, correlationId, expectedVersion } = data;
   
   const masterId = requireMaster(actor);
   
@@ -92,7 +98,7 @@ async function dispatch(competitionValue, matchValue, data, actor) {
     }
     
     // 4. Verify referee is eligible
-    const rosterEntry = await competitionRefereeRepository.findByReferee(competitionId, refereeId, connection);
+    const rosterEntry = await competitionRefereeRepository.findByRefereeInRoster(competitionId, refereeId, connection);
     if (!rosterEntry) {
       throw validationError("Referee is not in the competition roster");
     }
@@ -113,20 +119,28 @@ async function dispatch(competitionValue, matchValue, data, actor) {
     
     // 5. Create dispatch reservation
     const dispatchId = randomUUID();
-    const expectedVersion = record.dispatchVersion ? Number(record.dispatchVersion) : 0;
+    const currentVersion = record.dispatchVersion != null ? Number(record.dispatchVersion) : 0;
+    const clientExpectedVersion = expectedVersion != null ? Number(expectedVersion) : currentVersion;
+    
+    // Explicit expectedVersion check: client must agree with current server state
+    if (clientExpectedVersion !== currentVersion) {
+      const error = new Error("STALE_DISPATCH_VERSION: Dispatch version mismatch");
+      error.code = "CONFLICT";
+      throw error;
+    }
     
     const reservation = await competitionRefereeRepository.createReservation(dispatchId, {
       matchId,
       courtId,
       refereeId,
-      expectedVersion,
+      expectedVersion: currentVersion,
       correlationId: dispatchCorrelationId
     }, connection);
     
-    // 6. Update match to waiting_acceptance
+    // 6. Update match to assigned with dispatch tracking
     const updatedMatch = await repository.dispatch(competitionId, matchId, {
       dispatchId,
-      dispatchVersion: expectedVersion + 1,
+      dispatchVersion: currentVersion + 1,
       refereeId
     }, connection);
     
@@ -139,10 +153,10 @@ async function dispatch(competitionValue, matchValue, data, actor) {
       sourceType: "master_dispatch",
       actorId: masterId,
       correlationId: dispatchCorrelationId,
-      details: { dispatchId, refereeId, expectedVersion: expectedVersion + 1 }
+      details: { dispatchId, refereeId, expectedVersion: currentVersion + 1 }
     }, connection);
     
-    // Court runtime condition remains available during waiting_acceptance
+    // Court runtime condition remains available during assigned
     // (no change to court_operating_conditions)
     
     return {
@@ -160,9 +174,18 @@ async function acceptDispatch(competitionValue, matchValue, actor) {
   const refereeId = requireReferee(actor);
   
   return db.withTransaction(async (connection) => {
-    // Lock order: matches → referee_dispatch_reservations
+    // Lock order: tournaments → matches → referee_dispatch_reservations
     
-    // 1. Lock match row
+    // 1. Lock tournament row for lifecycle verification
+    const tournament = await tournamentRepository.getTournamentByIdForUpdate(competitionId, connection);
+    if (!tournament) {
+      const error = new Error("Competition not found");
+      error.code = "NOT_FOUND";
+      throw error;
+    }
+    assertCompetitionLifecycleEligible(tournament.status, "responsibilityAcceptance");
+    
+    // 2. Lock match row
     const record = await repository.findById(competitionId, matchId, connection, true);
     if (!record) {
       const error = new Error("Match not found");
@@ -170,8 +193,8 @@ async function acceptDispatch(competitionValue, matchValue, actor) {
       throw error;
     }
     
-    // Verify match is in waiting_acceptance status
-    if (record.status !== "waiting_acceptance") {
+    // Verify match is in assigned status
+    if (record.status !== "assigned") {
       throw validationError(`Match cannot be accepted in status ${record.status}`);
     }
     
@@ -180,43 +203,47 @@ async function acceptDispatch(competitionValue, matchValue, actor) {
       throw validationError("Only the assigned referee may accept this dispatch");
     }
     
-    // 2. Lock and update reservation
+    // 3. Handle dispatch reservation if present
     const reservation = await competitionRefereeRepository.findByMatch(matchId, connection);
-    if (!reservation) {
-      throw validationError("No active dispatch reservation found");
+    
+    if (reservation) {
+      if (reservation.refereeId !== refereeId) {
+        throw validationError("Referee does not match dispatch reservation");
+      }
+      
+      if (reservation.acceptedAt || reservation.rejectedAt) {
+        throw validationError("Dispatch has already been resolved");
+      }
+      
+      await competitionRefereeRepository.markAccepted(reservation.dispatchId, refereeId, connection);
     }
     
-    if (reservation.refereeId !== refereeId) {
-      throw validationError("Referee does not match dispatch reservation");
+    // 4. Update match to accepted
+    let updatedMatch;
+    if (reservation && reservation.dispatchId) {
+      updatedMatch = await repository.acceptDispatch(competitionId, matchId, reservation.dispatchId, connection);
+    } else {
+      // Simple assign (no dispatch reservation) — use acceptResponsibility path
+      updatedMatch = await repository.acceptResponsibility(competitionId, matchId, connection);
     }
     
-    if (reservation.acceptedAt || reservation.rejectedAt) {
-      throw validationError("Dispatch has already been resolved");
-    }
-    
-    await competitionRefereeRepository.markAccepted(reservation.dispatchId, refereeId, connection);
-    
-    // 3. Update match to accepted
-    const updatedMatch = await repository.acceptDispatch(competitionId, matchId, reservation.dispatchId, connection);
-    
-    // 4. Write chronology event
+    // 5. Write chronology event
+    const courtId = reservation ? reservation.courtId : null;
+    const correlationId = reservation ? reservation.correlationId : randomUUID();
     await courtRepository.appendEvent({
       tournamentId: competitionId,
-      courtId: reservation.courtId,
+      courtId: courtId || "unassigned",
       matchId,
       eventType: "referee_acceptance",
       sourceType: "referee_acceptance",
       actorId: refereeId,
-      correlationId: reservation.correlationId,
-      details: { dispatchId: reservation.dispatchId }
+      correlationId,
+      details: { dispatchId: reservation ? reservation.dispatchId : null }
     }, connection);
-    
-    // Court runtime condition remains available after acceptance
-    // (no change to court_operating_conditions)
     
     return {
       match: updatedMatch,
-      reservation: { ...reservation, acceptedAt: new Date().toISOString() }
+      reservation: reservation ? { ...reservation, acceptedAt: new Date().toISOString() } : null
     };
   });
 }
@@ -248,8 +275,8 @@ async function withdrawDispatch(competitionValue, matchValue, actor, data = {}) 
       throw error;
     }
     
-    // Verify match is in waiting_acceptance status
-    if (record.status !== "waiting_acceptance") {
+    // Verify match is in assigned status with active dispatch
+    if (record.status !== "assigned" || !record.dispatchId) {
       throw validationError(`Match cannot be withdrawn in status ${record.status}`);
     }
     
@@ -317,13 +344,13 @@ async function reassignDispatch(competitionValue, matchValue, newRefereeId, acto
       throw error;
     }
     
-    // Verify match is in waiting_acceptance status
-    if (record.status !== "waiting_acceptance") {
+    // Verify match is in assigned status with active dispatch
+    if (record.status !== "assigned" || !record.dispatchId) {
       throw validationError(`Match cannot be reassigned in status ${record.status}`);
     }
     
     // 3. Verify new referee is eligible
-    const rosterEntry = await competitionRefereeRepository.findByReferee(competitionId, newRefereeId, connection);
+    const rosterEntry = await competitionRefereeRepository.findByRefereeInRoster(competitionId, newRefereeId, connection);
     if (!rosterEntry) {
       throw validationError("New referee is not in the competition roster");
     }

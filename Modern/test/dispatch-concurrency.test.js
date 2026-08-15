@@ -1,263 +1,348 @@
 const { test } = require("node:test");
 const assert = require("node:assert");
 
-// Mock database connection
-const mockDb = {
-  withTransaction: async (fn) => {
-    const connection = createMockConnection();
-    return fn(connection);
-  }
-};
+// ---------------------------------------------------------------------------
+// Shared in-memory mock DB — monkey-patched before loading production modules.
+// All repositories and services that require("../database/db") share the same
+// pool object, so mutating its properties is visible to every caller.
+// ---------------------------------------------------------------------------
 
-function createMockConnection() {
-  const data = new Map();
-  const queries = [];
-  
+const db = require("../database/db");
+
+function createMockConnection(data) {
   return {
-    query: async (sql, params) => {
-      queries.push({ sql, params });
-      // Handle different query types
-      if (sql.includes("SELECT") && sql.includes("FROM matches")) {
-        const match = data.get(`match:${params[1]}`);
-        return [[match ? match : null]];
-      }
+    query: async (sql, params = []) => {
+      // --- SELECTs ---
       if (sql.includes("SELECT") && sql.includes("FROM tournaments")) {
-        return [[{ id: params[0], status: "ongoing" }]];
-      }
-      if (sql.includes("SELECT") && sql.includes("FROM competition_referees")) {
-        return [[{ id: 1, competition_id: params[0], referee_id: params[1], active: true, eligible: true }]];
-      }
-      if (sql.includes("SELECT") && sql.includes("FROM referee_dispatch_reservations")) {
-        const reservation = data.get(`reservation:${params[0]}`);
-        return [[reservation ? reservation : null]];
+        return [[{ id: params[0], name: "Test Competition", status: data.tournamentStatus || "running" }]];
       }
       if (sql.includes("SELECT") && sql.includes("FROM match_schedules")) {
-        return [[{ court_id: "court-1" }]];
+        return [[{ court_id: data.scheduledCourt || "court-1" }]];
       }
+      if (sql.includes("SELECT") && sql.includes("FROM matches")) {
+        const match = data.get(`match:${params[1]}`);
+        return [[match || null]];
+      }
+      if (sql.includes("SELECT") && sql.includes("FROM competition_referees")) {
+        const refId = params[1];
+        if (data.dispatchedReferees && data.dispatchedReferees.has(refId)) {
+          return [[null]];
+        }
+        return [[{ id: 1, competition_id: params[0], referee_id: refId, active: 1, eligible: 1 }]];
+      }
+      if (sql.includes("SELECT") && sql.includes("FROM referee_dispatch_reservations")) {
+        if (sql.includes("dispatch_id =")) {
+          const r = data.get(`reservation:${params[0]}`);
+          return [[r || null]];
+        }
+        if (sql.includes("match_id =")) {
+          for (const [, v] of data) {
+            if (v && v.match_id === params[0] && v.dispatch_id) return [[v]];
+          }
+          return [[null]];
+        }
+        if (sql.includes("correlation_id =")) {
+          for (const [, v] of data) {
+            if (v && v.correlation_id === params[0]) return [[v]];
+          }
+          return [[null]];
+        }
+      }
+
+      // --- INSERTs ---
       if (sql.includes("INSERT") && sql.includes("INTO referee_dispatch_reservations")) {
         const [dispatchId, matchId, courtId, refereeId, expectedVersion, correlationId] = params;
-        const reservation = {
-          dispatch_id: dispatchId,
-          match_id: matchId,
-          court_id: courtId,
-          referee_id: refereeId,
-          expected_version: expectedVersion,
-          correlation_id: correlationId,
-          accepted_at: null,
-          rejected_at: null,
-          rejected_reason: null
-        };
-        data.set(`reservation:${dispatchId}`, reservation);
+        data.set(`reservation:${dispatchId}`, {
+          dispatch_id: dispatchId, match_id: matchId, court_id: courtId,
+          referee_id: refereeId, expected_version: expectedVersion,
+          correlation_id: correlationId, accepted_at: null, rejected_at: null,
+          rejected_reason: null, created_at: new Date().toISOString()
+        });
         return [{ insertId: 1 }];
       }
       if (sql.includes("INSERT") && sql.includes("INTO tournament_coordination_chronology")) {
         return [{ insertId: 1 }];
       }
-      if (sql.includes("UPDATE") && sql.includes("matches")) {
-        return [{}];
+
+      // --- UPDATEs ---
+      if (sql.includes("UPDATE") && sql.includes("matches") && sql.includes("SET")) {
+        const key = `match:${params[params.length - 1]}`;
+        const match = data.get(key);
+        if (match) {
+          if (sql.includes("status = 'assigned'")) {
+            match.status = "assigned";
+            match.referee_id = params[0];
+          }
+          if (sql.includes("status = 'accepted'")) {
+            match.status = "accepted";
+          }
+          if (sql.includes("status = 'upcoming'")) {
+            match.status = "upcoming";
+            match.referee_id = null;
+            match.dispatch_id = null;
+            match.dispatch_version = null;
+          }
+          if (sql.includes("dispatch_id =")) {
+            match.dispatch_id = params[1];
+            match.dispatch_version = params[2];
+          }
+          if (sql.includes("dispatch_version = dispatch_version + 1")) {
+            match.dispatch_version = (match.dispatch_version || 0) + 1;
+          }
+          if (sql.includes("referee_id =") && sql.includes("dispatch_version = dispatch_version + 1")) {
+            match.referee_id = params[0];
+          }
+        }
+        return [{ affectedRows: 1 }];
       }
       if (sql.includes("UPDATE") && sql.includes("referee_dispatch_reservations")) {
-        return [{}];
+        return [{ affectedRows: 1 }];
       }
+      if (sql.includes("UPDATE") && sql.includes("court_operating_conditions")) {
+        return [{ affectedRows: 1 }];
+      }
+
       return [[]];
     }
   };
 }
 
-test("concurrent dispatch to same court: only one succeeds", async (t) => {
-  // Test that when two Masters try to dispatch to the same court simultaneously,
-  // only one succeeds due to FOR UPDATE lock on match row
-  
-  const results = [];
-  
-  // Simulate concurrent dispatch attempts
-  const dispatch1 = async () => {
-    // First dispatch succeeds
-    return { success: true, matchId: 1, courtId: "court-1", refereeId: "referee-1" };
-  };
-  
-  const dispatch2 = async () => {
-    // Second dispatch fails due to lock conflict
-    throw new Error("Match already has an active dispatch");
-  };
-  
-  const [result1, result2] = await Promise.allSettled([dispatch1(), dispatch2()]);
-  
-  assert.equal(result1.status, "fulfilled");
-  assert.equal(result2.status, "rejected");
-  assert.match(result2.reason.message, /active dispatch|conflict/i);
-});
+// Monkey-patch db object (all modules share this reference)
+const originalWithTransaction = db.withTransaction;
+db.withTransaction = async (fn) => {
+  const connection = createMockConnection(sharedData);
+  return fn(connection);
+};
 
-test("concurrent dispatch to same referee: only one succeeds", async (t) => {
-  // Test that when two Masters try to dispatch the same referee simultaneously,
-  // only one succeeds due to FOR UPDATE lock on referee_dispatch_reservations
-  
-  const results = [];
-  
-  // Simulate concurrent dispatch attempts
-  const dispatch1 = async () => {
-    // First dispatch succeeds
-    return { success: true, matchId: 1, refereeId: "referee-1" };
-  };
-  
-  const dispatch2 = async () => {
-    // Second dispatch fails due to referee already busy
-    throw new Error("Referee is not eligible for dispatch");
-  };
-  
-  const [result1, result2] = await Promise.allSettled([dispatch1(), dispatch2()]);
-  
-  assert.equal(result1.status, "fulfilled");
-  assert.equal(result2.status, "rejected");
-});
+// ---------------------------------------------------------------------------
+// Load production service AFTER patching
+// ---------------------------------------------------------------------------
 
-test("stale expectedVersion: full rollback", async (t) => {
-  // Test that when expectedVersion doesn't match, the entire transaction rolls back
-  
-  const dispatch = async (expectedVersion) => {
-    const currentVersion = 2; // Simulating current version
-    if (expectedVersion !== currentVersion) {
-      throw new Error("STALE_DISPATCH_VERSION: Dispatch version mismatch");
-    }
-    return { success: true, version: expectedVersion + 1 };
-  };
-  
-  // Try with stale version
+const dispatchService = require("../services/dispatch.service");
+
+// Shared data store — reset per test
+let sharedData;
+
+function resetData(overrides = {}) {
+  sharedData = new Map();
+  sharedData.tournamentStatus = overrides.tournamentStatus || "running";
+  sharedData.scheduledCourt = overrides.scheduledCourt || "court-1";
+  sharedData.dispatchedReferees = new Set();
+  sharedData.set(`match:${overrides.matchId || 1}`, {
+    id: overrides.matchId || 1,
+    tournament_id: overrides.competitionId || 1,
+    referee_id: null,
+    status: overrides.matchStatus || "idle",
+    score1: null, score2: null,
+    dispatch_id: overrides.dispatchId || null,
+    dispatch_version: overrides.dispatchVersion ?? null,
+    assigned_at: null,
+    responsibility_accepted_at: null,
+    result_confirmed_at: null,
+    result_confirmed_by: null
+  });
+  return sharedData;
+}
+
+const masterActor = { actorId: "master-1", actorType: "master" };
+
+// ---------------------------------------------------------------------------
+// Tests
+// ---------------------------------------------------------------------------
+
+test("concurrent dispatch same referee: second call fails roster check", async () => {
+  resetData();
+
+  const result1 = await dispatchService.dispatch(1, 1, {
+    courtId: "court-1", refereeId: "referee-1", correlationId: "corr-1"
+  }, masterActor);
+
+  assert.equal(result1.idempotent, false);
+  assert.equal(result1.match.status, "assigned");
+
+  // After first dispatch, mark referee as dispatched in mock
+  sharedData.dispatchedReferees.add("referee-1");
+
+  // Reset match to idle for second attempt (different match)
+  sharedData.set("match:2", {
+    id: 2, tournament_id: 1, referee_id: null, status: "idle",
+    score1: null, score2: null, dispatch_id: null, dispatch_version: null,
+    assigned_at: null, responsibility_accepted_at: null,
+    result_confirmed_at: null, result_confirmed_by: null
+  });
+
   await assert.rejects(
-    async () => dispatch(1),
+    () => dispatchService.dispatch(1, 2, {
+      courtId: "court-1", refereeId: "referee-1", correlationId: "corr-2"
+    }, masterActor),
+    /not eligible|not in the competition roster/
+  );
+});
+
+test("stale expectedVersion: full rollback, no writes", async () => {
+  resetData({ matchId: 10, dispatchVersion: 2 });
+
+  await assert.rejects(
+    () => dispatchService.dispatch(1, 10, {
+      courtId: "court-1", refereeId: "referee-1",
+      correlationId: "corr-stale", expectedVersion: 1
+    }, masterActor),
     /STALE_DISPATCH_VERSION/
   );
-});
 
-test("forced failure: no partial writes", async (t) => {
-  // Test that if a failure occurs after reservation creation, all writes roll back
-  
-  let reservationCreated = false;
-  let reservationRolledBack = false;
-  
-  try {
-    // Simulate successful reservation creation
-    reservationCreated = true;
-    const reservation = { dispatch_id: "dispatch-1", match_id: 1 };
-    
-    // Simulate failure in match update
-    throw new Error("Database connection lost");
-  } catch (error) {
-    // In a real transaction, the reservation would be rolled back
-    reservationRolledBack = true;
+  // Verify no writes occurred — match unchanged
+  const match = sharedData.get("match:10");
+  assert.equal(match.status, "idle");
+  assert.equal(match.dispatch_id, null);
+
+  // Verify no reservation was created
+  let reservationCount = 0;
+  for (const [k] of sharedData) {
+    if (k.startsWith("reservation:")) reservationCount++;
   }
-  
-  assert.equal(reservationCreated, true, "Reservation was created");
-  assert.equal(reservationRolledBack, true, "Transaction was rolled back");
+  assert.equal(reservationCount, 0);
 });
 
-test("same match cannot have multiple active dispatches", async (t) => {
-  // Test that a match with an active dispatch cannot be dispatched again
-  
-  const match = {
-    id: 1,
-    status: "waiting_acceptance",
-    dispatch_id: "dispatch-1"
+test("forced failure: transaction rollback leaves no partial writes", async () => {
+  resetData({ matchId: 20 });
+
+  // Monkey-patch to force failure after reservation creation
+  const origCreateReservation = require("../repositories/competition-referee.repository").createReservation;
+  const repo = require("../repositories/competition-referee.repository");
+  let reservationAttempted = false;
+  repo.createReservation = async () => {
+    reservationAttempted = true;
+    throw new Error("Forced failure after reservation");
   };
-  
-  const dispatch = async () => {
-    if (match.dispatch_id) {
-      throw new Error("DISPATCH_CONFLICT: Match already has an active dispatch");
-    }
-    return { success: true };
-  };
-  
-  await assert.rejects(
-    async () => dispatch(),
-    /DISPATCH_CONFLICT/
-  );
+
+  try {
+    await assert.rejects(
+      () => dispatchService.dispatch(1, 20, {
+        courtId: "court-1", refereeId: "referee-1", correlationId: "corr-force"
+      }, masterActor),
+      /Forced failure/
+    );
+  } finally {
+    repo.createReservation = origCreateReservation;
+  }
+
+  assert.equal(reservationAttempted, true, "Reservation was attempted");
+
+  // Match remains unchanged (transaction rolled back)
+  const match = sharedData.get("match:20");
+  assert.equal(match.status, "idle");
+  assert.equal(match.dispatch_id, null);
 });
 
-test("withdraw releases court and referee reservations", async (t) => {
-  // Test that withdrawing a dispatch releases the court and referee
-  
-  const withdraw = async () => {
-    const match = { status: "waiting_acceptance", dispatch_id: "dispatch-1" };
-    const reservation = { dispatch_id: "dispatch-1", referee_id: "referee-1" };
-    
-    // Withdraw logic
-    match.status = "upcoming";
-    match.dispatch_id = null;
-    reservation.rejected_at = new Date().toISOString();
-    
-    return { match, reservation };
+test("FOR UPDATE lock: dispatch queries match row with FOR UPDATE", async () => {
+  resetData({ matchId: 30 });
+
+  const lockedQueries = [];
+  const origWithTransaction = db.withTransaction;
+  db.withTransaction = async (fn) => {
+    const connection = createMockConnection(sharedData);
+    const origQuery = connection.query;
+    connection.query = async (sql, params) => {
+      if (sql.includes("FOR UPDATE")) {
+        lockedQueries.push(sql.trim());
+      }
+      return origQuery(sql, params);
+    };
+    return fn(connection);
   };
-  
-  const result = await withdraw();
+
+  try {
+    await dispatchService.dispatch(1, 30, {
+      courtId: "court-1", refereeId: "referee-1", correlationId: "corr-lock"
+    }, masterActor);
+  } finally {
+    db.withTransaction = origWithTransaction;
+  }
+
+  // Verify match row was locked with FOR UPDATE
+  const matchLock = lockedQueries.find(q => q.includes("FROM matches") && q.includes("FOR UPDATE"));
+  assert.ok(matchLock, "Match row must be locked with FOR UPDATE");
+
+  // Verify tournament row was locked with FOR UPDATE
+  const tournamentLock = lockedQueries.find(q => q.includes("FROM tournaments") && q.includes("FOR UPDATE"));
+  assert.ok(tournamentLock, "Tournament row must be locked with FOR UPDATE");
+});
+
+test("same match cannot be dispatched twice: second is idempotent", async () => {
+  resetData({ matchId: 40 });
+
+  const result1 = await dispatchService.dispatch(1, 40, {
+    courtId: "court-1", refereeId: "referee-1", correlationId: "corr-same"
+  }, masterActor);
+
+  assert.equal(result1.idempotent, false);
+  assert.equal(result1.match.status, "assigned");
+
+  // Same correlationId → idempotent return
+  const result2 = await dispatchService.dispatch(1, 40, {
+    courtId: "court-1", refereeId: "referee-1", correlationId: "corr-same"
+  }, masterActor);
+
+  assert.equal(result2.idempotent, true);
+});
+
+test("withdraw releases dispatch and resets match", async () => {
+  resetData({ matchId: 50 });
+
+  await dispatchService.dispatch(1, 50, {
+    courtId: "court-1", refereeId: "referee-1", correlationId: "corr-wd"
+  }, masterActor);
+
+  const match = sharedData.get("match:50");
+  assert.equal(match.status, "assigned");
+
+  const result = await dispatchService.withdrawDispatch(1, 50, masterActor, { reason: "test" });
   assert.equal(result.match.status, "upcoming");
-  assert.equal(result.match.dispatch_id, null);
-  assert.ok(result.reservation.rejected_at);
 });
 
-test("reassign in one transaction: release old and create new", async (t) => {
-  // Test that reassignment happens atomically
-  
-  const reassign = async () => {
-    const oldReservation = { dispatch_id: "dispatch-1", referee_id: "referee-1" };
-    const newReservation = { dispatch_id: "dispatch-2", referee_id: "referee-2" };
-    
-    // Mark old as rejected
-    oldReservation.rejected_at = new Date().toISOString();
-    oldReservation.rejected_reason = "reassigned_by_master";
-    
-    // Create new reservation
-    return { oldReservation, newReservation };
-  };
-  
-  const result = await reassign();
-  assert.ok(result.oldReservation.rejected_at);
-  assert.equal(result.newReservation.referee_id, "referee-2");
+test("reassign atomically swaps referee", async () => {
+  resetData({ matchId: 60 });
+
+  await dispatchService.dispatch(1, 60, {
+    courtId: "court-1", refereeId: "referee-1", correlationId: "corr-re"
+  }, masterActor);
+
+  const result = await dispatchService.reassignDispatch(1, 60, "referee-2", masterActor);
+  assert.equal(result.match.refereeId, "referee-2");
 });
 
-test("completed/archived competition rejects changes", async (t) => {
-  // Test that dispatch operations fail on completed/archived competitions
-  
-  const tournament = { id: 1, status: "completed" };
-  
-  const assertCompetitionLifecycleEligible = (status, capability) => {
-    if (status === "completed" || status === "archived") {
-      throw new Error("Competition is not eligible for changes");
-    }
-  };
-  
-  assert.throws(
-    () => assertCompetitionLifecycleEligible(tournament.status, "refereeAssignment"),
-    /not eligible/
+test("completed competition rejects dispatch", async () => {
+  resetData({ matchId: 70, tournamentStatus: "completed" });
+
+  await assert.rejects(
+    () => dispatchService.dispatch(1, 70, {
+      courtId: "court-1", refereeId: "referee-1", correlationId: "corr-completed"
+    }, masterActor),
+    /not available/i
   );
 });
 
-test("restart reconstruction: state persisted", async (t) => {
-  // Test that dispatch state can be reconstructed after restart
-  
-  const persistedState = {
-    match: {
-      id: 1,
-      status: "waiting_acceptance",
-      dispatch_id: "dispatch-1",
-      dispatch_version: 1
-    },
-    reservation: {
-      dispatch_id: "dispatch-1",
-      match_id: 1,
-      court_id: "court-1",
-      referee_id: "referee-1",
-      accepted_at: null,
-      rejected_at: null
+test("restart reconstruction: state persisted in match and reservation", async () => {
+  resetData({ matchId: 80 });
+
+  await dispatchService.dispatch(1, 80, {
+    courtId: "court-1", refereeId: "referee-1", correlationId: "corr-restart"
+  }, masterActor);
+
+  const match = sharedData.get("match:80");
+  assert.equal(match.status, "assigned");
+  assert.ok(match.dispatch_id);
+  assert.equal(match.dispatch_version, 1);
+
+  // Find the reservation
+  let reservation = null;
+  for (const [k, v] of sharedData) {
+    if (k.startsWith("reservation:") && v.match_id === 80) {
+      reservation = v;
+      break;
     }
-  };
-  
-  // Simulate reconstruction
-  const reconstructed = {
-    match: persistedState.match,
-    reservation: persistedState.reservation
-  };
-  
-  assert.equal(reconstructed.match.status, "waiting_acceptance");
-  assert.equal(reconstructed.reservation.dispatch_id, "dispatch-1");
-  assert.equal(reconstructed.reservation.rejected_at, null);
+  }
+  assert.ok(reservation, "Reservation must exist");
+  assert.equal(reservation.referee_id, "referee-1");
+  assert.equal(reservation.rejected_at, null);
 });

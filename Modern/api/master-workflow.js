@@ -14,7 +14,7 @@ router.get("/:competitionId/live-status", async (req, res) => {
     }
     res.json(await liveMatchStatusService.getLiveMatchStatus(req.params.competitionId));
   } catch (error) {
-    const status = error.code === "VALIDATION_ERROR" ? 400 : 500;
+    const status = error.code === "VALIDATION_ERROR" ? 400 : error.code === "FORBIDDEN" ? 403 : 500;
     res.status(status).json({ error: error.message });
   }
 });
@@ -24,11 +24,12 @@ router.post("/:competitionId/matches/:matchId/assign", async (req, res) => {
     const result = await service.assignReferee(
       req.params.competitionId,
       req.params.matchId,
-      { refereeId: req.body.refereeId }
+      { refereeId: req.body.refereeId, correlationId: req.body.correlationId, expectedVersion: req.body.expectedVersion },
+      req.actor
     );
     res.json(result);
   } catch (error) {
-    const statuses = { VALIDATION_ERROR: 400, NOT_FOUND: 404 };
+    const statuses = { VALIDATION_ERROR: 400, NOT_FOUND: 404, FORBIDDEN: 403, CONFLICT: 409 };
     res.status(statuses[error.code] || 500).json({ error: error.message });
   }
 });
@@ -36,21 +37,21 @@ router.post("/:competitionId/matches/:matchId/assign", async (req, res) => {
 // Atomic dispatch: Master submits matchId + courtId + refereeId + expectedVersion + correlationId
 router.post("/:competitionId/matches/:matchId/dispatch", async (req, res) => {
   try {
-    const { courtId, refereeId, correlationId } = req.body;
+    const { courtId, refereeId, correlationId, expectedVersion } = req.body;
     const result = await service.dispatchReferee(
       req.params.competitionId,
       req.params.matchId,
-      { courtId, refereeId, correlationId },
+      { courtId, refereeId, correlationId, expectedVersion },
       req.actor
     );
     res.json(result);
   } catch (error) {
-    const statuses = { VALIDATION_ERROR: 400, NOT_FOUND: 404 };
+    const statuses = { VALIDATION_ERROR: 400, NOT_FOUND: 404, FORBIDDEN: 403, CONFLICT: 409 };
     res.status(statuses[error.code] || 500).json({ error: error.message });
   }
 });
 
-// Withdraw dispatch: Master can withdraw a waiting_acceptance dispatch
+// Withdraw dispatch: Master can withdraw an assigned dispatch
 router.post("/:competitionId/matches/:matchId/withdraw", async (req, res) => {
   try {
     const { reason } = req.body;
@@ -62,7 +63,7 @@ router.post("/:competitionId/matches/:matchId/withdraw", async (req, res) => {
     );
     res.json(result);
   } catch (error) {
-    const statuses = { VALIDATION_ERROR: 400, NOT_FOUND: 404 };
+    const statuses = { VALIDATION_ERROR: 400, NOT_FOUND: 404, FORBIDDEN: 403, CONFLICT: 409 };
     res.status(statuses[error.code] || 500).json({ error: error.message });
   }
 });
@@ -80,7 +81,7 @@ router.post("/:competitionId/matches/:matchId/reassign", async (req, res) => {
     );
     res.json(result);
   } catch (error) {
-    const statuses = { VALIDATION_ERROR: 400, NOT_FOUND: 404 };
+    const statuses = { VALIDATION_ERROR: 400, NOT_FOUND: 404, FORBIDDEN: 403, CONFLICT: 409 };
     res.status(statuses[error.code] || 500).json({ error: error.message });
   }
 });
@@ -93,7 +94,7 @@ router.post("/:competitionId/matches/:matchId/confirm-result", async (req, res) 
       req.actor
     ));
   } catch (error) {
-    const statuses = { VALIDATION_ERROR: 400, NOT_FOUND: 404 };
+    const statuses = { VALIDATION_ERROR: 400, NOT_FOUND: 404, FORBIDDEN: 403 };
     res.status(statuses[error.code] || 500).json({ error: error.message });
   }
 });
@@ -103,7 +104,7 @@ function courtHandler(action) {
     try {
       res.json(await service[action](req.params.competitionId, req.params.courtId, req.actor, req.body));
     } catch (error) {
-      const statuses = { VALIDATION_ERROR: 400, NOT_FOUND: 404 };
+      const statuses = { VALIDATION_ERROR: 400, NOT_FOUND: 404, FORBIDDEN: 403 };
       res.status(statuses[error.code] || 500).json({ error: error.message });
     }
   };
