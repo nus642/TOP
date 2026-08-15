@@ -6,6 +6,7 @@ const bodyParser = require('body-parser');
 const path = require('node:path');
 
 const competitionRoutes = require("./api/competition");
+const scheduleImportRoutes = require("./api/schedule-import");
 const legacyRoutes = require("./api/legacy");
 const matchOperationsRoutes = require("./api/match-operations");
 const masterOperationalVisibilityRoutes = require("./api/master-operational-visibility");
@@ -31,6 +32,7 @@ function createApp({ actorSessions = createActorSessionStore() } = {}) {
   app.use("/archive", express.static(path.join(__dirname, "archive")));
   app.use("/presentation", express.static(path.join(__dirname, "presentation")));
 
+  app.use("/api/competition", requireActorSession(actorSessions), scheduleImportRoutes);
   app.use("/api/competition", competitionRoutes);
   app.use("/api/session", createSessionRouter(actorSessions));
   app.use("/api", legacyRoutes);

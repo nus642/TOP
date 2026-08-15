@@ -5,6 +5,7 @@ async function listForCompetition(competitionId, connection = db) {
     `SELECT p.id AS participant_id,
             pci.checked_in,
             pci.checked_in_at,
+            pci.source,
             pci.updated_at
        FROM players p
        LEFT JOIN player_check_ins pci

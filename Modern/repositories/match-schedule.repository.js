@@ -41,4 +41,11 @@ async function create(schedule, connection = db) {
     };
 }
 
-module.exports = { findMatch, findByMatch, create };
+async function deleteByTournament(tournamentId, connection = db) {
+    await connection.query(
+        `DELETE FROM match_schedules WHERE tournament_id = ?`,
+        [tournamentId]
+    );
+}
+
+module.exports = { findMatch, findByMatch, create, deleteByTournament };

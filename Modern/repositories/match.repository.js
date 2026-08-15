@@ -124,10 +124,27 @@ async function updateMatchScore(
 
 
 
+async function getActiveMatchesByTournament(
+    tournamentId,
+    connection = db
+) {
+    const [rows] = await connection.query(
+        `
+        SELECT COUNT(*) AS cnt
+        FROM matches
+        WHERE tournament_id = ?
+        AND status NOT IN ('idle', 'upcoming')
+        `,
+        [tournamentId]
+    );
+    return rows[0]?.cnt || 0;
+}
+
 module.exports = {
 
     getMatchesByTournament,
     createMatch,
     deleteMatchesByTournament,
-    updateMatchScore
+    updateMatchScore,
+    getActiveMatchesByTournament
 };

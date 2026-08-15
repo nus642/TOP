@@ -58,7 +58,8 @@ test("checkIn delegates mutation and waiver data to the existing check-in author
     competitionId: 3,
     participantId: 8,
     state: READINESS_STATES.READY,
-    checkedInAt
+    checkedInAt,
+    source: null
   });
 });
 
@@ -87,7 +88,8 @@ test("getReadiness delegates registration and check-in lookup to the existing wo
     competitionId: 3,
     participantId: 8,
     state: "not_checked_in",
-    checkedInAt: null
+    checkedInAt: null,
+    source: null
   });
   assert.deepEqual(calls, [[3, 8]]);
 });
