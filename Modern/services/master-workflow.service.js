@@ -67,7 +67,10 @@ function withdrawDispatch(competitionValue, matchValue, actor, data = {}) {
   const competitionId = positiveId(competitionValue, "competition id");
   const matchId = positiveId(matchValue, "match id");
 
-  return dispatchService.withdrawDispatch(competitionId, matchId, actor, data);
+  return dispatchService.withdrawDispatch(competitionId, matchId, actor, {
+    reason: data.reason,
+    expectedVersion: data.expectedVersion
+  });
 }
 
 // Reassign dispatch: Master can reassign to a different referee while waiting
@@ -75,7 +78,11 @@ function reassignDispatch(competitionValue, matchValue, newRefereeId, actor, dat
   const competitionId = positiveId(competitionValue, "competition id");
   const matchId = positiveId(matchValue, "match id");
 
-  return dispatchService.reassignDispatch(competitionId, matchId, refereeId(newRefereeId), actor, data);
+  return dispatchService.reassignDispatch(competitionId, matchId, refereeId(newRefereeId), actor, {
+    reason: data.reason,
+    expectedVersion: data.expectedVersion,
+    correlationId: data.correlationId
+  });
 }
 
 // Backend-authoritative candidates query

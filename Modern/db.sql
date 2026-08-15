@@ -84,8 +84,10 @@ CREATE TABLE IF NOT EXISTS matches (
 
 -- M2 Competition Referee Roster and Atomic Dispatch support.
 -- Upgrade path for databases created before dispatch coordination.
--- Step 1: Migrate any legacy waiting_acceptance rows to assigned.
-SET @wa_count = (SELECT COUNT(*) FROM matches WHERE status = 'waiting_acceptance');
+-- Step 1: Safely check if waiting_acceptance ENUM value exists, then migrate.
+SET @col_type = (SELECT COLUMN_TYPE FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='matches' AND COLUMN_NAME='status');
+SET @has_wa = IF(@col_type LIKE '%waiting_acceptance%', 1, 0);
+SET @wa_count = IF(@has_wa > 0, (SELECT COUNT(*) FROM matches WHERE status = 'waiting_acceptance'), 0);
 SET @sql = IF(@wa_count > 0, 'UPDATE matches SET status = ''assigned'' WHERE status = ''waiting_acceptance''', 'SELECT 1');
 PREPARE stmt FROM @sql;
 EXECUTE stmt;
@@ -167,12 +169,14 @@ CREATE TABLE IF NOT EXISTS referee_dispatch_reservations (
     referee_id VARCHAR(100) NOT NULL,
     expected_version BIGINT NOT NULL,
     correlation_id VARCHAR(100) NOT NULL,
+    competition_id INT NOT NULL DEFAULT 0,
     accepted_at TIMESTAMP(6) DEFAULT NULL,
     rejected_at TIMESTAMP(6) DEFAULT NULL,
     rejected_reason VARCHAR(255) DEFAULT NULL,
     created_at TIMESTAMP(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
     FOREIGN KEY (match_id) REFERENCES matches(id) ON DELETE CASCADE,
-    UNIQUE KEY uq_dispatch_correlation (correlation_id)
+    UNIQUE KEY uq_dispatch_correlation (competition_id, correlation_id),
+    INDEX ix_dispatch_reservations_competition (competition_id)
 ) DEFAULT CHARSET=utf8mb4;
 
 CREATE TABLE IF NOT EXISTS tournament_coordination_chronology (
@@ -219,6 +223,26 @@ WHERE m.status = 'playing' AND ms.court_id IS NOT NULL AND ms.court_id <> '';
 
 -- Append-only trusted records created by official match confirmation. Their
 -- identity and attribution remain independent from the mutable match row.
+
+-- Migration: Add competition_id to referee_dispatch_reservations if not present.
+SET @col_exists = (SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='referee_dispatch_reservations' AND COLUMN_NAME='competition_id');
+SET @sql = IF(@col_exists = 0, 'ALTER TABLE referee_dispatch_reservations ADD COLUMN competition_id INT NOT NULL DEFAULT 0 AFTER correlation_id', 'SELECT 1');
+PREPARE stmt FROM @sql;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
+
+-- Populate competition_id from matches table.
+UPDATE referee_dispatch_reservations r
+JOIN matches m ON r.match_id = m.id
+SET r.competition_id = m.tournament_id
+WHERE r.competition_id = 0;
+
+-- Update unique key to include competition_id if old key exists.
+SET @idx_exists = (SELECT COUNT(*) FROM INFORMATION_SCHEMA.STATISTICS WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='referee_dispatch_reservations' AND INDEX_NAME='uq_dispatch_correlation');
+SET @sql = IF(@idx_exists > 0, 'ALTER TABLE referee_dispatch_reservations DROP INDEX uq_dispatch_correlation, ADD UNIQUE KEY uq_dispatch_correlation (competition_id, correlation_id)', 'SELECT 1');
+PREPARE stmt FROM @sql;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
 CREATE TABLE IF NOT EXISTS match_official_records (
     id BIGINT PRIMARY KEY AUTO_INCREMENT,
     tournament_id INT NOT NULL,

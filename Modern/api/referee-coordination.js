@@ -11,7 +11,7 @@ router.get("/:competitionId/referees/roster", async (req, res) => {
   try {
     if (req.actor?.actorType !== "master") {
       const error = new Error("Only a master may query the referee roster");
-      error.code = "VALIDATION_ERROR";
+      error.code = "FORBIDDEN";
       throw error;
     }
     res.json(await refereeCoordinationService.listRoster(req.params.competitionId));
@@ -26,7 +26,7 @@ router.post("/:competitionId/referees/roster", async (req, res) => {
   try {
     if (req.actor?.actorType !== "master") {
       const error = new Error("Only a master may create the referee roster");
-      error.code = "VALIDATION_ERROR";
+      error.code = "FORBIDDEN";
       throw error;
     }
     const { refereeIds } = req.body;
@@ -47,7 +47,7 @@ router.get("/:competitionId/referees/eligible", async (req, res) => {
   try {
     if (req.actor?.actorType !== "master") {
       const error = new Error("Only a master may query eligible referees");
-      error.code = "VALIDATION_ERROR";
+      error.code = "FORBIDDEN";
       throw error;
     }
     res.json(await refereeCoordinationService.listEligibleReferees(req.params.competitionId));
@@ -62,7 +62,7 @@ router.patch("/:competitionId/referees/:refereeId", async (req, res) => {
   try {
     if (req.actor?.actorType !== "master") {
       const error = new Error("Only a master may update referee status");
-      error.code = "VALIDATION_ERROR";
+      error.code = "FORBIDDEN";
       throw error;
     }
     const updates = {};
@@ -92,7 +92,7 @@ router.get("/:competitionId/matches/:matchId/available-candidates", async (req, 
   try {
     if (req.actor?.actorType !== "master") {
       const error = new Error("Only a master may query dispatch candidates");
-      error.code = "VALIDATION_ERROR";
+      error.code = "FORBIDDEN";
       throw error;
     }
     res.json(await refereeCoordinationService.listAvailableCandidates(

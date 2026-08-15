@@ -37,7 +37,7 @@ test("master assignment delegates once to the authoritative dispatch service", a
 
   const actor = { actorId: "master-1", actorType: "master" };
   const result = await masterWorkflowService.assignReferee("3", "9", {
-    refereeId: " referee-7 "
+    refereeId: " referee-7 ", expectedVersion: 0
   }, actor);
 
   assert.equal(calls.length, 1);
@@ -55,10 +55,10 @@ test("master service validates its request boundary before delegation", async (t
   dispatchService.dispatch = async () => assert.fail("must not delegate invalid input");
 
   const invalidRequests = [
-    ["bad", 9, { refereeId: "referee-7" }],
-    [3, 0, { refereeId: "referee-7" }],
-    [3, 9, {}],
-    [3, 9, { refereeId: "  " }]
+    ["bad", 9, { refereeId: "referee-7", expectedVersion: 0 }],
+    [3, 0, { refereeId: "referee-7", expectedVersion: 0 }],
+    [3, 9, {}, undefined],
+    [3, 9, { refereeId: "  " }, undefined]
   ];
   for (const request of invalidRequests) {
     await assert.rejects(

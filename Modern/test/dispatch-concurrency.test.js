@@ -25,12 +25,31 @@ function createMockConnection(data) {
       }
       if (sql.includes("SELECT") && sql.includes("FROM competition_referees")) {
         const refId = params[1];
-        if (data.dispatchedReferees && data.dispatchedReferees.has(refId)) {
-          return [[null]];
-        }
         return [[{ id: 1, competition_id: params[0], referee_id: refId, active: 1, eligible: 1 }]];
       }
       if (sql.includes("SELECT") && sql.includes("FROM referee_dispatch_reservations")) {
+        // Active reservation by court
+        if (sql.includes("r.court_id =") && sql.includes("r.competition_id")) {
+          for (const [, v] of data) {
+            if (v && v.court_id === params[0] && v.competition_id === params[1] &&
+                !v.accepted_at && !v.rejected_at) {
+              const match = data.get(`match:${v.match_id}`);
+              if (match && match.status === "assigned") return [[v]];
+            }
+          }
+          return [[null]];
+        }
+        // Active reservation by referee
+        if (sql.includes("r.referee_id =") && sql.includes("r.competition_id")) {
+          for (const [, v] of data) {
+            if (v && v.referee_id === params[0] && v.competition_id === params[1] &&
+                !v.accepted_at && !v.rejected_at) {
+              const match = data.get(`match:${v.match_id}`);
+              if (match && match.status === "assigned") return [[v]];
+            }
+          }
+          return [[null]];
+        }
         if (sql.includes("dispatch_id =")) {
           const r = data.get(`reservation:${params[0]}`);
           return [[r || null]];
@@ -42,8 +61,11 @@ function createMockConnection(data) {
           return [[null]];
         }
         if (sql.includes("correlation_id =")) {
+          // findByCorrelationId(competitionId, correlationId)
+          const compId = params[0];
+          const corrId = params[1];
           for (const [, v] of data) {
-            if (v && v.correlation_id === params[0]) return [[v]];
+            if (v && v.competition_id === compId && v.correlation_id === corrId) return [[v]];
           }
           return [[null]];
         }
@@ -51,11 +73,12 @@ function createMockConnection(data) {
 
       // --- INSERTs ---
       if (sql.includes("INSERT") && sql.includes("INTO referee_dispatch_reservations")) {
-        const [dispatchId, matchId, courtId, refereeId, expectedVersion, correlationId] = params;
+        const [dispatchId, matchId, courtId, refereeId, expectedVersion, correlationId, competitionId] = params;
         data.set(`reservation:${dispatchId}`, {
           dispatch_id: dispatchId, match_id: matchId, court_id: courtId,
           referee_id: refereeId, expected_version: expectedVersion,
-          correlation_id: correlationId, accepted_at: null, rejected_at: null,
+          correlation_id: correlationId, competition_id: competitionId,
+          accepted_at: null, rejected_at: null,
           rejected_reason: null, created_at: new Date().toISOString()
         });
         return [{ insertId: 1 }];
@@ -108,7 +131,6 @@ function createMockConnection(data) {
 }
 
 // Monkey-patch db object (all modules share this reference)
-const originalWithTransaction = db.withTransaction;
 db.withTransaction = async (fn) => {
   const connection = createMockConnection(sharedData);
   return fn(connection);
@@ -127,7 +149,6 @@ function resetData(overrides = {}) {
   sharedData = new Map();
   sharedData.tournamentStatus = overrides.tournamentStatus || "running";
   sharedData.scheduledCourt = overrides.scheduledCourt || "court-1";
-  sharedData.dispatchedReferees = new Set();
   sharedData.set(`match:${overrides.matchId || 1}`, {
     id: overrides.matchId || 1,
     tournament_id: overrides.competitionId || 1,
@@ -150,20 +171,42 @@ const masterActor = { actorId: "master-1", actorType: "master" };
 // Tests
 // ---------------------------------------------------------------------------
 
-test("concurrent dispatch same referee: second call fails roster check", async () => {
+test("concurrent dispatch same referee: second call fails active reservation check", async () => {
   resetData();
 
   const result1 = await dispatchService.dispatch(1, 1, {
-    courtId: "court-1", refereeId: "referee-1", correlationId: "corr-1"
+    courtId: "court-1", refereeId: "referee-1", correlationId: "corr-1", expectedVersion: 0
   }, masterActor);
 
   assert.equal(result1.idempotent, false);
   assert.equal(result1.match.status, "assigned");
 
-  // After first dispatch, mark referee as dispatched in mock
-  sharedData.dispatchedReferees.add("referee-1");
+  // Reset match 2 to idle for second attempt
+  sharedData.set("match:2", {
+    id: 2, tournament_id: 1, referee_id: null, status: "idle",
+    score1: null, score2: null, dispatch_id: null, dispatch_version: null,
+    assigned_at: null, responsibility_accepted_at: null,
+    result_confirmed_at: null, result_confirmed_by: null
+  });
 
-  // Reset match to idle for second attempt (different match)
+  // Second dispatch with same referee → fails because active reservation exists
+  await assert.rejects(
+    () => dispatchService.dispatch(1, 2, {
+      courtId: "court-1", refereeId: "referee-1", correlationId: "corr-2", expectedVersion: 0
+    }, masterActor),
+    /REFEREE_CONFLICT|active dispatch reservation/
+  );
+});
+
+test("concurrent dispatch same court: second call fails active reservation check", async () => {
+  resetData();
+
+  const result1 = await dispatchService.dispatch(1, 1, {
+    courtId: "court-1", refereeId: "referee-1", correlationId: "corr-court-1", expectedVersion: 0
+  }, masterActor);
+  assert.equal(result1.idempotent, false);
+
+  // Reset match 2 for second attempt (different referee, same court)
   sharedData.set("match:2", {
     id: 2, tournament_id: 1, referee_id: null, status: "idle",
     score1: null, score2: null, dispatch_id: null, dispatch_version: null,
@@ -173,9 +216,9 @@ test("concurrent dispatch same referee: second call fails roster check", async (
 
   await assert.rejects(
     () => dispatchService.dispatch(1, 2, {
-      courtId: "court-1", refereeId: "referee-1", correlationId: "corr-2"
+      courtId: "court-1", refereeId: "referee-2", correlationId: "corr-court-2", expectedVersion: 0
     }, masterActor),
-    /not eligible|not in the competition roster/
+    /COURT_CONFLICT|active dispatch reservation/
   );
 });
 
@@ -203,12 +246,23 @@ test("stale expectedVersion: full rollback, no writes", async () => {
   assert.equal(reservationCount, 0);
 });
 
+test("missing expectedVersion: rejected with VALIDATION_ERROR", async () => {
+  resetData({ matchId: 11 });
+
+  await assert.rejects(
+    () => dispatchService.dispatch(1, 11, {
+      courtId: "court-1", refereeId: "referee-1", correlationId: "corr-no-ver"
+    }, masterActor),
+    /Valid expectedVersion is required/
+  );
+});
+
 test("forced failure: transaction rollback leaves no partial writes", async () => {
   resetData({ matchId: 20 });
 
   // Monkey-patch to force failure after reservation creation
-  const origCreateReservation = require("../repositories/competition-referee.repository").createReservation;
   const repo = require("../repositories/competition-referee.repository");
+  const origCreateReservation = repo.createReservation;
   let reservationAttempted = false;
   repo.createReservation = async () => {
     reservationAttempted = true;
@@ -218,7 +272,7 @@ test("forced failure: transaction rollback leaves no partial writes", async () =
   try {
     await assert.rejects(
       () => dispatchService.dispatch(1, 20, {
-        courtId: "court-1", refereeId: "referee-1", correlationId: "corr-force"
+        courtId: "court-1", refereeId: "referee-1", correlationId: "corr-force", expectedVersion: 0
       }, masterActor),
       /Forced failure/
     );
@@ -253,7 +307,7 @@ test("FOR UPDATE lock: dispatch queries match row with FOR UPDATE", async () => 
 
   try {
     await dispatchService.dispatch(1, 30, {
-      courtId: "court-1", refereeId: "referee-1", correlationId: "corr-lock"
+      courtId: "court-1", refereeId: "referee-1", correlationId: "corr-lock", expectedVersion: 0
     }, masterActor);
   } finally {
     db.withTransaction = origWithTransaction;
@@ -272,7 +326,7 @@ test("same match cannot be dispatched twice: second is idempotent", async () => 
   resetData({ matchId: 40 });
 
   const result1 = await dispatchService.dispatch(1, 40, {
-    courtId: "court-1", refereeId: "referee-1", correlationId: "corr-same"
+    courtId: "court-1", refereeId: "referee-1", correlationId: "corr-same", expectedVersion: 0
   }, masterActor);
 
   assert.equal(result1.idempotent, false);
@@ -280,7 +334,7 @@ test("same match cannot be dispatched twice: second is idempotent", async () => 
 
   // Same correlationId → idempotent return
   const result2 = await dispatchService.dispatch(1, 40, {
-    courtId: "court-1", refereeId: "referee-1", correlationId: "corr-same"
+    courtId: "court-1", refereeId: "referee-1", correlationId: "corr-same", expectedVersion: 0
   }, masterActor);
 
   assert.equal(result2.idempotent, true);
@@ -290,13 +344,16 @@ test("withdraw releases dispatch and resets match", async () => {
   resetData({ matchId: 50 });
 
   await dispatchService.dispatch(1, 50, {
-    courtId: "court-1", refereeId: "referee-1", correlationId: "corr-wd"
+    courtId: "court-1", refereeId: "referee-1", correlationId: "corr-wd", expectedVersion: 0
   }, masterActor);
 
   const match = sharedData.get("match:50");
   assert.equal(match.status, "assigned");
+  assert.equal(match.dispatch_version, 1);
 
-  const result = await dispatchService.withdrawDispatch(1, 50, masterActor, { reason: "test" });
+  const result = await dispatchService.withdrawDispatch(1, 50, masterActor, {
+    reason: "test", expectedVersion: 1
+  });
   assert.equal(result.match.status, "upcoming");
 });
 
@@ -304,10 +361,12 @@ test("reassign atomically swaps referee", async () => {
   resetData({ matchId: 60 });
 
   await dispatchService.dispatch(1, 60, {
-    courtId: "court-1", refereeId: "referee-1", correlationId: "corr-re"
+    courtId: "court-1", refereeId: "referee-1", correlationId: "corr-re", expectedVersion: 0
   }, masterActor);
 
-  const result = await dispatchService.reassignDispatch(1, 60, "referee-2", masterActor);
+  const result = await dispatchService.reassignDispatch(1, 60, "referee-2", masterActor, {
+    reason: "test", expectedVersion: 1
+  });
   assert.equal(result.match.refereeId, "referee-2");
 });
 
@@ -316,7 +375,7 @@ test("completed competition rejects dispatch", async () => {
 
   await assert.rejects(
     () => dispatchService.dispatch(1, 70, {
-      courtId: "court-1", refereeId: "referee-1", correlationId: "corr-completed"
+      courtId: "court-1", refereeId: "referee-1", correlationId: "corr-completed", expectedVersion: 0
     }, masterActor),
     /not available/i
   );
@@ -326,7 +385,7 @@ test("restart reconstruction: state persisted in match and reservation", async (
   resetData({ matchId: 80 });
 
   await dispatchService.dispatch(1, 80, {
-    courtId: "court-1", refereeId: "referee-1", correlationId: "corr-restart"
+    courtId: "court-1", refereeId: "referee-1", correlationId: "corr-restart", expectedVersion: 0
   }, masterActor);
 
   const match = sharedData.get("match:80");
@@ -345,4 +404,5 @@ test("restart reconstruction: state persisted in match and reservation", async (
   assert.ok(reservation, "Reservation must exist");
   assert.equal(reservation.referee_id, "referee-1");
   assert.equal(reservation.rejected_at, null);
+  assert.equal(reservation.competition_id, 1);
 });

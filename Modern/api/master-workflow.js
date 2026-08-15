@@ -54,12 +54,12 @@ router.post("/:competitionId/matches/:matchId/dispatch", async (req, res) => {
 // Withdraw dispatch: Master can withdraw an assigned dispatch
 router.post("/:competitionId/matches/:matchId/withdraw", async (req, res) => {
   try {
-    const { reason } = req.body;
+    const { reason, expectedVersion } = req.body;
     const result = await service.withdrawDispatch(
       req.params.competitionId,
       req.params.matchId,
       req.actor,
-      { reason }
+      { reason, expectedVersion }
     );
     res.json(result);
   } catch (error) {
@@ -71,13 +71,13 @@ router.post("/:competitionId/matches/:matchId/withdraw", async (req, res) => {
 // Reassign dispatch: Master can reassign to a different referee while waiting
 router.post("/:competitionId/matches/:matchId/reassign", async (req, res) => {
   try {
-    const { newRefereeId, reason } = req.body;
+    const { newRefereeId, reason, expectedVersion, correlationId } = req.body;
     const result = await service.reassignDispatch(
       req.params.competitionId,
       req.params.matchId,
       newRefereeId,
       req.actor,
-      { reason }
+      { reason, expectedVersion, correlationId }
     );
     res.json(result);
   } catch (error) {

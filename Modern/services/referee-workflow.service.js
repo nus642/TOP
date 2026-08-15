@@ -19,15 +19,15 @@ function refereeActor(value) {
 
 // Accept: unified authority through dispatch service.
 // Handles both dispatch-tracked and simple assign acceptance.
-function acceptMatch(tournamentId, refereeValue, matchId) {
+function acceptMatch(tournamentId, refereeValue, matchId, data = {}) {
   const actor = refereeActor(refereeValue);
-  return dispatchService.acceptDispatch(tournamentId, matchId, actor);
+  return dispatchService.acceptDispatch(tournamentId, matchId, actor, data);
 }
 
 // Accept dispatch: same authority as acceptMatch (unified)
-function acceptDispatch(tournamentId, refereeValue, matchId) {
+function acceptDispatch(tournamentId, refereeValue, matchId, data = {}) {
   const actor = refereeActor(refereeValue);
-  return dispatchService.acceptDispatch(tournamentId, matchId, actor);
+  return dispatchService.acceptDispatch(tournamentId, matchId, actor, data);
 }
 
 function recordScore(tournamentId, refereeValue, matchId, data = {}) {

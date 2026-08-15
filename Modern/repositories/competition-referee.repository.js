@@ -15,6 +15,7 @@ function mapReservation(row) {
   return row && {
     id: row.id,
     dispatchId: row.dispatch_id,
+    competitionId: row.competition_id,
     matchId: row.match_id,
     courtId: row.court_id,
     refereeId: row.referee_id,
@@ -99,14 +100,14 @@ async function updateRefereeStatus(competitionId, refereeId, updates, connection
 // --- Referee Dispatch Reservations ---
 
 async function createReservation(dispatchId, data, connection = db) {
-  const { matchId, courtId, refereeId, expectedVersion, correlationId } = data;
+  const { matchId, courtId, refereeId, expectedVersion, correlationId, competitionId } = data;
   
   try {
     await connection.query(
       `INSERT INTO referee_dispatch_reservations 
-         (dispatch_id, match_id, court_id, referee_id, expected_version, correlation_id)
-       VALUES (?, ?, ?, ?, ?, ?)`,
-      [dispatchId, matchId, courtId, refereeId, expectedVersion, correlationId]
+         (dispatch_id, match_id, court_id, referee_id, expected_version, correlation_id, competition_id)
+       VALUES (?, ?, ?, ?, ?, ?, ?)`,
+      [dispatchId, matchId, courtId, refereeId, expectedVersion, correlationId, competitionId]
     );
     return findByDispatchId(dispatchId, connection);
   } catch (error) {
@@ -164,29 +165,39 @@ async function findReservationByReferee(refereeId, status, connection = db) {
 }
 
 async function markAccepted(dispatchId, refereeId, connection = db) {
-  await connection.query(
+  const [result] = await connection.query(
     `UPDATE referee_dispatch_reservations 
      SET accepted_at = CURRENT_TIMESTAMP(6)
      WHERE dispatch_id = ? AND referee_id = ? AND accepted_at IS NULL`,
     [dispatchId, refereeId]
   );
+  if (result.affectedRows === 0) {
+    const error = new Error("Reservation acceptance failed: already resolved");
+    error.code = "CONFLICT";
+    throw error;
+  }
   return findByDispatchId(dispatchId, connection);
 }
 
 async function markRejected(dispatchId, refereeId, reason, connection = db) {
-  await connection.query(
+  const [result] = await connection.query(
     `UPDATE referee_dispatch_reservations 
      SET rejected_at = CURRENT_TIMESTAMP(6), rejected_reason = ?
      WHERE dispatch_id = ? AND referee_id = ? AND rejected_at IS NULL`,
     [reason, dispatchId, refereeId]
   );
+  if (result.affectedRows === 0) {
+    const error = new Error("Reservation rejection failed: already resolved");
+    error.code = "CONFLICT";
+    throw error;
+  }
   return findByDispatchId(dispatchId, connection);
 }
 
-async function findByCorrelationId(correlationId, connection = db) {
+async function findByCorrelationId(competitionId, correlationId, connection = db) {
   const [rows] = await connection.query(
-    `SELECT * FROM referee_dispatch_reservations WHERE correlation_id = ?`,
-    [correlationId]
+    `SELECT * FROM referee_dispatch_reservations WHERE competition_id = ? AND correlation_id = ?`,
+    [competitionId, correlationId]
   );
   return mapReservation(rows[0]);
 }
@@ -196,6 +207,33 @@ async function deleteReservation(dispatchId, connection = db) {
     `DELETE FROM referee_dispatch_reservations WHERE dispatch_id = ?`,
     [dispatchId]
   );
+}
+
+// Active reservation conflict checks (FOR UPDATE within transaction)
+async function findActiveReservationByCourt(courtId, competitionId, connection) {
+  const [rows] = await connection.query(
+    `SELECT r.* FROM referee_dispatch_reservations r
+     JOIN matches m ON r.match_id = m.id
+     WHERE r.court_id = ? AND r.competition_id = ?
+       AND r.accepted_at IS NULL AND r.rejected_at IS NULL
+       AND m.status = 'assigned'
+     LIMIT 1 FOR UPDATE`,
+    [courtId, competitionId]
+  );
+  return mapReservation(rows[0]);
+}
+
+async function findActiveReservationByReferee(refereeId, competitionId, connection) {
+  const [rows] = await connection.query(
+    `SELECT r.* FROM referee_dispatch_reservations r
+     JOIN matches m ON r.match_id = m.id
+     WHERE r.referee_id = ? AND r.competition_id = ?
+       AND r.accepted_at IS NULL AND r.rejected_at IS NULL
+       AND m.status = 'assigned'
+     LIMIT 1 FOR UPDATE`,
+    [refereeId, competitionId]
+  );
+  return mapReservation(rows[0]);
 }
 
 module.exports = {
@@ -213,5 +251,8 @@ module.exports = {
   markAccepted,
   markRejected,
   findByCorrelationId,
-  deleteReservation
+  deleteReservation,
+  // Active reservation conflict checks
+  findActiveReservationByCourt,
+  findActiveReservationByReferee
 };

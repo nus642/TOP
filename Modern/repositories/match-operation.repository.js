@@ -107,21 +107,31 @@ async function assign(tournamentId, matchId, refereeId, connection = db) {
 }
 
 async function acceptResponsibility(tournamentId, matchId, connection = db) {
-  await connection.query(
+  const [result] = await connection.query(
     `UPDATE matches SET responsibility_accepted_at = CURRENT_TIMESTAMP, status = 'accepted'
-     WHERE tournament_id = ? AND id = ?`, [tournamentId, matchId]
+     WHERE tournament_id = ? AND id = ? AND status = 'assigned'`, [tournamentId, matchId]
   );
+  if (result.affectedRows === 0) {
+    const error = new Error("Accept responsibility failed: match state changed");
+    error.code = "CONFLICT";
+    throw error;
+  }
   return findById(tournamentId, matchId, connection);
 }
 
 async function dispatch(tournamentId, matchId, data, connection = db) {
   const { dispatchId, dispatchVersion, refereeId } = data;
-  await connection.query(
+  const [result] = await connection.query(
     `UPDATE matches SET referee_id = ?, assigned_at = CURRENT_TIMESTAMP, 
        dispatch_id = ?, dispatch_version = ?, status = 'assigned'
-     WHERE tournament_id = ? AND id = ?`,
+     WHERE tournament_id = ? AND id = ? AND status IN ('idle', 'upcoming')`,
     [refereeId, dispatchId, dispatchVersion, tournamentId, matchId]
   );
+  if (result.affectedRows === 0) {
+    const error = new Error("Dispatch failed: match state changed");
+    error.code = "CONFLICT";
+    throw error;
+  }
   return findById(tournamentId, matchId, connection);
 }
 
@@ -141,21 +151,31 @@ async function acceptDispatch(tournamentId, matchId, dispatchId, connection = db
 }
 
 async function withdrawDispatch(tournamentId, matchId, connection = db) {
-  await connection.query(
+  const [result] = await connection.query(
     `UPDATE matches SET dispatch_id = NULL, dispatch_version = NULL,
        referee_id = NULL, assigned_at = NULL, status = 'upcoming'
      WHERE tournament_id = ? AND id = ? AND status = 'assigned' AND dispatch_id IS NOT NULL`,
     [tournamentId, matchId]
   );
+  if (result.affectedRows === 0) {
+    const error = new Error("Withdraw failed: match state changed");
+    error.code = "CONFLICT";
+    throw error;
+  }
   return findById(tournamentId, matchId, connection);
 }
 
 async function reassignDispatch(tournamentId, matchId, newRefereeId, connection = db) {
-  await connection.query(
+  const [result] = await connection.query(
     `UPDATE matches SET referee_id = ?, dispatch_version = dispatch_version + 1
      WHERE tournament_id = ? AND id = ? AND status = 'assigned' AND dispatch_id IS NOT NULL`,
     [newRefereeId, tournamentId, matchId]
   );
+  if (result.affectedRows === 0) {
+    const error = new Error("Reassign failed: match state changed");
+    error.code = "CONFLICT";
+    throw error;
+  }
   return findById(tournamentId, matchId, connection);
 }
 
