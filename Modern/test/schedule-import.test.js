@@ -267,6 +267,62 @@ test("rejects empty round with no matches", () => {
   assert.ok(errors.some((e) => e.message.includes("Round must not be empty")));
 });
 
+// ─── Null-row safety: must produce row-level errors, not TypeError ──────────
+
+test("validateImportData reports row error for null player row", () => {
+  const data = makeMinimalImport();
+  data.players.splice(1, 0, null);
+  const { errors } = validateImportData(data);
+  assert.ok(errors.some((e) => e.row === "players[1]" && e.message.includes("object")),
+    `Expected row-level error, got: ${JSON.stringify(errors)}`);
+});
+
+test("validateImportData reports row error for null pair row", () => {
+  const data = makeMinimalImport();
+  data.pairs.splice(0, 0, null);
+  const { errors } = validateImportData(data);
+  assert.ok(errors.some((e) => e.row === "pairs[0]" && e.message.includes("object")),
+    `Expected row-level error, got: ${JSON.stringify(errors)}`);
+});
+
+test("validateImportData reports row error for null round row", () => {
+  const data = makeMinimalImport();
+  data.rounds.splice(0, 0, null);
+  const { errors } = validateImportData(data);
+  assert.ok(errors.some((e) => e.row === "rounds[0]" && e.message.includes("object")),
+    `Expected row-level error, got: ${JSON.stringify(errors)}`);
+});
+
+test("validateImportData reports row error for null match row", () => {
+  const data = makeMinimalImport();
+  data.rounds[0].matches.splice(0, 0, null);
+  const { errors } = validateImportData(data);
+  assert.ok(errors.some((e) => e.row === "rounds[0].matches[0]" && e.message.includes("object")),
+    `Expected row-level error, got: ${JSON.stringify(errors)}`);
+});
+
+test("validateImportData skips null pair in pairLookup without crashing", () => {
+  const data = makeMinimalImport();
+  data.pairs.push(null);
+  // Should not throw — null pair is reported as error, pairLookup skips it
+  const { errors } = validateImportData(data);
+  assert.ok(errors.some((e) => e.row === "pairs[2]" && e.message.includes("object")));
+  // Other valid pairs should still be checked normally
+  assert.ok(!errors.some((e) => e.message.includes("does not match any declared pair")));
+});
+
+test("importSchedule returns VALIDATION_ERROR (not 500) for null match row", async () => {
+  setupMocks();
+  try {
+    const data = makeMinimalImport();
+    data.rounds[0].matches.splice(0, 0, null);
+    await assert.rejects(
+      () => importSchedule(1, data, MASTER_ACTOR),
+      (err) => err.code === "VALIDATION_ERROR"
+    );
+  } finally { restoreMocks(); }
+});
+
 // ─── Blocking review fix #3: strict fixed-pair validation ──────────────────
 
 test("rejects player not belonging to any pair in fixed-pair mode", () => {

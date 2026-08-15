@@ -79,6 +79,10 @@ function validateImportData(data) {
   for (let i = 0; i < data.players.length; i++) {
     const p = data.players[i];
     const row = `players[${i}]`;
+    if (!p || typeof p !== "object") {
+      errors.push({ row, message: "Player row must be an object" });
+      continue;
+    }
     if (!p.name || typeof p.name !== "string" || !p.name.trim()) {
       errors.push({ row, message: "Player name is required" });
       continue;
@@ -102,6 +106,10 @@ function validateImportData(data) {
     for (let i = 0; i < data.pairs.length; i++) {
       const pair = data.pairs[i];
       const row = `pairs[${i}]`;
+      if (!pair || typeof pair !== "object") {
+        errors.push({ row, message: "Pair row must be an object" });
+        continue;
+      }
       if (!pair.name || typeof pair.name !== "string" || !pair.name.trim()) {
         errors.push({ row, message: "Pair name is required" });
         continue;
@@ -140,6 +148,7 @@ function validateImportData(data) {
   const pairLookup = new Set();
   if (Array.isArray(data.pairs)) {
     for (const pair of data.pairs) {
+      if (!pair || typeof pair !== "object" || !pair.name || typeof pair.name !== "string") continue;
       const names = pair.name.split(" & ").map((s) => s.trim()).sort();
       pairLookup.add(names.join(" & "));
     }
@@ -153,6 +162,10 @@ function validateImportData(data) {
     const round = data.rounds[r];
     const roundLabel = `rounds[${r}]`;
 
+    if (!round || typeof round !== "object") {
+      errors.push({ row: roundLabel, message: "Round row must be an object" });
+      continue;
+    }
     if (!Array.isArray(round.matches)) {
       errors.push({ row: roundLabel, message: "Round must contain a matches array" });
       continue;
@@ -165,6 +178,12 @@ function validateImportData(data) {
     for (let m = 0; m < round.matches.length; m++) {
       const match = round.matches[m];
       const row = `${roundLabel}.matches[${m}]`;
+
+      if (!match || typeof match !== "object") {
+        errors.push({ row, message: "Match row must be an object" });
+        continue;
+      }
+
       totalMatches++;
 
       // Normalize court and scheduledAt before validation
