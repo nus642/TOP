@@ -22,7 +22,9 @@ function map(row) {
     referee: {
       refereeId: row.referee_id,
       assignedAt: timestamp(row.assigned_at),
-      responsibilityAcceptedAt: timestamp(row.responsibility_accepted_at)
+      responsibilityAcceptedAt: timestamp(row.responsibility_accepted_at),
+      dispatchId: row.dispatch_id,
+      dispatchVersion: row.dispatch_version
     },
     operationStatus: row.operation_status,
     resultConfirmedAt: timestamp(row.result_confirmed_at)

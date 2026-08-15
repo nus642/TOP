@@ -13,6 +13,7 @@ const masterOperationalVisibilityRoutes = require("./api/master-operational-visi
 const masterWorkflowRoutes = require("./api/master-workflow");
 const participantReadinessRoutes = require("./api/participant-readiness");
 const refereeWorkflowRoutes = require("./api/referee-workflow");
+const refereeCoordinationRoutes = require("./api/referee-coordination");
 const publicMatchScoreboardRoutes = require("./api/public-match-scoreboard");
 const competitionArchiveRoutes = require("./api/competition-archive");
 const { createActorSessionStore } = require("./session/actor-session");
@@ -41,6 +42,7 @@ function createApp({ actorSessions = createActorSessionStore() } = {}) {
   app.use("/api/master-workflow", requireActorSession(actorSessions), masterWorkflowRoutes);
   app.use("/api/participant-readiness", requireActorSession(actorSessions), participantReadinessRoutes);
   app.use("/api/referee-workflow", requireActorSession(actorSessions), refereeWorkflowRoutes);
+  app.use("/api/referee-coordination", requireActorSession(actorSessions), refereeCoordinationRoutes);
   app.use("/api/public/competitions", publicMatchScoreboardRoutes);
   app.use("/api/public/competitions", competitionArchiveRoutes);
 

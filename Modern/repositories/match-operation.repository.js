@@ -112,6 +112,46 @@ async function acceptResponsibility(tournamentId, matchId, connection = db) {
   return findById(tournamentId, matchId, connection);
 }
 
+async function dispatch(tournamentId, matchId, data, connection = db) {
+  const { dispatchId, dispatchVersion, refereeId } = data;
+  await connection.query(
+    `UPDATE matches SET referee_id = ?, assigned_at = CURRENT_TIMESTAMP, 
+       dispatch_id = ?, dispatch_version = ?, status = 'waiting_acceptance'
+     WHERE tournament_id = ? AND id = ?`,
+    [refereeId, dispatchId, dispatchVersion, tournamentId, matchId]
+  );
+  return findById(tournamentId, matchId, connection);
+}
+
+async function acceptDispatch(tournamentId, matchId, dispatchId, connection = db) {
+  await connection.query(
+    `UPDATE matches SET dispatch_version = dispatch_version + 1,
+       responsibility_accepted_at = CURRENT_TIMESTAMP, status = 'accepted'
+     WHERE tournament_id = ? AND id = ? AND dispatch_id = ?`,
+    [tournamentId, matchId, dispatchId]
+  );
+  return findById(tournamentId, matchId, connection);
+}
+
+async function withdrawDispatch(tournamentId, matchId, connection = db) {
+  await connection.query(
+    `UPDATE matches SET dispatch_id = NULL, dispatch_version = NULL,
+       referee_id = NULL, assigned_at = NULL, status = 'upcoming'
+     WHERE tournament_id = ? AND id = ? AND status = 'waiting_acceptance'`,
+    [tournamentId, matchId]
+  );
+  return findById(tournamentId, matchId, connection);
+}
+
+async function reassignDispatch(tournamentId, matchId, newRefereeId, connection = db) {
+  await connection.query(
+    `UPDATE matches SET referee_id = ?, dispatch_version = dispatch_version + 1
+     WHERE tournament_id = ? AND id = ? AND status = 'waiting_acceptance'`,
+    [newRefereeId, tournamentId, matchId]
+  );
+  return findById(tournamentId, matchId, connection);
+}
+
 async function start(tournamentId, matchId, connection = db) {
   await connection.query(
     `UPDATE matches SET started_at = CURRENT_TIMESTAMP, status = 'playing'
@@ -164,6 +204,10 @@ module.exports = {
   findByReferee,
   assign,
   acceptResponsibility,
+  dispatch,
+  acceptDispatch,
+  withdrawDispatch,
+  reassignDispatch,
   start,
   recordScore,
   interrupt,

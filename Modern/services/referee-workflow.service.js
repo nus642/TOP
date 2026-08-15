@@ -1,4 +1,5 @@
 const matchOperationsService = require("./match-operations.service");
+const dispatchService = require("./dispatch.service");
 
 // This module provides referee operational access while Match Operations
 // remains the authority for match execution.
@@ -23,6 +24,12 @@ function acceptMatch(tournamentId, refereeValue, matchId) {
   });
 }
 
+// Accept dispatch: Only the assigned Referee can accept a waiting_acceptance dispatch
+function acceptDispatch(tournamentId, refereeValue, matchId) {
+  const actor = refereeActor(refereeValue);
+  return dispatchService.acceptDispatch(tournamentId, matchId, actor);
+}
+
 function recordScore(tournamentId, refereeValue, matchId, data = {}) {
   const actor = refereeActor(refereeValue);
   return matchOperationsService.submitResult(
@@ -45,4 +52,4 @@ function resumeMatch(tournamentId, refereeValue, matchId, data = {}) {
   return matchOperationsService.resumeMatch(tournamentId, matchId, refereeActor(refereeValue), data);
 }
 
-module.exports = { acceptMatch, startMatch, recordScore, interruptMatch, resumeMatch };
+module.exports = { acceptMatch, acceptDispatch, startMatch, recordScore, interruptMatch, resumeMatch };

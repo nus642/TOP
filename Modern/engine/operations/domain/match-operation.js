@@ -4,6 +4,7 @@ const STATES = Object.freeze({
   IDLE: "idle",
   UPCOMING: "upcoming",
   ASSIGNED: "assigned", // Referee responsibility is established.
+  WAITING_ACCEPTANCE: "waiting_acceptance", // Dispatch sent, waiting for referee acceptance.
   ACCEPTED: "accepted", // The assigned Referee acknowledged responsibility.
   PLAYING: "playing", // Match execution is in progress.
   INTERRUPTED: "interrupted", // The assigned Referee explicitly paused execution.
@@ -30,6 +31,8 @@ class MatchOperation {
     this.status = record.status || STATES.IDLE;
     this.score1 = record.score1 ?? null;
     this.score2 = record.score2 ?? null;
+    this.dispatchId = record.dispatchId || null;
+    this.dispatchVersion = record.dispatchVersion ?? null;
   }
 
   assign(refereeId) {
@@ -39,6 +42,64 @@ class MatchOperation {
     }
     this.refereeId = refereeId;
     this.status = STATES.ASSIGNED;
+    return this;
+  }
+
+  // Dispatch a match to a referee. The match enters waiting_acceptance status.
+  dispatch(refereeId, dispatchId, expectedVersion) {
+    required(refereeId, "refereeId");
+    required(dispatchId, "dispatchId");
+    if (![STATES.IDLE, STATES.UPCOMING, STATES.ASSIGNED].includes(this.status)) {
+      throw new OperationsError("INVALID_OPERATION_STATE", "Only idle/upcoming/assigned matches can be dispatched");
+    }
+    if (this.dispatchId && this.dispatchId !== dispatchId) {
+      throw new OperationsError("DISPATCH_CONFLICT", "Match already has an active dispatch");
+    }
+    this.refereeId = refereeId;
+    this.dispatchId = dispatchId;
+    this.dispatchVersion = expectedVersion;
+    this.status = STATES.WAITING_ACCEPTANCE;
+    return this;
+  }
+
+  // Accept a waiting dispatch. Only the assigned referee can accept.
+  acceptDispatch(refereeId, expectedVersion) {
+    this.assertAssignedReferee(refereeId);
+    if (this.status !== STATES.WAITING_ACCEPTANCE) {
+      throw new OperationsError("INVALID_OPERATION_STATE", "Match is not waiting for acceptance");
+    }
+    if (this.dispatchVersion !== expectedVersion) {
+      throw new OperationsError("STALE_DISPATCH_VERSION", "Dispatch version mismatch");
+    }
+    this.status = STATES.ACCEPTED;
+    return this;
+  }
+
+  // Withdraw a waiting dispatch. Match returns to upcoming status.
+  withdrawDispatch() {
+    if (this.status !== STATES.WAITING_ACCEPTANCE) {
+      throw new OperationsError("INVALID_OPERATION_STATE", "Only waiting_acceptance matches can be withdrawn");
+    }
+    this.refereeId = null;
+    this.dispatchId = null;
+    this.dispatchVersion = null;
+    this.status = STATES.UPCOMING;
+    return this;
+  }
+
+  // Reassign a waiting dispatch to a different referee.
+  reassignDispatch(newRefereeId, newDispatchId, expectedVersion) {
+    required(newRefereeId, "newRefereeId");
+    required(newDispatchId, "newDispatchId");
+    if (this.status !== STATES.WAITING_ACCEPTANCE) {
+      throw new OperationsError("INVALID_OPERATION_STATE", "Only waiting_acceptance matches can be reassigned");
+    }
+    if (this.dispatchVersion !== expectedVersion) {
+      throw new OperationsError("STALE_DISPATCH_VERSION", "Dispatch version mismatch");
+    }
+    this.refereeId = newRefereeId;
+    this.dispatchId = newDispatchId;
+    this.dispatchVersion = expectedVersion + 1;
     return this;
   }
 

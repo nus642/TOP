@@ -72,17 +72,26 @@ CREATE TABLE IF NOT EXISTS matches (
     score2 INT DEFAULT NULL,
     referee_id VARCHAR(100) DEFAULT NULL,
     assigned_at TIMESTAMP NULL DEFAULT NULL,
+    dispatch_id VARCHAR(100) DEFAULT NULL,
+    dispatch_version BIGINT DEFAULT NULL,
     responsibility_accepted_at TIMESTAMP NULL DEFAULT NULL,
     started_at TIMESTAMP NULL DEFAULT NULL,
     result_confirmed_at TIMESTAMP NULL DEFAULT NULL,
     result_confirmed_by VARCHAR(100) DEFAULT NULL,
-    status ENUM('idle','upcoming','assigned','accepted','playing','interrupted','scored','awaiting_confirmation','confirmed','finished') DEFAULT 'idle',
+    status ENUM('idle','upcoming','assigned','waiting_acceptance','accepted','playing','interrupted','scored','awaiting_confirmation','confirmed','finished') DEFAULT 'idle',
     FOREIGN KEY (tournament_id) REFERENCES tournaments(id) ON DELETE CASCADE
 ) DEFAULT CHARSET=utf8mb4;
 
 -- Additive upgrade for databases created before M2.
 ALTER TABLE matches MODIFY COLUMN status
     ENUM('idle','upcoming','assigned','accepted','playing','interrupted','scored','awaiting_confirmation','confirmed','finished') DEFAULT 'idle';
+
+-- M2 Competition Referee Roster and Atomic Dispatch support.
+-- Upgrade path for databases created before dispatch coordination.
+ALTER TABLE matches 
+  MODIFY COLUMN status ENUM('idle','upcoming','assigned','waiting_acceptance','accepted','playing','interrupted','scored','awaiting_confirmation','confirmed','finished') DEFAULT 'idle',
+  ADD COLUMN IF NOT EXISTS dispatch_id VARCHAR(100) DEFAULT NULL AFTER assigned_at,
+  ADD COLUMN IF NOT EXISTS dispatch_version BIGINT DEFAULT NULL AFTER dispatch_id;
 
 -- M2 Court Management authority. Schedule court references remain the source of
 -- known Courts; these rows contain only mutable operating truth.
@@ -118,6 +127,41 @@ CREATE TABLE IF NOT EXISTS court_disruptions (
     FOREIGN KEY (tournament_id) REFERENCES tournaments(id) ON DELETE CASCADE,
     FOREIGN KEY (affected_match_id) REFERENCES matches(id) ON DELETE SET NULL,
     INDEX ix_court_disruptions_open (tournament_id, court_id, disposition)
+) DEFAULT CHARSET=utf8mb4;
+
+-- M2 Competition Referee Roster. The Master controls which referees can be
+-- assigned to matches in this competition. Only active and eligible referees
+-- are dispatch candidates.
+CREATE TABLE IF NOT EXISTS competition_referees (
+    id BIGINT PRIMARY KEY AUTO_INCREMENT,
+    competition_id INT NOT NULL,
+    referee_id VARCHAR(100) NOT NULL,
+    active BOOLEAN NOT NULL DEFAULT TRUE,
+    eligible BOOLEAN NOT NULL DEFAULT TRUE,
+    created_at TIMESTAMP(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
+    FOREIGN KEY (competition_id) REFERENCES tournaments(id) ON DELETE CASCADE,
+    UNIQUE KEY uq_competition_referees (competition_id, referee_id),
+    INDEX ix_competition_referees_active (competition_id, active, eligible)
+) DEFAULT CHARSET=utf8mb4;
+
+-- M2 Referee Dispatch Reservations. Each dispatch creates one reservation row.
+-- The dispatch is atomic: either all changes commit together, or all rollback.
+-- The reservation tracks which referee accepted and when, and provides idempotency
+-- through the correlation_id.
+CREATE TABLE IF NOT EXISTS referee_dispatch_reservations (
+    id BIGINT PRIMARY KEY AUTO_INCREMENT,
+    dispatch_id VARCHAR(100) NOT NULL,
+    match_id INT NOT NULL,
+    court_id VARCHAR(100) NOT NULL,
+    referee_id VARCHAR(100) NOT NULL,
+    expected_version BIGINT NOT NULL,
+    correlation_id VARCHAR(100) NOT NULL,
+    accepted_at TIMESTAMP(6) DEFAULT NULL,
+    rejected_at TIMESTAMP(6) DEFAULT NULL,
+    rejected_reason VARCHAR(255) DEFAULT NULL,
+    created_at TIMESTAMP(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
+    FOREIGN KEY (match_id) REFERENCES matches(id) ON DELETE CASCADE,
+    UNIQUE KEY uq_dispatch_correlation (correlation_id)
 ) DEFAULT CHARSET=utf8mb4;
 
 CREATE TABLE IF NOT EXISTS tournament_coordination_chronology (
