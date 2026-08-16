@@ -19,7 +19,10 @@ function mapDisruption(row) {
 
 async function findScheduledCourt(tournamentId, matchId, connection = db) {
   const [rows] = await connection.query(
-    `SELECT court_id FROM match_schedules WHERE tournament_id = ? AND match_id = ?`,
+    `SELECT COALESCE(ms.court_id, m.court) AS court_id
+     FROM matches m
+     LEFT JOIN match_schedules ms ON ms.tournament_id = m.tournament_id AND ms.match_id = m.id
+     WHERE m.tournament_id = ? AND m.id = ?`,
     [tournamentId, matchId]);
   return rows[0]?.court_id || null;
 }

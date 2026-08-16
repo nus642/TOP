@@ -274,7 +274,7 @@ SELECT
     m.team1_name,
     m.team2_name,
     ms.scheduled_at,
-    ms.court_id,
+    COALESCE(ms.court_id, m.court) AS court_id,
     m.referee_id,
     m.status AS operation_status,
     m.assigned_at,

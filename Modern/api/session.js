@@ -32,9 +32,11 @@ function requireActorSession(store) {
     // This middleware runs before the mounted router has populated req.params, so
     // compare identity-bearing legacy URL segments at the session boundary.
     const match = req.path.match(/\/(?:referees|participants)\/([^/]+)(?:\/|$)/);
+    const NON_ACTOR_SEGMENTS = new Set(["roster", "eligible", "available-candidates"]);
     let routedActorId;
     try {
-      routedActorId = match && decodeURIComponent(match[1]);
+      const raw = match && decodeURIComponent(match[1]);
+      routedActorId = raw && !NON_ACTOR_SEGMENTS.has(raw) ? raw : null;
     } catch {
       return res.status(401).json({ error: "Workflow actor does not match authenticated session" });
     }
