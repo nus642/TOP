@@ -15,7 +15,10 @@ for (let m = 0; m < 16; m++) {
   const a = pairA * 2;
   const b = pairB * 2;
   const slot = Math.floor(m / 6);
-  const time = `2026-09-12 08:${String(slot * 30).padStart(2, "0")}`;
+  // Slot times via real time arithmetic: 08:00, 08:30, 09:00 (never "08:60")
+  const slotDate = new Date(2026, 8, 12, 8, 0, 0);
+  slotDate.setMinutes(slotDate.getMinutes() + slot * 30);
+  const time = `2026-09-12 ${String(slotDate.getHours()).padStart(2, "0")}:${String(slotDate.getMinutes()).padStart(2, "0")}`;
   lines.push([
     1, `${(m % 6) + 1}号场`, time,
     names[a], names[a + 1], names[b], names[b + 1],

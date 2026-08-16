@@ -77,7 +77,12 @@
     const naive = raw.match(/^(\d{4})[-/](\d{1,2})[-/](\d{1,2})[ T](\d{1,2}):(\d{2})(?::(\d{2}))?$/);
     if (naive) {
       const [, y, mo, d, h, mi, s] = naive;
-      const date = new Date(Number(y), Number(mo) - 1, Number(d), Number(h), Number(mi), Number(s || 0));
+      const hour = Number(h);
+      const minute = Number(mi);
+      const second = Number(s || 0);
+      // Strict boundary guards: reject impossible times before Date rollover
+      if (hour > 23 || minute > 59 || second > 59) return null;
+      const date = new Date(Number(y), Number(mo) - 1, Number(d), hour, minute, second);
       if (Number.isNaN(date.getTime())) return null;
       // Guard against impossible dates rolled over by Date (e.g. month 13)
       if (date.getMonth() !== Number(mo) - 1 || date.getDate() !== Number(d)) return null;
@@ -184,7 +189,7 @@
       if (!court) errors.push({ line: record.line, message: "court 场地名称不能为空" });
       const scheduledAt = parseLocalDateTime(timeRaw);
       if (!scheduledAt) {
-        errors.push({ line: record.line, message: `time 时间格式无法识别：「${timeRaw || "空"}」，请使用如 2026-09-12 08:00` });
+        errors.push({ line: record.line, message: `time 时间无效：「${timeRaw || "空"}」，请使用如 2026-09-12 08:00（小时 00-23，分钟 00-59）` });
       }
       const players = [p1, p2, p3, p4];
       players.forEach((name, side) => {

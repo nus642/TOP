@@ -179,6 +179,42 @@ test("parseLocalDateTime accepts naive local, slash, and ISO forms", () => {
   assert.equal(ImportParser.parseLocalDateTime(""), null);
 });
 
+test("parseLocalDateTime rejects out-of-range hour/minute/second without rollover (B1 regression)", () => {
+  // These must NOT silently roll over via Date (e.g. 08:60 must not become 09:00)
+  assert.equal(ImportParser.parseLocalDateTime("2026-09-12 08:60"), null);
+  assert.equal(ImportParser.parseLocalDateTime("2026-09-12 08:99"), null);
+  assert.equal(ImportParser.parseLocalDateTime("2026-09-12 24:00"), null);
+  assert.equal(ImportParser.parseLocalDateTime("2026-09-12 08:00:60"), null);
+  // Boundaries remain valid
+  assert.ok(ImportParser.parseLocalDateTime("2026-09-12 23:59:59"));
+  assert.ok(ImportParser.parseLocalDateTime("2026-09-12 00:00"));
+});
+
+test("invalid minute in CSV reports the physical line number (B1 regression)", () => {
+  const csv = [
+    HEADER,
+    "1,1号场,2026-09-12 08:00,张伟,李强,王芳,刘敏,张伟 & 李强,王芳 & 刘敏",
+    "1,2号场,2026-09-12 08:60,陈杰,杨丽,赵磊,黄静,陈杰 & 杨丽,赵磊 & 黄静"
+  ].join("\n");
+  const { data, errors } = ImportParser.normalizeCsvToImport(csv);
+  assert.equal(data, null);
+  assert.ok(errors.some((e) => e.line === 3 && e.message.includes("time")));
+  // No match may carry a silently rolled-over scheduledAt
+  const allMatches = (data?.rounds ?? []).flatMap((r) => r.matches);
+  assert.ok(!allMatches.some((m) => m.scheduledAt && m.scheduledAt.includes("09:00")));
+});
+
+test("published sample file contains only legal clock times (B1 regression)", () => {
+  const sample = fs.readFileSync(
+    path.join(__dirname, "..", "operator", "templates", "top-import-sample-32.csv"), "utf8");
+  assert.ok(!/\d{2}:(?:[6-9]\d|\d{3})/.test(sample), "sample must not contain minutes >= 60");
+  const times = sample.split(/\r?\n/).slice(1).filter(Boolean).map((l) => l.split(",")[2]);
+  assert.equal(times.length, 16);
+  for (const t of times) {
+    assert.ok(ImportParser.parseLocalDateTime(t) !== null, `sample time must be legal: ${t}`);
+  }
+});
+
 // ─── Server error mapping and client meta stripping ─────────────────────────
 
 test("stripClientMeta removes __line from the posted payload", () => {
