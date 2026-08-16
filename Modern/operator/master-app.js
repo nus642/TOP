@@ -162,7 +162,20 @@ list.addEventListener("click", async (event) => {
     reassignBtn.textContent = "正在加载候选…";
     try {
       const candidates = await workflow.loadCandidates(matchId, matchId);
-      const referees = candidates.eligibleReferees || [];
+      let referees = candidates.eligibleReferees || [];
+      // 过滤掉当前裁判（换派时当前裁判已被占用，不应出现在候选列表中）
+      const currentArticle = reassignBtn.closest(".match");
+      const currentMatchId = currentArticle?.dataset.matchId;
+      // 从 list 中查找对应比赛的裁判ID（通过 data-match-id 属性匹配）
+      const currentMatchEl = list.querySelector(`.match[data-match-id="${currentMatchId}"]`);
+      const assignmentPara = currentMatchEl?.querySelector(".assignment");
+      // 解析 "裁判：XXX · 派单版本" 格式中的裁判ID
+      const currentRefereeId = assignmentPara
+        ? assignmentPara.textContent.replace("裁判：", "").split(" · ")[0].trim()
+        : null;
+      if (currentRefereeId) {
+        referees = referees.filter(r => r.refereeId !== currentRefereeId);
+      }
       const article = reassignBtn.closest(".match");
       const form = document.createElement("div");
       form.className = "dispatch-form";
