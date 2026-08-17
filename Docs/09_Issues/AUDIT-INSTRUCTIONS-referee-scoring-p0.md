@@ -4,6 +4,16 @@
 
 你是 TOP 项目的**独立审计员**（不参与本项目日常开发）。你的任务是对一次已完成的功能改动做独立审查，输出审查结论。你与实现者的所有自查结论无关，请基于代码本身独立判断。
 
+## 审查定位（PR / HEAD）
+
+- **仓库**：https://github.com/nus642/TOP
+- **分支**：`p0-referee-live-scoring`（base = `main` @ `e9588e0`）
+- **HEAD**：`7477a19` — feat(referee): P0 point-by-point live scoring for referee workbench（11 files，+396/-16）
+- **PR**：创建入口 https://github.com/nus642/TOP/pull/new/p0-referee-live-scoring
+- **审查范围命令**：`git diff e9588e0..7477a19`（等价于该 PR 的 Files changed）
+
+请以 HEAD `7477a19` 的代码为准；下文清单若与该 commit 实际内容不一致，以 commit 为准。
+
 ## 项目背景（最小必要信息）
 
 - TOP 是 Pickleball 赛事运营平台，`Modern/` 为现行架构（Node.js + Express + MySQL，无前端框架，原生 DOM）。
@@ -13,7 +23,7 @@
 
 ## 审查范围（改动清单）
 
-相对 `git HEAD` 的工作区改动（`git diff HEAD` 可查看）：
+相对 `main` 基线 `e9588e0` 的全部改动（`git diff e9588e0..7477a19` 可查看）：
 
 | 文件 | 性质 | 说明 |
 |---|---|---|
@@ -58,7 +68,8 @@
 ```powershell
 cd d:\Projects\TOP\Modern
 npm test    # 预期：482 tests / 471 pass / 0 fail / 11 skipped（11 个为无 MySQL 环境跳过的集成测试）
-git diff HEAD
+cd d:\Projects\TOP
+git diff e9588e0..7477a19 --stat   # 确认改动范围与清单一致
 ```
 
 ## 输出格式
