@@ -30,7 +30,7 @@
       view.busy(action.matchId);
       try {
         if (accountabilityFlow) accountabilityFlow.verify(accountability);
-        if (action.type === "accept") await api.accept(context.tournamentId, context.refereeId, action.matchId);
+        if (action.type === "accept") await api.accept(context.tournamentId, context.refereeId, action.matchId, action.dispatchVersion);
         if (action.type === "start") await api.start(context.tournamentId, context.refereeId, action.matchId);
         if (action.type === "interrupt") await api.interrupt(context.tournamentId, context.refereeId, action.matchId);
         if (action.type === "resume") await api.resume(context.tournamentId, context.refereeId, action.matchId);

@@ -29,7 +29,7 @@ function matchCard(match) {
     confirmed: `<p class="complete">赛果已由比赛操作确认</p>`
   }[match.status] || `<p class="muted">等待比赛操作</p>`;
 
-  return `<article class="match" data-match-id="${escapeHtml(match.id)}">
+  return `<article class="match" data-match-id="${escapeHtml(match.id)}" data-dispatch-version="${match.dispatchVersion ?? 0}">
     <header><div><span class="eyebrow">第 ${escapeHtml(match.roundNum || "—")} 轮</span><h2>${team1} <span>对</span> ${team2}</h2></div><span class="status">${escapeHtml(UiText.statusLabel(match.status))}</span></header>
     <div class="meta"><span>⌖ ${escapeHtml(match.court || "场地待定")}</span><span>◷ ${match.scheduledAt ? escapeHtml(new Date(match.scheduledAt).toLocaleString("zh-CN")) : "时间待定"}</span></div>
     <div class="score"><strong>${score1}</strong><span>正式比分</span><strong>${score2}</strong></div>
@@ -57,7 +57,14 @@ form.addEventListener("submit", async (event) => {
 });
 list.addEventListener("click", (event) => {
   const button = event.target.closest("button[data-action]");
-  if (button) workflow.run({ type: button.dataset.action, matchId: button.closest(".match").dataset.matchId });
+  if (button) {
+    const matchEl = button.closest(".match");
+    workflow.run({
+      type: button.dataset.action,
+      matchId: matchEl.dataset.matchId,
+      dispatchVersion: Number(matchEl.dataset.dispatchVersion || 0)
+    });
+  }
 });
 list.addEventListener("submit", (event) => {
   if (!event.target.matches(".score-form")) return;

@@ -23,9 +23,10 @@
       assignedMatches(tournamentId, refereeId) {
         return request(`/match-operations/${scope(tournamentId, refereeId)}/matches`);
       },
-      accept(tournamentId, refereeId, matchId) {
+      accept(tournamentId, refereeId, matchId, dispatchVersion) {
         return request(`/referee-workflow/${scope(tournamentId, refereeId)}/matches/${encodeURIComponent(matchId)}/accept`, {
-          method: "POST", headers: { "Content-Type": "application/json" }, body: "{}"
+          method: "POST", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ expectedVersion: dispatchVersion ?? 0, correlationId: `accept-${matchId}-${Date.now()}` })
         });
       },
       start(tournamentId, refereeId, matchId) {

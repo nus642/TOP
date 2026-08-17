@@ -27,7 +27,9 @@ function map(row) {
       dispatchVersion: row.dispatch_version
     },
     operationStatus: row.operation_status,
-    resultConfirmedAt: timestamp(row.result_confirmed_at)
+    resultConfirmedAt: timestamp(row.result_confirmed_at),
+    score1: row.score1 != null ? Number(row.score1) : null,
+    score2: row.score2 != null ? Number(row.score2) : null
   };
 }
 

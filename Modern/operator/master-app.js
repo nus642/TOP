@@ -26,6 +26,9 @@ function matchCard(match) {
   const dispatchLabel = UiText.dispatchStatusLabel(dispatchStatus);
   const nextAction = UiText.nextActionLabel(dispatchStatus);
   const version = referee.dispatchVersion ?? 0;
+  const score1 = match.score1 ?? null;
+  const score2 = match.score2 ?? null;
+  const hasScore = score1 !== null && score2 !== null;
 
   let actionHtml = "";
 
@@ -48,6 +51,7 @@ function matchCard(match) {
     <header><div><span class="eyebrow">第 ${escapeHtml(match.roundNumber || "—")} 轮</span><h2>${team1} <span>对</span> ${team2}</h2></div><span class="status">${escapeHtml(dispatchLabel)}</span></header>
     <div class="meta"><span>⌖ ${escapeHtml(schedule.courtId || "场地待定")}</span><span>◷ ${schedule.scheduledAt ? escapeHtml(new Date(schedule.scheduledAt).toLocaleString("zh-CN")) : "时间待定"}</span></div>
     <p class="assignment">裁判：<strong>${escapeHtml(referee.refereeId || "未分配")}</strong> · 派单版本 ${escapeHtml(version)} · 下一步：${escapeHtml(nextAction)}</p>
+    ${hasScore ? `<div class="score"><strong>${escapeHtml(score1)}</strong><span>正式比分</span><strong>${escapeHtml(score2)}</strong></div>` : ""}
     ${actionHtml}
   </article>`;
 }

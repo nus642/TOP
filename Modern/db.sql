@@ -170,8 +170,8 @@ CREATE TABLE IF NOT EXISTS referee_dispatch_reservations (
     expected_version BIGINT NOT NULL,
     correlation_id VARCHAR(100) NOT NULL,
     competition_id INT NOT NULL DEFAULT 0,
-    accepted_at TIMESTAMP(6) DEFAULT NULL,
-    rejected_at TIMESTAMP(6) DEFAULT NULL,
+    accepted_at TIMESTAMP(6) NULL DEFAULT NULL,
+    rejected_at TIMESTAMP(6) NULL DEFAULT NULL,
     rejected_reason VARCHAR(255) DEFAULT NULL,
     created_at TIMESTAMP(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
     FOREIGN KEY (match_id) REFERENCES matches(id) ON DELETE CASCADE,
@@ -281,7 +281,9 @@ SELECT
     m.responsibility_accepted_at,
     m.dispatch_id,
     m.dispatch_version,
-    m.result_confirmed_at
+    m.result_confirmed_at,
+    m.score1,
+    m.score2
 FROM matches m
 JOIN tournaments t ON t.id = m.tournament_id
 LEFT JOIN match_schedules ms

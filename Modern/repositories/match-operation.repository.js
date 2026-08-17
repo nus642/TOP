@@ -41,6 +41,7 @@ function mapRefereeWork(row) {
     score2: row.score2,
     assignedAt: row.assigned_at,
     responsibilityAcceptedAt: row.responsibility_accepted_at,
+    dispatchVersion: row.dispatch_version != null ? Number(row.dispatch_version) : 0,
     resultConfirmedAt: row.result_confirmed_at,
     courtCondition: row.court_condition || (row.court_id ? "available" : null),
     courtVersion: Number(row.court_version || 0),
