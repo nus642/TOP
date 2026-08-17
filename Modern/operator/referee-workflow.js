@@ -36,7 +36,8 @@
         if (action.type === "resume") await api.resume(context.tournamentId, context.refereeId, action.matchId);
         if (action.type === "score") await api.recordScore(context.tournamentId, context.refereeId, action.matchId, action.score);
         await refresh();
-      } catch (error) { view.error(error.message); }
+        return true;
+      } catch (error) { view.error(error.message); return false; }
     }
 
     return {

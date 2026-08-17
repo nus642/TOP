@@ -2,3 +2,7 @@ node_modules/
 .env
 *.log
 rehearsal/.rehearsal-state.json
+
+# Development-only local tooling: never deployed, never committed.
+_check-accounts.js
+public/dev-login.html

@@ -11,14 +11,20 @@ test("operator API client targets only existing referee workflow boundaries", as
   };
   const api = createRefereeApi({ fetchImpl, baseUrl: "/api" });
   await api.assignedMatches(3, "referee/7");
-  await api.accept(3, "referee/7", 9);
+  await api.accept(3, "referee/7", 9, 2);
   await api.start(3, "referee/7", 9);
   await api.interrupt(3, "referee/7", 9);
   await api.resume(3, "referee/7", 9);
   await api.recordScore(3, "referee/7", 9, { score1: 11, score2: 8 });
+  // accept carries the dispatch version for optimistic concurrency plus a
+  // time-based correlation id; assert the shape rather than the timestamp.
+  const acceptBody = JSON.parse(calls[1][2]);
+  assert.equal(acceptBody.expectedVersion, 2);
+  assert.match(acceptBody.correlationId, /^accept-9-\d+$/);
+  calls[1][2] = "accept-body";
   assert.deepEqual(calls, [
     ["/api/match-operations/3/referees/referee%2F7/matches", "GET", undefined],
-    ["/api/referee-workflow/3/referees/referee%2F7/matches/9/accept", "POST", "{}"],
+    ["/api/referee-workflow/3/referees/referee%2F7/matches/9/accept", "POST", "accept-body"],
     ["/api/referee-workflow/3/referees/referee%2F7/matches/9/start", "POST", "{}"],
     ["/api/referee-workflow/3/referees/referee%2F7/matches/9/interrupt", "POST", "{}"],
     ["/api/referee-workflow/3/referees/referee%2F7/matches/9/resume", "POST", "{}"],
