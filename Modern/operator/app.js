@@ -16,7 +16,7 @@ function matchCard(match) {
   const score2 = match.score2 ?? "–";
   const playingAction = ["constrained", "uncertain"].includes(match.courtCondition)
     ? `<p class="notice error">场地${match.courtCondition === "constrained" ? "受限" : "状态待确认"}，请明确中断比赛。</p><button data-action="interrupt">中断比赛</button>`
-    : `<form class="score-form"><label>${team1}<input name="score1" type="number" min="0" required></label><label>${team2}<input name="score2" type="number" min="0" required></label><button>录入比分并结束执行</button></form>`;
+    : RefereeScoring.panelHtml({ matchId: escapeHtml(match.id), team1, team2 });
   const interruptedAction = match.courtCondition === "available"
     ? `<p class="complete">场地已由主控报告恢复，请明确恢复比赛。</p><button data-action="resume">恢复比赛</button>`
     : `<p class="muted">比赛已中断，等待主控报告场地恢复。</p>`;
@@ -45,6 +45,11 @@ const view = {
     notice.textContent = `已加载 ${matches.length} 场已分配比赛。`;
     notice.className = "notice";
     list.innerHTML = matches.length ? matches.map(matchCard).join("") : `<div class="empty"><strong>当前任务已全部处理。</strong><p>目前没有已分配的比赛。</p></div>`;
+    RefereeScoring.mount(list, {
+      onSubmit({ matchId, score }) {
+        return workflow.run({ type: "score", matchId, score });
+      }
+    });
   }
 };
 
@@ -65,13 +70,6 @@ list.addEventListener("click", (event) => {
       dispatchVersion: Number(matchEl.dataset.dispatchVersion || 0)
     });
   }
-});
-list.addEventListener("submit", (event) => {
-  if (!event.target.matches(".score-form")) return;
-  event.preventDefault();
-  const values = new FormData(event.target);
-  workflow.run({ type: "score", matchId: event.target.closest(".match").dataset.matchId,
-    score: { score1: Number(values.get("score1")), score2: Number(values.get("score2")) } });
 });
 
 // Referee identity entry: pick a name from the roster, then establish a session
