@@ -12,7 +12,9 @@ const original = {
     withTransaction: db.withTransaction,
     getCheckInState: checkinRepository.getCheckInState,
     upsertCheckInState: checkinRepository.upsertCheckInState,
+    bulkUpsertReadiness: checkinRepository.bulkUpsertReadiness,
     getPlayerByIdForTournament: playerRepository.getPlayerByIdForTournament,
+    getPlayersByTournament: playerRepository.getPlayersByTournament,
     getTournamentByIdWithConnection: tournamentRepository.getTournamentByIdWithConnection,
     createWaiver: waiverRepository.createWaiver,
     getLatestWaiver: waiverRepository.getLatestWaiver
@@ -34,7 +36,9 @@ test.afterEach(() => {
     db.withTransaction = original.withTransaction;
     checkinRepository.getCheckInState = original.getCheckInState;
     checkinRepository.upsertCheckInState = original.upsertCheckInState;
+    checkinRepository.bulkUpsertReadiness = original.bulkUpsertReadiness;
     playerRepository.getPlayerByIdForTournament = original.getPlayerByIdForTournament;
+    playerRepository.getPlayersByTournament = original.getPlayersByTournament;
     tournamentRepository.getTournamentByIdWithConnection = original.getTournamentByIdWithConnection;
     waiverRepository.createWaiver = original.createWaiver;
     waiverRepository.getLatestWaiver = original.getLatestWaiver;
@@ -142,6 +146,72 @@ test("getCheckInStatus returns unchecked status without a row", async () => {
 test("checkInPlayer rejects missing waiver acceptance", async () => {
     await assert.rejects(
         () => checkinService.checkInPlayer(1, 2, {}),
+        { code: "VALIDATION_ERROR" }
+    );
+});
+
+test("checkInAll bulk checks in every registered player without waivers", async () => {
+    playerRepository.getPlayersByTournament = async (competitionId) => [
+        { id: 101, tournament_id: competitionId, name: "P1" },
+        { id: 102, tournament_id: competitionId, name: "P2" },
+        { id: 103, tournament_id: competitionId, name: "P3" }
+    ];
+    const calls = [];
+    checkinRepository.bulkUpsertReadiness = async (competitionId, playerIds, source) => {
+        calls.push([competitionId, playerIds, source]);
+    };
+    waiverRepository.createWaiver = async () => {
+        throw new Error("bulk check-in must not create waivers");
+    };
+
+    const result = await checkinService.checkInAll(7, { actorId: "master-1", actorType: "master" });
+
+    assert.equal(result.competitionId, 7);
+    assert.equal(result.checkedInCount, 3);
+    assert.deepEqual(calls, [[7, [101, 102, 103], "master-bulk-check-in"]]);
+});
+
+test("checkInAll is idempotent across repeated runs", async () => {
+    playerRepository.getPlayersByTournament = async () => [{ id: 101 }, { id: 102 }];
+    checkinRepository.bulkUpsertReadiness = async () => {};
+
+    const first = await checkinService.checkInAll(7, { actorType: "master" });
+    const second = await checkinService.checkInAll(7, { actorType: "master" });
+
+    assert.equal(first.checkedInCount, 2);
+    assert.equal(second.checkedInCount, 2);
+});
+
+test("checkInAll rejects non-master actors", async () => {
+    await assert.rejects(
+        () => checkinService.checkInAll(7, { actorId: "referee-1", actorType: "referee" }),
+        { code: "FORBIDDEN" }
+    );
+});
+
+test("checkInAll rejects unknown competition", async () => {
+    tournamentRepository.getTournamentByIdWithConnection = async () => null;
+
+    await assert.rejects(
+        () => checkinService.checkInAll(404, { actorType: "master" }),
+        { code: "NOT_FOUND" }
+    );
+});
+
+test("checkInAll tolerates an empty roster", async () => {
+    playerRepository.getPlayersByTournament = async () => [];
+    checkinRepository.bulkUpsertReadiness = async () => {
+        throw new Error("bulk upsert must not run for an empty roster");
+    };
+
+    const result = await checkinService.checkInAll(7, { actorType: "master" });
+
+    assert.equal(result.checkedInCount, 0);
+});
+
+test("checkInAll rejects invalid competition id", async () => {
+    await assert.rejects(
+        () => checkinService.checkInAll("abc", { actorType: "master" }),
         { code: "VALIDATION_ERROR" }
     );
 });

@@ -140,11 +140,74 @@ async function getActiveMatchesByTournament(
     return rows[0]?.cnt || 0;
 }
 
+async function findByIdForUpdate(
+    tournamentId,
+    matchId,
+    connection = db
+) {
+    const [rows] = await connection.query(
+        `
+        SELECT *
+        FROM matches
+        WHERE tournament_id = ? AND id = ?
+        FOR UPDATE
+        `,
+        [tournamentId, matchId]
+    );
+    return rows[0] || null;
+}
+
+async function updateMatchArrangement(
+    tournamentId,
+    matchId,
+    data,
+    connection = db
+) {
+    const [result] = await connection.query(
+        `
+        UPDATE matches
+        SET round_num = ?, court = ?, player1_id = ?, player2_id = ?, player3_id = ?, player4_id = ?, team1_name = ?, team2_name = ?
+        WHERE tournament_id = ? AND id = ?
+        `,
+        [
+            data.roundNum,
+            data.court,
+            data.player1Id,
+            data.player2Id,
+            data.player3Id,
+            data.player4Id,
+            data.team1Name,
+            data.team2Name,
+            tournamentId,
+            matchId
+        ]
+    );
+    return result;
+}
+
+async function deleteMatchById(
+    tournamentId,
+    matchId,
+    connection = db
+) {
+    const [result] = await connection.query(
+        `
+        DELETE FROM matches
+        WHERE tournament_id = ? AND id = ?
+        `,
+        [tournamentId, matchId]
+    );
+    return result;
+}
+
 module.exports = {
 
     getMatchesByTournament,
     createMatch,
     deleteMatchesByTournament,
     updateMatchScore,
-    getActiveMatchesByTournament
+    getActiveMatchesByTournament,
+    findByIdForUpdate,
+    updateMatchArrangement,
+    deleteMatchById
 };

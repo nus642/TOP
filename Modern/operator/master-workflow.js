@@ -102,6 +102,18 @@
       }
     }
 
+    async function checkInAll() {
+      view.loading();
+      try {
+        if (accountabilityFlow) accountabilityFlow.verify(accountability);
+        const result = await api.checkInAll(competitionId);
+        if (view.info) view.info(`已签到全部 ${result.checkedInCount} 名选手`);
+        await refresh();
+      } catch (error) {
+        view.error(error);
+      }
+    }
+
     async function reportCourt({ courtId, condition, expectedVersion, affectedMatchId }) {
       view.busy(`场地 ${courtId}`);
       try {
@@ -132,6 +144,7 @@
       reassign,
       loadCandidates,
       confirm,
+      checkInAll,
       reportCourt,
       deferCourt,
       refresh

@@ -138,6 +138,48 @@ async function checkInPlayer(competitionIdValue, playerIdValue, data = {}) {
     });
 }
 
+async function checkInAll(competitionIdValue, actor = {}) {
+    const competitionId = parsePositiveId(competitionIdValue, "competition");
+
+    if (actor.actorType !== "master") {
+        const error = new Error("Only a master may bulk check in players");
+        error.code = "FORBIDDEN";
+        throw error;
+    }
+
+    return db.withTransaction(async (connection) => {
+        const competition = await tournamentRepository.getTournamentByIdWithConnection(
+            competitionId,
+            connection
+        );
+
+        if (!competition) {
+            throw makeNotFoundError("Competition not found");
+        }
+
+        const players = await playerRepository.getPlayersByTournament(
+            competitionId,
+            connection
+        );
+        const playerIds = players.map((player) => player.id);
+
+        // Match-day shortcut: Master bulk check-in bypasses per-player waiver acceptance.
+        if (playerIds.length > 0) {
+            await checkinRepository.bulkUpsertReadiness(
+                competitionId,
+                playerIds,
+                "master-bulk-check-in",
+                connection
+            );
+        }
+
+        return {
+            competitionId,
+            checkedInCount: playerIds.length
+        };
+    });
+}
+
 async function getCheckInStatus(competitionIdValue, playerIdValue) {
     const competitionId = parsePositiveId(competitionIdValue, "competition");
     const playerId = parsePositiveId(playerIdValue, "player");
@@ -165,5 +207,6 @@ async function getCheckInStatus(competitionIdValue, playerIdValue) {
 module.exports = {
     acceptWaiver,
     checkInPlayer,
+    checkInAll,
     getCheckInStatus
 };

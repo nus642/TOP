@@ -15,6 +15,7 @@
         const error = new Error(body.error || "主控操作无法完成该请求");
         error.errorCode = body.errorCode || null;
         error.statusCode = response.status;
+        error.details = body.details || null;
         throw error;
       }
       return body;
@@ -73,6 +74,34 @@
         return request(`/master-workflow/${encodeURIComponent(competitionId)}/matches/${encodeURIComponent(matchId)}/reassign`, {
           method: "POST", headers: { "Content-Type": "application/json" },
           body: JSON.stringify(data)
+        });
+      },
+      checkInAll(competitionId) {
+        return request(`/master-workflow/${encodeURIComponent(competitionId)}/check-in-all`, {
+          method: "POST", headers: { "Content-Type": "application/json" }, body: "{}"
+        });
+      },
+      scheduleImport(competitionId, data) {
+        return request(`/competition/${encodeURIComponent(competitionId)}/schedule/import`, {
+          method: "POST", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(data)
+        });
+      },
+      addMatchArrangement(competitionId, data) {
+        return request(`/competition/${encodeURIComponent(competitionId)}/schedule/matches`, {
+          method: "POST", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(data)
+        });
+      },
+      editMatchArrangement(competitionId, matchId, data) {
+        return request(`/competition/${encodeURIComponent(competitionId)}/schedule/matches/${encodeURIComponent(matchId)}`, {
+          method: "PUT", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(data)
+        });
+      },
+      deleteMatchArrangement(competitionId, matchId) {
+        return request(`/competition/${encodeURIComponent(competitionId)}/schedule/matches/${encodeURIComponent(matchId)}`, {
+          method: "DELETE"
         });
       }
     };

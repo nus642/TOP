@@ -16,7 +16,7 @@ function createMockConnection(data) {
       if (sql.includes("SELECT") && sql.includes("FROM tournaments")) {
         return [[{ id: params[0], name: "Test Competition", status: data.tournamentStatus || "running" }]];
       }
-      if (sql.includes("SELECT") && sql.includes("FROM match_schedules")) {
+      if (sql.includes("SELECT") && (sql.includes("FROM match_schedules") || sql.includes("COALESCE(ms.court_id, m.court)"))) {
         return [[{ court_id: data.scheduledCourt || "court-1" }]];
       }
       if (sql.includes("SELECT") && sql.includes("FROM matches")) {

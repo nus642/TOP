@@ -2,6 +2,7 @@ const express = require("express");
 const service = require("../services/master-workflow.service");
 const liveMatchStatusService = require("../services/live-match-status.service");
 const dispatchService = require("../services/dispatch.service");
+const checkinService = require("../services/checkin.service");
 
 const router = express.Router();
 
@@ -16,6 +17,15 @@ router.get("/:competitionId/live-status", async (req, res) => {
   } catch (error) {
     const status = error.code === "VALIDATION_ERROR" ? 400 : error.code === "FORBIDDEN" ? 403 : 500;
     res.status(status).json({ error: error.message });
+  }
+});
+
+router.post("/:competitionId/check-in-all", async (req, res) => {
+  try {
+    res.json(await checkinService.checkInAll(req.params.competitionId, req.actor));
+  } catch (error) {
+    const statuses = { VALIDATION_ERROR: 400, NOT_FOUND: 404, FORBIDDEN: 403 };
+    res.status(statuses[error.code] || 500).json({ error: error.message });
   }
 });
 

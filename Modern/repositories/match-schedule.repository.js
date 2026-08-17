@@ -29,6 +29,16 @@ async function findByMatch(competitionId, matchId, connection = db) {
     return map(rows[0]);
 }
 
+// Lock the match_schedules row for UPDATE to maintain the global lock order:
+// tournaments → match_schedules → matches → reservations → referees
+async function findByMatchForUpdate(competitionId, matchId, connection = db) {
+    const [rows] = await connection.query(
+        `SELECT * FROM match_schedules WHERE tournament_id = ? AND match_id = ? FOR UPDATE`,
+        [competitionId, matchId]
+    );
+    return map(rows[0]);
+}
+
 async function create(schedule, connection = db) {
     const [result] = await connection.query(
         `INSERT INTO match_schedules (tournament_id, match_id, scheduled_at, court_id)
@@ -48,4 +58,30 @@ async function deleteByTournament(tournamentId, connection = db) {
     );
 }
 
-module.exports = { findMatch, findByMatch, create, deleteByTournament };
+async function updateByMatch(schedule, connection = db) {
+    const [result] = await connection.query(
+        `UPDATE match_schedules SET scheduled_at = ?, court_id = ?
+         WHERE tournament_id = ? AND match_id = ?`,
+        [new Date(schedule.scheduledAt), schedule.courtId, schedule.competitionId, schedule.matchId]
+    );
+    return result.affectedRows;
+}
+
+async function deleteByMatch(competitionId, matchId, connection = db) {
+    await connection.query(
+        `DELETE FROM match_schedules WHERE tournament_id = ? AND match_id = ?`,
+        [competitionId, matchId]
+    );
+}
+
+async function findCourtTimeConflict(competitionId, courtId, scheduledAt, excludeMatchId, connection = db) {
+    const [rows] = await connection.query(
+        `SELECT match_id FROM match_schedules
+         WHERE tournament_id = ? AND court_id = ? AND scheduled_at = ? AND match_id <> ?
+         LIMIT 1`,
+        [competitionId, courtId, new Date(scheduledAt), excludeMatchId || 0]
+    );
+    return rows[0] || null;
+}
+
+module.exports = { findMatch, findByMatch, findByMatchForUpdate, create, deleteByTournament, updateByMatch, deleteByMatch, findCourtTimeConflict };

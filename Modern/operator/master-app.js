@@ -3,6 +3,13 @@ const list = document.querySelector("#matches");
 const notice = document.querySelector("#notice");
 const contextForm = document.querySelector("#context-form");
 const courtList = document.querySelector("#courts");
+const checkInAllButton = document.querySelector("#check-in-all");
+const importData = document.querySelector("#import-data");
+const importSubmit = document.querySelector("#import-submit");
+const importResult = document.querySelector("#import-result");
+const addMatchForm = document.querySelector("#add-match-form");
+
+let activeCompetitionId = null;
 
 function escapeHtml(value) {
   return String(value ?? "").replace(/[&<>'"]/g, (character) => ({
@@ -23,7 +30,11 @@ function matchCard(match) {
   let actionHtml = "";
 
   if (dispatchStatus === "not_dispatched") {
-    actionHtml = `<button type="button" class="btn-dispatch" data-action="dispatch" data-match-id="${escapeHtml(match.matchId)}" data-version="${escapeHtml(version)}" data-court="${escapeHtml(schedule.courtId || "")}">派单</button>`;
+    actionHtml = `<div class="dispatch-actions">
+      <button type="button" class="btn-dispatch" data-action="dispatch" data-match-id="${escapeHtml(match.matchId)}" data-version="${escapeHtml(version)}" data-court="${escapeHtml(schedule.courtId || "")}">派单</button>
+      <button type="button" data-action="edit-match" data-match-id="${escapeHtml(match.matchId)}">编辑</button>
+      <button type="button" data-action="delete-match" data-match-id="${escapeHtml(match.matchId)}">删除</button>
+    </div>`;
   } else if (dispatchStatus === "waiting_acceptance") {
     actionHtml = `<div class="dispatch-actions">
       <button type="button" class="btn-withdraw" data-action="withdraw" data-match-id="${escapeHtml(match.matchId)}" data-version="${escapeHtml(version)}">撤回</button>
@@ -33,7 +44,7 @@ function matchCard(match) {
     actionHtml = `<button type="button" data-action="confirm-result" data-match-id="${escapeHtml(match.matchId)}">确认已提交赛果</button>`;
   }
 
-  return `<article class="match" data-match-id="${escapeHtml(match.matchId)}" data-dispatch-status="${escapeHtml(dispatchStatus)}">
+  return `<article class="match" data-match-id="${escapeHtml(match.matchId)}" data-dispatch-status="${escapeHtml(dispatchStatus)}" data-round="${escapeHtml(match.roundNumber || "")}" data-court="${escapeHtml(schedule.courtId || "")}" data-scheduled-at="${escapeHtml(schedule.scheduledAt || "")}" data-side-one="${escapeHtml(match.sides?.one || "")}" data-side-two="${escapeHtml(match.sides?.two || "")}">
     <header><div><span class="eyebrow">第 ${escapeHtml(match.roundNumber || "—")} 轮</span><h2>${team1} <span>对</span> ${team2}</h2></div><span class="status">${escapeHtml(dispatchLabel)}</span></header>
     <div class="meta"><span>⌖ ${escapeHtml(schedule.courtId || "场地待定")}</span><span>◷ ${schedule.scheduledAt ? escapeHtml(new Date(schedule.scheduledAt).toLocaleString("zh-CN")) : "时间待定"}</span></div>
     <p class="assignment">裁判：<strong>${escapeHtml(referee.refereeId || "未分配")}</strong> · 派单版本 ${escapeHtml(version)} · 下一步：${escapeHtml(nextAction)}</p>
@@ -68,6 +79,10 @@ const view = {
     notice.textContent = UiText.userFacingError(message);
     notice.className = "notice error";
   },
+  info(message) {
+    notice.textContent = message;
+    notice.className = "notice";
+  },
   matches(matches) {
     notice.textContent = `运行视图中共有 ${matches.length} 场比赛`;
     notice.className = "notice";
@@ -86,7 +101,85 @@ const workflow = MasterWorkflow.createMasterWorkflow({ api, view, accountability
 contextForm.addEventListener("submit", async (event) => {
   event.preventDefault();
   try {
-    await workflow.start(ResponsibilityContext.browser.current());
+    const context = ResponsibilityContext.browser.current();
+    activeCompetitionId = context?.competitionId || null;
+    await workflow.start(context);
+    checkInAllButton.disabled = false;
+    importSubmit.disabled = false;
+    addMatchForm.querySelector('button[type="submit"]').disabled = false;
+  } catch (error) { view.error(error); }
+});
+
+// Bulk check-in: Master marks every registered player as checked in
+checkInAllButton.addEventListener("click", async () => {
+  if (!confirm("确认将全部选手标记为已签到？")) return;
+  checkInAllButton.disabled = true;
+  try {
+    await workflow.checkInAll();
+  } finally {
+    checkInAllButton.disabled = false;
+  }
+});
+
+// Convert an ISO timestamp to a datetime-local input value,
+// pinned to Asia/Shanghai to avoid local timezone drift on operator devices.
+function toLocalInputValue(iso) {
+  if (!iso) return "";
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return "";
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Shanghai", year: "numeric", month: "2-digit", day: "2-digit",
+    hour: "2-digit", minute: "2-digit", hour12: false
+  }).formatToParts(d);
+  const get = (type) => (parts.find((p) => p.type === type) || {}).value || "";
+  return `${get("year")}-${get("month")}-${get("day")}T${get("hour")}:${get("minute")}`;
+}
+
+// Schedule import: paste external arrangement JSON, whole-table replace
+importSubmit.addEventListener("click", async () => {
+  importResult.innerHTML = "";
+  let data;
+  try {
+    data = JSON.parse(importData.value);
+  } catch {
+    importResult.innerHTML = `<p class="notice error">JSON 格式不正确，无法解析。</p>`;
+    return;
+  }
+  importSubmit.disabled = true;
+  try {
+    const result = await api.scheduleImport(activeCompetitionId, data);
+    const summary = result.summary || {};
+    importResult.innerHTML = `<p class="notice">导入成功：${escapeHtml(summary.players ?? 0)} 名选手、${escapeHtml(summary.pairs ?? 0)} 对组合、${escapeHtml(summary.matches ?? 0)} 场比赛、${escapeHtml(summary.rounds ?? 0)} 轮。</p>`;
+    importData.value = "";
+    await workflow.refresh();
+  } catch (error) {
+    const rows = Array.isArray(error.details?.errors) ? error.details.errors : [];
+    importResult.innerHTML = rows.length
+      ? `<p class="notice error">导入校验失败（${rows.length} 项）：</p><ul class="import-errors">${rows.map((row) => `<li>${escapeHtml(row.row || "全局")}：${escapeHtml(row.message)}</li>`).join("")}</ul>`
+      : `<p class="notice error">${escapeHtml(UiText.userFacingError(error))}</p>`;
+  } finally {
+    importSubmit.disabled = false;
+  }
+});
+
+// Add one match to the arrangement
+addMatchForm.addEventListener("submit", async (event) => {
+  event.preventDefault();
+  const formData = new FormData(addMatchForm);
+  const rawTime = formData.get("scheduledAt");
+  try {
+    const result = await api.addMatchArrangement(activeCompetitionId, {
+      roundNum: Number(formData.get("roundNum")),
+      court: formData.get("court"),
+      scheduledAt: rawTime ? new Date(rawTime).toISOString() : "",
+      p1: formData.get("p1"),
+      p2: formData.get("p2"),
+      p3: formData.get("p3"),
+      p4: formData.get("p4")
+    });
+    view.info(`已新增比赛 ${result.matchId}`);
+    addMatchForm.reset();
+    await workflow.refresh();
   } catch (error) { view.error(error); }
 });
 
@@ -131,6 +224,46 @@ list.addEventListener("click", async (event) => {
   if (cancelBtn) {
     const form = cancelBtn.closest(".dispatch-form");
     if (form) form.remove();
+    return;
+  }
+
+  // Edit single match arrangement (only offered for undispatched matches)
+  const editBtn = event.target.closest('button[data-action="edit-match"]');
+  if (editBtn) {
+    const article = editBtn.closest(".match");
+    const matchId = editBtn.dataset.matchId;
+    const [p1 = "", p2 = ""] = (article.dataset.sideOne || "").split(" & ");
+    const [p3 = "", p4 = ""] = (article.dataset.sideTwo || "").split(" & ");
+    const existing = article.querySelector(".dispatch-form");
+    if (existing) existing.remove();
+    const form = document.createElement("div");
+    form.className = "dispatch-form";
+    form.innerHTML = `<form class="inline-edit-form arrangement-form" data-match-id="${escapeHtml(matchId)}">
+      <label>轮次 <input name="roundNum" inputmode="numeric" value="${escapeHtml(article.dataset.round)}" required></label>
+      <label>场地 <input name="court" value="${escapeHtml(article.dataset.court)}" required></label>
+      <label>时间 <input name="scheduledAt" type="datetime-local" value="${escapeHtml(toLocalInputValue(article.dataset.scheduledAt))}" required></label>
+      <label>P1 <input name="p1" value="${escapeHtml(p1)}" required></label>
+      <label>P2 <input name="p2" value="${escapeHtml(p2)}" required></label>
+      <label>P3 <input name="p3" value="${escapeHtml(p3)}" required></label>
+      <label>P4 <input name="p4" value="${escapeHtml(p4)}" required></label>
+      <div><button type="submit">保存修改</button> <button type="button" data-action="cancel-dispatch">取消</button></div>
+    </form>`;
+    article.appendChild(form);
+    return;
+  }
+
+  // Delete single match arrangement
+  const deleteBtn = event.target.closest('button[data-action="delete-match"]');
+  if (deleteBtn) {
+    if (!confirm("确认删除该场比赛？删除后无法恢复。")) return;
+    deleteBtn.disabled = true;
+    try {
+      await api.deleteMatchArrangement(activeCompetitionId, deleteBtn.dataset.matchId);
+      await workflow.refresh();
+    } catch (error) {
+      view.error(error);
+      deleteBtn.disabled = false;
+    }
     return;
   }
 
@@ -221,6 +354,21 @@ list.addEventListener("submit", (event) => {
       newRefereeId: formData.get("newRefereeId"),
       expectedVersion: Number(formData.get("expectedVersion"))
     });
+    return;
+  }
+  if (event.target.matches(".inline-edit-form")) {
+    event.preventDefault();
+    const formData = new FormData(event.target);
+    const rawTime = formData.get("scheduledAt");
+    api.editMatchArrangement(activeCompetitionId, event.target.dataset.matchId, {
+      roundNum: Number(formData.get("roundNum")),
+      court: formData.get("court"),
+      scheduledAt: rawTime ? new Date(rawTime).toISOString() : "",
+      p1: formData.get("p1"),
+      p2: formData.get("p2"),
+      p3: formData.get("p3"),
+      p4: formData.get("p4")
+    }).then(() => workflow.refresh()).catch((error) => view.error(error));
     return;
   }
   if (event.target.matches(".assignment-form")) {

@@ -13,7 +13,7 @@ function createMockConnection(data) {
       if (sql.includes("SELECT") && sql.includes("FROM tournaments")) {
         return [[{ id: params[0], name: "Test", status: "running" }]];
       }
-      if (sql.includes("SELECT") && sql.includes("FROM match_schedules")) {
+      if (sql.includes("SELECT") && (sql.includes("FROM match_schedules") || sql.includes("COALESCE(ms.court_id, m.court)"))) {
         const courtForMatch = data.courtOverride || "court-1";
         return [[{ court_id: courtForMatch }]];
       }

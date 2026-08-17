@@ -66,3 +66,89 @@ list.addEventListener("submit", (event) => {
   workflow.run({ type: "score", matchId: event.target.closest(".match").dataset.matchId,
     score: { score1: Number(values.get("score1")), score2: Number(values.get("score2")) } });
 });
+
+// Referee identity entry: pick a name from the roster, then establish a session
+// via the development-only foundation-establish boundary (accepted risk for the
+// first event's trusted-network scenario; no password authentication yet).
+(function mountIdentityEntry() {
+  const entry = document.querySelector("#identity-entry");
+  if (!entry) return;
+  const identityForm = document.querySelector("#identity-form");
+  const competitionInput = identityForm.elements.competitionId;
+  const refereeSelect = identityForm.elements.refereeId;
+  const submitButton = identityForm.querySelector('button[type="submit"]');
+  const status = document.querySelector("#identity-status");
+
+  function setStatus(message, isError = false) {
+    status.textContent = message;
+    status.className = isError ? "notice error" : "notice";
+  }
+
+  async function loadRoster() {
+    const competitionId = competitionInput.value.trim();
+    if (!competitionId) return;
+    refereeSelect.disabled = true;
+    submitButton.disabled = true;
+    refereeSelect.innerHTML = `<option value="">正在加载花名册…</option>`;
+    setStatus("正在加载裁判花名册…");
+    try {
+      const response = await fetch(`/api/public/competitions/${encodeURIComponent(competitionId)}/referee-roster`);
+      const body = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(body.error || "花名册加载失败");
+      const referees = body.referees || [];
+      if (referees.length === 0) {
+        refereeSelect.innerHTML = `<option value="">该赛事暂无裁判花名册</option>`;
+        setStatus("该赛事尚未登记裁判花名册，请联系主控。", true);
+        return;
+      }
+      refereeSelect.innerHTML = `<option value="">请选择您的名字</option>${referees.map((name) => `<option value="${escapeHtml(name)}">${escapeHtml(name)}</option>`).join("")}`;
+      refereeSelect.disabled = false;
+      setStatus(`已加载 ${referees.length} 位裁判，请选择您的名字。`);
+    } catch (error) {
+      refereeSelect.innerHTML = `<option value="">花名册加载失败</option>`;
+      setStatus(UiText.userFacingError(error), true);
+    }
+  }
+
+  competitionInput.addEventListener("change", loadRoster);
+  refereeSelect.addEventListener("change", () => {
+    submitButton.disabled = !refereeSelect.value;
+  });
+
+  identityForm.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    const competitionId = competitionInput.value.trim();
+    const refereeId = refereeSelect.value;
+    if (!competitionId || !refereeId) return;
+    submitButton.disabled = true;
+    setStatus("正在建立身份…");
+    try {
+      const response = await fetch("/api/session/foundation-establish", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ actorId: refereeId, actorType: "referee" })
+      });
+      const body = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(body.error || "身份建立失败");
+      localStorage.setItem(ResponsibilityContext.COMPETITION_KEY, competitionId);
+      window.location.href = `/operator/?competitionId=${encodeURIComponent(competitionId)}`;
+    } catch (error) {
+      setStatus(UiText.userFacingError(error), true);
+      submitButton.disabled = false;
+    }
+  });
+
+  // Show the entry card only when no authenticated session exists.
+  fetch("/api/session/me").then((response) => {
+    if (!response.ok) {
+      entry.hidden = false;
+      const stored = localStorage.getItem(ResponsibilityContext.COMPETITION_KEY);
+      const query = new URLSearchParams(window.location.search).get("competitionId");
+      const preset = query || stored;
+      if (preset) {
+        competitionInput.value = preset;
+        loadRoster();
+      }
+    }
+  }).catch(() => { entry.hidden = false; });
+})();

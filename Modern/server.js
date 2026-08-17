@@ -15,6 +15,7 @@ const participantReadinessRoutes = require("./api/participant-readiness");
 const refereeWorkflowRoutes = require("./api/referee-workflow");
 const refereeCoordinationRoutes = require("./api/referee-coordination");
 const publicMatchScoreboardRoutes = require("./api/public-match-scoreboard");
+const publicRefereeRosterRoutes = require("./api/public-referee-roster");
 const competitionArchiveRoutes = require("./api/competition-archive");
 const { createActorSessionStore } = require("./session/actor-session");
 const { createSessionRouter, requireActorSession } = require("./api/session");
@@ -44,6 +45,7 @@ function createApp({ actorSessions = createActorSessionStore() } = {}) {
   app.use("/api/referee-workflow", requireActorSession(actorSessions), refereeWorkflowRoutes);
   app.use("/api/referee-coordination", requireActorSession(actorSessions), refereeCoordinationRoutes);
   app.use("/api/public/competitions", publicMatchScoreboardRoutes);
+  app.use("/api/public/competitions", publicRefereeRosterRoutes);
   app.use("/api/public/competitions", competitionArchiveRoutes);
 
   return app;

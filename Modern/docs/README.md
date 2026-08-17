@@ -21,6 +21,18 @@ Sessions are held in one process-local `Map`. They disappear on restart and do n
 work across multiple application instances. This is intentionally unsuitable for
 production deployment.
 
+### First-event accepted risk: passwordless referee identity entry
+
+For the first competition (trusted-network scenario, six known referees) the referee
+workstation entry lets an operator type a competition id and pick their own name from
+the roster, then calls `foundation-establish` directly. Supporting this boundary:
+
+* `GET /api/public/competitions/:competitionId/referee-roster` exposes roster referee
+  names without a session (names only, no other data).
+* Selecting a name **does not prove identity**; anyone on the network can impersonate
+  a listed referee. This is an explicitly accepted risk for the first event and is
+  recorded as technical debt to be closed by the production identity integration.
+
 The [production identity integration boundary](production-identity-integration.md)
 defines how a future verified external identity is linked to this existing actor
 session contract. It supplies ports only: no provider, protocol, account model, or

@@ -5,7 +5,31 @@
   <aside><a class="brand" href="."><span>TOP</span> 赛事运行</a><div class="aside-copy"><span class="eyebrow">主控工作台</span><h1>保障赛事顺利进行。</h1><p>清晰掌握今日比赛运行情况并完成协调。</p></div><footer>比赛操作仍以赛事系统记录为准。</footer></aside>
   <main><nav><div><span class="eyebrow">主控流程</span><h1>比赛操作</h1></div><a class="workspace-link" href=".">裁判工作台</a></nav>
     <form id="context-form" class="context master-context"><label>比赛<input name="competitionId" value="1" inputmode="numeric" required></label><button>打开主控工作台</button></form>
-    <div class="heading"><p id="notice" class="notice">打开工作台以加载运行状态。</p><span>赛事系统权威数据</span></div>
+    <div class="heading"><p id="notice" class="notice">打开工作台以加载运行状态。</p><span class="heading-tools"><button id="check-in-all" type="button" disabled>一键签到全部选手</button> · 赛事系统权威数据</span></div>
+    <section aria-labelledby="schedule-title"><div class="heading"><h2 id="schedule-title">赛程管理</h2><span>导入与单场调整</span></div>
+      <div class="schedule-panel">
+        <details id="import-panel">
+          <summary>导入外部对阵表（JSON）</summary>
+          <p class="muted">粘贴完整导入模板（含 players / rounds，fixed-pair 模式含 pairs）。导入仅在竞赛处于 draft 且无已执行比赛时允许，将整表替换。</p>
+          <textarea id="import-data" rows="10" placeholder='{"mode":"fixed-pair","players":[{"name":"张三"}],"pairs":[{"name":"张三 & 李四"}],"rounds":[{"round":1,"matches":[{"court":"A1","scheduledAt":"2026-08-20T10:00:00+08:00","p1":"张三","p2":"李四","p3":"王五","p4":"赵六","team1":"张三 & 李四","team2":"王五 & 赵六"}]}]}'></textarea>
+          <button id="import-submit" type="button" disabled>执行导入</button>
+          <div id="import-result" aria-live="polite"></div>
+        </details>
+        <details id="add-match-panel">
+          <summary>新增单场比赛</summary>
+          <form id="add-match-form" class="arrangement-form">
+            <label>轮次 <input name="roundNum" inputmode="numeric" required></label>
+            <label>场地 <input name="court" required></label>
+            <label>时间 <input name="scheduledAt" type="datetime-local" required></label>
+            <label>P1 <input name="p1" required></label>
+            <label>P2 <input name="p2" required></label>
+            <label>P3 <input name="p3" required></label>
+            <label>P4 <input name="p4" required></label>
+            <button type="submit" disabled>新增比赛</button>
+          </form>
+        </details>
+      </div>
+    </section>
     <section aria-labelledby="courts-title"><div class="heading"><h2 id="courts-title">场地协调</h2><span>可追溯运行事实</span></div><div id="courts" class="court-grid" aria-live="polite"><div class="empty"><strong>尚未加载场地。</strong></div></div></section>
     <section id="matches" aria-live="polite"><div class="empty"><strong>准备就绪。</strong><p>请在上方输入比赛信息。</p></div></section>
   </main>
