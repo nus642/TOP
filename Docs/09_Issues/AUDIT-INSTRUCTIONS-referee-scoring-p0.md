@@ -9,8 +9,8 @@
 - **仓库**：https://github.com/nus642/TOP
 - **分支**：`p0-referee-live-scoring`（base = `main` @ `e9588e0`）
 - **HEAD**：`7477a19` — feat(referee): P0 point-by-point live scoring for referee workbench（11 files，+396/-16）
-- **PR**：创建入口 https://github.com/nus642/TOP/pull/new/p0-referee-live-scoring
-- **审查范围命令**：`git diff e9588e0..7477a19`（等价于该 PR 的 Files changed）
+- **PR**：https://github.com/nus642/TOP/pull/147
+- **审查范围命令**：`git diff e9588e0..7477a19`（PR 还含 `dfaa680`，仅更新本指令文档，不在代码审查范围内）
 
 请以 HEAD `7477a19` 的代码为准；下文清单若与该 commit 实际内容不一致，以 commit 为准。
 
