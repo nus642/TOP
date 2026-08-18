@@ -2,4 +2,6 @@ node_modules/
 .env
 *.log
 rehearsal/.rehearsal-state.json
-dev/
+dev/*
+!dev/dev-login.html
+!dev/prepare-m2-test-data.js
