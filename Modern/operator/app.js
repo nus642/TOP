@@ -30,7 +30,7 @@ function matchCard(match) {
   }[match.status] || `<p class="muted">等待比赛操作</p>`;
 
   return `<article class="match" data-match-id="${escapeHtml(match.id)}" data-dispatch-version="${match.dispatchVersion ?? 0}">
-    <header><div><span class="eyebrow">第 ${escapeHtml(match.roundNum || "—")} 轮</span><h2>${team1} <span>对</span> ${team2}</h2></div><span class="status">${escapeHtml(UiText.statusLabel(match.status))}</span></header>
+    <header><div><span class="eyebrow">第 ${escapeHtml(match.roundNumber || "—")} 轮</span><h2>${team1} <span>对</span> ${team2}</h2></div><span class="status">${escapeHtml(UiText.statusLabel(match.status))}</span></header>
     <div class="meta"><span>⌖ ${escapeHtml(match.court || "场地待定")}</span><span>◷ ${match.scheduledAt ? escapeHtml(new Date(match.scheduledAt).toLocaleString("zh-CN")) : "时间待定"}</span></div>
     <div class="score"><strong>${score1}</strong><span>正式比分</span><strong>${score2}</strong></div>
     <div class="action">${actions}</div>

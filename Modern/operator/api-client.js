@@ -11,7 +11,11 @@
         : options;
       const response = await fetchImpl(`${baseUrl}${path}`, requestOptions);
       const body = await response.json().catch(() => ({}));
-      if (!response.ok) throw new Error(body.error || "比赛操作无法完成该请求");
+      if (!response.ok) {
+        const error = new Error(body.error || "比赛操作无法完成该请求");
+        error.statusCode = response.status;
+        throw error;
+      }
       return body;
     }
 
