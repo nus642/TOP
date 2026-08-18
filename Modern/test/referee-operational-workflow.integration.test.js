@@ -39,6 +39,10 @@ test("repository reads the assigned referee workflow from match and schedule per
         player2_id: 12,
         player3_id: 21,
         player4_id: 22,
+        player1_name: "Ana",
+        player2_name: "Ben",
+        player3_name: "Cara",
+        player4_name: "Dan",
         score1: null,
         score2: null,
         assigned_at: "2026-08-09T09:00:00.000Z",
@@ -52,8 +56,8 @@ test("repository reads the assigned referee workflow from match and schedule per
 
   assert.equal(matches[0].status, "assigned");
   assert.equal(matches[0].scheduledAt, "2026-08-09T10:00:00.000Z");
-  assert.deepEqual(matches[0].team1, { name: "Alpha", playerIds: [11, 12] });
-  assert.deepEqual(matches[0].team2, { name: "Bravo", playerIds: [21, 22] });
+  assert.deepEqual(matches[0].team1, { name: "Alpha", playerIds: [11, 12], players: [{ id: 11, name: "Ana" }, { id: 12, name: "Ben" }] });
+  assert.deepEqual(matches[0].team2, { name: "Bravo", playerIds: [21, 22], players: [{ id: 21, name: "Cara" }, { id: 22, name: "Dan" }] });
 });
 
 test("API exposes only the referee's existing match-operation records", async (t) => {

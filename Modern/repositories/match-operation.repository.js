@@ -43,11 +43,19 @@ function mapRefereeWork(row) {
     scheduledAt: row.scheduled_at,
     team1: {
       name: row.team1_name,
-      playerIds: [row.player1_id, row.player2_id].filter((id) => id !== null)
+      playerIds: [row.player1_id, row.player2_id].filter((id) => id != null),
+      players: [
+        row.player1_id != null ? { id: row.player1_id, name: row.player1_name || "" } : null,
+        row.player2_id != null ? { id: row.player2_id, name: row.player2_name || "" } : null
+      ].filter(Boolean)
     },
     team2: {
       name: row.team2_name,
-      playerIds: [row.player3_id, row.player4_id].filter((id) => id !== null)
+      playerIds: [row.player3_id, row.player4_id].filter((id) => id != null),
+      players: [
+        row.player3_id != null ? { id: row.player3_id, name: row.player3_name || "" } : null,
+        row.player4_id != null ? { id: row.player4_id, name: row.player4_name || "" } : null
+      ].filter(Boolean)
     },
     score1: row.score1,
     score2: row.score2,
@@ -97,13 +105,19 @@ async function findByReferee(tournamentId, refereeId, connection = db) {
   const [rows] = await connection.query(
     `SELECT m.*, ms.scheduled_at, ms.court_id,
        coc.condition_name AS court_condition, COALESCE(coc.version, 0) AS court_version,
-       cd.id AS disruption_id, cd.disposition AS disruption_disposition, cd.version AS disruption_version
+       cd.id AS disruption_id, cd.disposition AS disruption_disposition, cd.version AS disruption_version,
+       p1.name AS player1_name, p2.name AS player2_name,
+       p3.name AS player3_name, p4.name AS player4_name
      FROM matches m
      LEFT JOIN match_schedules ms ON ms.match_id = m.id
      LEFT JOIN court_operating_conditions coc
        ON coc.tournament_id = ms.tournament_id AND coc.court_id = ms.court_id
      LEFT JOIN court_disruptions cd
        ON cd.tournament_id = ms.tournament_id AND cd.court_id = ms.court_id AND cd.disposition <> 'resolved'
+     LEFT JOIN players p1 ON p1.id = m.player1_id
+     LEFT JOIN players p2 ON p2.id = m.player2_id
+     LEFT JOIN players p3 ON p3.id = m.player3_id
+     LEFT JOIN players p4 ON p4.id = m.player4_id
      WHERE m.tournament_id = ? AND m.referee_id = ?
      ORDER BY ms.scheduled_at IS NULL, ms.scheduled_at, m.round_num, m.id`,
     [tournamentId, refereeId]

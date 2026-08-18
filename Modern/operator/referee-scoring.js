@@ -37,6 +37,7 @@
       timeline: [],
       history: [],
       halfSwitched: false,
+      viewSwapped: false,
       gameEnded: false,
       matchEnded: false,
       currentGame: 1,
@@ -109,6 +110,9 @@
       const switchPoint = Math.ceil(state.match.targetScore / 2);
       if (maxScore === switchPoint && !state.halfSwitched) {
         state.halfSwitched = true;
+        // Mirror Legacy L1051: switching ends flips the referee's on-screen view
+        // so the team that walked to the opposite end renders on the other side.
+        state.viewSwapped = !state.viewSwapped;
         events.sideSwitch = true;
       }
       if (isGameWon()) {
@@ -116,6 +120,26 @@
         events.gameWon = true;
       }
       return events;
+    }
+
+    // Read-only layout for the on-court position view. Returns each team's
+    // left/right court player names plus the current serving player, so the UI
+    // can render the four court slots and highlight the server.
+    function courtLayout() {
+      const serving = servingInfo();
+      return {
+        t1: { left: state.teams.t1.l, right: state.teams.t1.r },
+        t2: { left: state.teams.t2.l, right: state.teams.t2.r },
+        servingTeam: serving.team,
+        servingPlayer: serving.player,
+        servingCourt: serving.court,
+        viewSwapped: state.viewSwapped
+      };
+    }
+
+    function toggleView() {
+      state.viewSwapped = !state.viewSwapped;
+      return state.viewSwapped;
     }
 
     function undo() {
@@ -190,6 +214,8 @@
       endGame,
       finalScore,
       servingInfo,
+      courtLayout,
+      toggleView,
       isGameEnded: () => state.gameEnded,
       isMatchEnded: () => state.matchEnded,
       winner: () => (state.t1Wins > state.t2Wins ? 1 : state.t2Wins > state.t1Wins ? 2 : 0),

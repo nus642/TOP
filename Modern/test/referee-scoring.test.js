@@ -195,3 +195,35 @@ test("backup saves, loads, and clears serialized state", () => {
   backup.clear();
   assert.equal(backup.load(), null);
 });
+
+test("side switch at half score flips viewSwapped and undo restores it", () => {
+  const scoring = doublesScoring({ targetScore: 11, capScore: 0 });
+  assert.equal(scoring.state().viewSwapped, false);
+  for (let i = 0; i < 6; i++) scoring.award(1); // reaches ceil(11/2)
+  assert.equal(scoring.state().viewSwapped, true);
+  scoring.undo();
+  assert.equal(scoring.state().viewSwapped, false);
+});
+
+test("toggleView flips viewSwapped manually", () => {
+  const scoring = doublesScoring({ targetScore: 11, capScore: 0 });
+  assert.equal(scoring.toggleView(), true);
+  assert.equal(scoring.state().viewSwapped, true);
+  assert.equal(scoring.toggleView(), false);
+});
+
+test("courtLayout reports left/right players, server, and view flag", () => {
+  const scoring = doublesScoring({ targetScore: 11, capScore: 0 });
+  let layout = scoring.courtLayout();
+  assert.deepEqual(layout.t1, { left: "A", right: "B" });
+  assert.deepEqual(layout.t2, { left: "C", right: "D" });
+  assert.equal(layout.servingTeam, 1);
+  assert.equal(layout.servingPlayer, "B"); // score 0 -> right court serves
+  assert.equal(layout.viewSwapped, false);
+
+  scoring.award(1); // serving side wins: positions swap to l=B, r=A
+  layout = scoring.courtLayout();
+  assert.deepEqual(layout.t1, { left: "B", right: "A" });
+  assert.equal(layout.servingPlayer, "B"); // t1 score 1 (odd) -> left court serves
+  assert.equal(layout.servingCourt, "left");
+});
