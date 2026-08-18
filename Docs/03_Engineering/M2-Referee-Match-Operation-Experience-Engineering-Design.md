@@ -3,8 +3,8 @@
 | Field | Value |
 |---|---|
 | Design Record ID | ED-M2-RMO-001 |
-| Version | 0.1 |
-| Status | Draft |
+| Version | 1.0 |
+| Status | Approved |
 | Design owner | TOP Engineering Team |
 | Decision authority | TOP Engineering Governance |
 | Design date | 2026-08-18 |
@@ -518,7 +518,15 @@ during implementation:
 4. **No domain bypass:** The score-snapshot endpoint validates actor identity and
    match assignment but does NOT invoke domain state machine transitions.
 
-## 12. Change and reconsideration control
+## 12. Review record
+
+| Round | Reviewer | Result | Outcome |
+|---|---|---|---|
+| R1 (2026-08-18) | Independent audit (Gemini Pro) | Hold — Needs Revision | 3 CRITICAL (status-machine conflict in score snapshot; `map()` read-path gap; public/master read-path coverage), 2 MAJOR (transaction/lock contention; INSERT column list), 4 MINOR findings. |
+| R1 disposition (2026-08-18) | Design owner | Findings closed | ED-04 rewritten (dedicated snapshot endpoint, no transaction/lock/state change); ED-02 extended to `map()`; ED-07 added (read paths verified compatible); ED-03 expanded (INSERT column list); ED-05 game-over guard; implementation constraints §11. Commit `7569cd8`. |
+| R2 (2026-08-18) | Independent audit (Gemini Pro) | Pass — Clear to proceed | All 6 dimensions pass with zero findings. Snapshot path decoupled from state machine; read paths closed; high-frequency write path lightweight. |
+
+## 13. Change and reconsideration control
 
 This design applies only to the exact baselines above. A material change to the
 product boundary, a cited source, a decision, or a finding requires governed
@@ -526,4 +534,4 @@ impact review and reassessment.
 
 ---
 
-**Status:** Draft; review findings addressed; awaiting approval
+**Status:** Approved; implementation authorized per review record §12
