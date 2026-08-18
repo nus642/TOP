@@ -106,10 +106,21 @@ upstream business authority.
 - `createMatch` callers must supply or accept defaults;
 - No state machine change; no new service.
 
-### ED-02: Read-path extension — `mapRefereeWork` returns format fields
+### ED-02: Read-path extension — both `map()` and `mapRefereeWork()` return format fields
 
-**Decision:** Extend `mapRefereeWork` in `match-operation.repository.js` to return:
+**Decision:** Extend **both** mapping functions in `match-operation.repository.js`:
 
+1. `mapRefereeWork()` — used by `findByReferee()` for the referee work list:
+```javascript
+format: {
+  gameFormat: Number(row.game_format || 1),
+  scoreRule: row.score_rule || 'rally',
+  targetScore: Number(row.target_score || 21),
+  capScore: Number(row.cap_score || 21)
+}
+```
+
+2. `map()` — used by `findById()` and all single-match domain operations:
 ```javascript
 format: {
   gameFormat: Number(row.game_format || 1),
@@ -120,63 +131,102 @@ format: {
 ```
 
 **Rationale:**
-- Referee experience needs format to pre-fill on-court setup;
-- `findByReferee` query uses `SELECT m.*` which already includes new columns after
-  migration;
-- No additional JOIN required.
+- `findByReferee` uses `mapRefereeWork`; referee experience needs format to pre-fill
+  on-court setup;
+- `findById` uses `map`; it is the canonical single-match reader used by
+  `submitResult`, `recordScore`, and all domain mutations — omitting format here
+  would cause data loss on any refresh or re-read path;
+- Both queries use `SELECT m.*` or `SELECT *` which includes new columns after
+  migration; no additional JOIN required.
 
 **Impact:**
-- Frontend receives format in assigned-match response;
+- Frontend receives format in both assigned-match list and single-match reads;
 - No breaking change to existing consumers (additive field).
 
 ### ED-03: Master writes format defaults at match generation
 
-**Decision:** All `createMatch` call sites supply format defaults:
+**Decision:** All `createMatch` call sites supply format defaults **and** the
+`createMatch` INSERT statement is extended to include the new columns:
 
 | Call site | Current behavior | M2 behavior |
 |---|---|---|
 | `schedule-import.service.js` L378 | No format fields | Add `game_format: 1, score_rule: 'rally', target_score: 21, cap_score: 21` |
 | `competition.service.js` L386 | No format fields | Add defaults |
 | `competition.service.js` L689 | No format fields | Add defaults |
+| `match.repository.js` `createMatch` | INSERT without format columns | Extend INSERT column list and VALUES to include `game_format`, `score_rule`, `target_score`, `cap_score` |
 
 **Rationale:**
 - Legacy writes at task creation (`master.html` L2259, L2738, L2784, L2906);
 - Defaults match Legacy (`rally/21/21`);
-- Master UI for per-match override is out of M2 scope; defaults apply.
+- Master UI for per-match override is out of M2 scope; defaults apply;
+- The `createMatch` function in `match.repository.js` uses an explicit INSERT with
+  a hardcoded column list; new columns **must** be appended to both the column list
+  and VALUES clause to avoid `Column count doesn't match value count` errors.
 
 **Alternatives considered:**
 - Master UI for per-match format configuration — deferred to future milestone;
-- Referee-only format setting — rejected: violates Master-designated requirement.
+- Referee-only format setting — rejected: violates Master-designated requirement;
+- Rely on DB defaults without explicit INSERT columns — rejected: explicit is
+  clearer and avoids silent default drift.
 
 **Impact:**
 - All new matches carry format;
 - Existing matches receive defaults via migration;
 - No API change required (format flows through existing read path).
 
-### ED-04: Score-snapshot write during play
+### ED-04: Score-snapshot write during play (dedicated lightweight endpoint)
 
-**Decision:** Reuse existing `recordScore` endpoint for live score snapshots.
+**Decision:** Create a **new** lightweight score-snapshot endpoint that writes
+`score1`/`score2` **without** changing status or invoking domain state transitions.
+Do **not** reuse the existing `recordScore` service method.
 
-**Mechanism:**
-- Referee experience calls `PUT /api/match-operations/:tournamentId/matches/:matchId/score`
-  (or equivalent existing endpoint) after each point with current `score1`/`score2`;
-- Backend writes `score1`/`score2` to `matches` table without changing status;
-- Status remains `playing` until final submission;
-- Public scoreboard and master view poll `matches.score1/score2` at 3–5 second intervals.
+**Why not reuse `recordScore`:**
+- `match-operations.service.js` L162–166 calls `repository.recordScore()` which
+  executes `UPDATE matches SET score1=?, score2=?, status='scored'` (L193);
+- This changes status to `'scored'` on every call, terminating the match lifecycle
+  after the first point;
+- The existing `recordScore` also goes through domain validation via
+  `MatchOperation.recordScore()` which enforces state machine transitions;
+- Using it for per-point snapshots would irreversibly corrupt match state.
+
+**New endpoint design:**
+
+```
+PUT /api/match-operations/:tournamentId/matches/:matchId/score-snapshot
+Body: { score1: number, score2: number }
+Response: 204 No Content
+```
+
+**Backend behavior:**
+- Validate: match exists, status is `playing`, actor is the assigned referee;
+- Execute a single lightweight UPDATE: `UPDATE matches SET score1=?, score2=? WHERE id=? AND tournament_id=? AND status='playing'`;
+- No transaction wrapper, no `FOR UPDATE` lock, no domain state transition;
+- No status change; match remains `playing`;
+- Return 204 on success, 409 if match is not in `playing` state.
+
+**Frontend behavior:**
+- After each point, call the snapshot endpoint with current `score1`/`score2`;
+- Use `AbortController` to cancel any in-flight snapshot request before sending a
+  new one (prevents stale writes from overwriting newer state);
+- On network error: retry once, then continue (local state is authoritative);
+- Public scoreboard and master view poll at 3–5 second intervals.
 
 **Rationale:**
-- Legacy uses `sync_live_score` API call (`referee.html` L656–664);
-- Modern already has `recordScore` which writes `score1`/`score2`;
-- Polling avoids new push channel or service;
-- Score-snapshot writes are idempotent and do not affect state machine.
+- Legacy uses `sync_live_score` API call (`referee.html` L656–664) as a separate
+  fire-and-forget call;
+- Separating snapshot from final submission preserves state machine integrity;
+- Lightweight UPDATE avoids connection pool exhaustion under concurrent matches;
+- Polling avoids new push channel or service.
 
 **Alternatives considered:**
+- Reuse `recordScore` — rejected: changes status to `'scored'` (CRITICAL flaw);
 - WebSocket push — rejected: new service, violates boundary;
 - Separate `live_score` table — rejected: unnecessary duplication;
 - No live sync — rejected: violates M2-AC-14.
 
 **Impact:**
-- Increased write frequency to `matches` table (one write per point);
+- New lightweight write path (one UPDATE per point, no transaction, no lock);
+- `recordScore` endpoint remains unchanged for final score submission;
 - Public scoreboard displays in-progress scores;
 - M2-AC-15 requires clear "in-progress" vs "official" differentiation.
 
@@ -212,6 +262,13 @@ format: {
    - Even score → right-court player serves;
    - Odd score → left-court player serves;
 5. Singles: server identity follows team, position follows score parity.
+
+**Game-over guard (from Legacy L989, L1057):**
+- After win-condition evaluation returns `true`, set `state.over = true`;
+- All subsequent `award()` calls must be rejected with an early return:
+  `if (matchState.over || activeTimer) return;`
+- This prevents accidental point recording after the game has ended;
+- Undo restores `matchState.over = false` (from Legacy L1067).
 
 **Win-condition evaluation (from Legacy L1056–1057):**
 ```javascript
@@ -312,17 +369,18 @@ required.
 
 ## 6. File change summary
 
-| File | Change |
-|---|---|
-| `Modern/db.sql` | Add migration block for 4 columns |
-| `Modern/repositories/match-operation.repository.js` | Extend `mapRefereeWork` to return `format` object |
-| `Modern/repositories/match.repository.js` | Extend `createMatch` INSERT to include format columns |
-| `Modern/services/schedule-import.service.js` | Add format defaults to `createMatch` call |
-| `Modern/services/competition.service.js` | Add format defaults to both `createMatch` call sites |
-| `Modern/services/match-operations.service.js` | (No change — `recordScore` already accepts `score1`/`score2`) |
-| `Modern/operator/referee-workflow.js` | Implement pre-match setup flow with format pre-fill |
-| `Modern/operator/app.js` | Display format in match card |
-| `Modern/operator/api-client.js` | Add score-snapshot write method |
+| File | Change | Reason |
+|---|---|---|
+| `Modern/db.sql` | Add migration block for 4 columns | ED-01 |
+| `Modern/repositories/match-operation.repository.js` | Extend `mapRefereeWork()` AND `map()` to return `format` object; add `writeScoreSnapshot()` | ED-02, ED-04 |
+| `Modern/repositories/match.repository.js` | Extend `createMatch` INSERT to include format columns in column list and VALUES | ED-03 |
+| `Modern/services/schedule-import.service.js` | Add format defaults to `createMatch` call | ED-03 |
+| `Modern/services/competition.service.js` | Add format defaults to both `createMatch` call sites | ED-03 |
+| `Modern/services/match-operations.service.js` | Add `writeScoreSnapshot()` method (lightweight UPDATE, no transaction, no state change) | ED-04 |
+| `Modern/api/referee-workflow.js` | Add `PUT /:matchId/score-snapshot` route | ED-04 |
+| `Modern/operator/referee-workflow.js` | Implement pre-match setup flow with format pre-fill | ED-05 |
+| `Modern/operator/app.js` | Display format in match card | ED-02 |
+| `Modern/operator/api-client.js` | Add score-snapshot write method with AbortController | ED-04 |
 
 ## 7. Traceability
 
@@ -332,32 +390,51 @@ required.
 | Pre-match setup with format pre-fill | ED-02 (read path), ED-05 (client state) |
 | Rally scoring serve rotation | ED-05 (client state machine) |
 | Win-condition evaluation | ED-05 (client state machine) |
-| Live score sync | ED-04 (score snapshot) |
+| Live score sync | ED-04 (dedicated snapshot endpoint) |
 | Undo last point | ED-05 (history stack) |
 | Multi-game tracking | ED-05 (client state) |
 | localStorage backup | ED-06 |
 | Declared database exception | ED-01 |
+| Public scoreboard compatibility | ED-07 (read path already compatible) |
+| Master visibility compatibility | ED-07 (read path already compatible) |
+
+### ED-07: Public scoreboard and master visibility read paths (no change required)
+
+**Assessment:** The existing read paths already read `m.score1` and `m.score2`:
+
+- `public-match-scoreboard.repository.js` L15–16: `m.score1, m.score2` in SELECT;
+- `public-match-scoreboard.service.js` L23–26: maps `score1`/`score2` to public response;
+- `public-match-scoreboard.service.js` L22: returns `status: row.match_status` (enables
+  in-progress vs final differentiation);
+- `master-operational-visibility.repository.js` L31–32: maps `score1`/`score2`.
+
+**Conclusion:** No code changes required for these read paths. Once ED-04 writes
+score snapshots to `matches.score1/score2`, both the public scoreboard and master
+visibility will automatically display in-progress scores because they already read
+these columns. The `confirmed: Boolean(row.has_official_record)` field in the
+public scoreboard provides the required M2-AC-15 differentiation.
 
 ## 8. Acceptance criteria mapping
 
-| AC | Engineering decision |
-|---|---|
-| M2-AC-01 (format config) | ED-01, ED-02, ED-05 |
-| M2-AC-01a (Master pre-fill) | ED-02, ED-03 |
-| M2-AC-01b (defaults) | ED-03 |
-| M2-AC-03 (rally rotation) | ED-05 |
-| M2-AC-04 (server display) | ED-05 |
-| M2-AC-05 (timeline) | ED-05 |
-| M2-AC-05a (win condition) | ED-05 |
-| M2-AC-06 (side-switch) | ED-05 |
-| M2-AC-07 (timeout) | ED-05 |
-| M2-AC-08 (medical timeout) | ED-05 |
-| M2-AC-09 (undo) | ED-05 |
-| M2-AC-10 (multi-game) | ED-05 |
-| M2-AC-14 (live sync) | ED-04 |
-| M2-AC-18 (architectural compliance) | ED-01 (declared exception) |
-| M2-AC-19 (client state) | ED-05, ED-06 |
-| M2-AC-20 (automation coverage) | Test plan required |
+| AC | Engineering decision | Notes |
+|---|---|---|
+| M2-AC-01 (format config) | ED-01, ED-02, ED-05 | |
+| M2-AC-01a (Master pre-fill) | ED-02, ED-03 | |
+| M2-AC-01b (defaults) | ED-03 | |
+| M2-AC-03 (rally rotation) | ED-05 | Includes game-over guard |
+| M2-AC-04 (server display) | ED-05 | |
+| M2-AC-05 (timeline) | ED-05 | |
+| M2-AC-05a (win condition) | ED-05 | |
+| M2-AC-06 (side-switch) | ED-05 | |
+| M2-AC-07 (timeout) | ED-05 | |
+| M2-AC-08 (medical timeout) | ED-05 | |
+| M2-AC-09 (undo) | ED-05 | Includes over-state restore |
+| M2-AC-10 (multi-game) | ED-05 | |
+| M2-AC-14 (live sync) | ED-04 | Dedicated snapshot endpoint |
+| M2-AC-15 (in-progress vs official) | ED-04, ED-07 | Scoreboard already differentiates |
+| M2-AC-18 (architectural compliance) | ED-01 (declared exception) | |
+| M2-AC-19 (client state) | ED-05, ED-06 | |
+| M2-AC-20 (automation coverage) | Test plan §9 | |
 
 ## 9. Test plan
 
@@ -376,27 +453,37 @@ required.
 
 - [ ] `createMatch` with format fields succeeds;
 - [ ] `createMatch` without format fields uses defaults;
-- [ ] Score-snapshot write does not change status.
+- [ ] Score-snapshot write does NOT change status (remains `playing`);
+- [ ] Score-snapshot write returns 409 if match status is not `playing`;
+- [ ] Score-snapshot write is a single UPDATE without transaction/lock;
+- [ ] Final `recordScore` still changes status to `scored` (regression).
 
 ### 9.4 Client-side state machine tests
 
 - [ ] Rally rotation: partner swap on serve win;
 - [ ] Rally rotation: parity-based next server;
+- [ ] Rally rotation: no swap when receiving side wins;
 - [ ] Win condition: target + 2-point lead;
 - [ ] Win condition: cap-score forced end;
 - [ ] Win condition: cap=0 no cap;
-- [ ] Undo: restores score, rotation, timeline;
+- [ ] Game-over guard: points rejected after game ends;
+- [ ] Undo: restores score, rotation, timeline, and over-state;
 - [ ] Side-switch: triggers at half-score;
+- [ ] Side-switch: triggers only once;
 - [ ] Multi-game: best-of-3 tracking;
 - [ ] Timeout: quota tracking per game;
-- [ ] Medical timeout: quota tracking per match.
+- [ ] Medical timeout: quota tracking per match;
+- [ ] AbortController: in-flight snapshot cancelled before new one sent.
 
 ### 9.5 Live sync tests
 
 - [ ] Score-snapshot write updates `matches.score1/score2`;
-- [ ] Public scoreboard displays in-progress score;
+- [ ] Score-snapshot write does NOT update `matches.status`;
+- [ ] Public scoreboard displays in-progress score (status=`playing`, confirmed=false);
 - [ ] Master view displays in-progress score;
-- [ ] In-progress score is visually differentiated from official result.
+- [ ] In-progress score is visually differentiated from official result (M2-AC-15);
+- [ ] After final submission, score shows as confirmed;
+- [ ] Concurrent snapshot writes do not corrupt data.
 
 ### 9.6 Backup/restore tests
 
@@ -415,7 +502,23 @@ ED-M2-RMO-001 makes no decision about:
 - Match format editing after play begins;
 - Tournament creation, draw generation, or schedule optimization.
 
-## 11. Change and reconsideration control
+## 11. Implementation constraints (from review)
+
+These constraints are derived from the Gemini review findings and must be observed
+during implementation:
+
+1. **XSS prevention:** All HTML template interpolations in the referee scoring panel
+   must use an `escapeHtml` function that escapes `<`, `>`, `"`, `'`, and `&`.
+   Attribute values (e.g., `data-team="${team}"`) require quote-aware escaping.
+2. **Polling lifecycle:** Score-snapshot writes must use `AbortController` to cancel
+   in-flight requests before sending new ones. On network error, retry once then
+   continue (local state is authoritative).
+3. **Status guard:** The score-snapshot endpoint must reject requests when match
+   status is not `playing` (return 409). This prevents writes after final submission.
+4. **No domain bypass:** The score-snapshot endpoint validates actor identity and
+   match assignment but does NOT invoke domain state machine transitions.
+
+## 12. Change and reconsideration control
 
 This design applies only to the exact baselines above. A material change to the
 product boundary, a cited source, a decision, or a finding requires governed
@@ -423,4 +526,4 @@ impact review and reassessment.
 
 ---
 
-**Status:** Draft; awaiting review
+**Status:** Draft; review findings addressed; awaiting approval
