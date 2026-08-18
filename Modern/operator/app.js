@@ -9,6 +9,108 @@ function escapeHtml(value) {
   })[character]);
 }
 
+// M2 Referee Match Operation Experience (ED-05/ED-06): client-side rally
+// scoring sessions. State lives here (plus a localStorage backup); only score
+// snapshots travel to the backend.
+const scoringSessions = new Map();
+let currentMatches = [];
+
+function scoringSession(match) {
+  const key = String(match.id);
+  let session = scoringSessions.get(key);
+  if (session) return session;
+  const backup = RefereeScoring.createBackup({
+    storage: window.localStorage,
+    key: `top-referee-scoring:${key}`
+  });
+  const restored = backup.load();
+  const scoring = RefereeScoring.createRallyScoring({
+    restore: restored,
+    format: match.format,
+    teams: { team1: match.team1?.name, team2: match.team2?.name },
+    doubles: Boolean(match.team1?.playerIds?.length > 1 || match.team2?.playerIds?.length > 1)
+  });
+  session = { scoring, backup, sideSwitchNotice: false };
+  scoringSessions.set(key, session);
+  return session;
+}
+
+function releaseSession(matchId) {
+  const session = scoringSessions.get(String(matchId));
+  if (session) session.backup.clear();
+  scoringSessions.delete(String(matchId));
+}
+
+function persistAndSnapshot(match, session) {
+  session.backup.save(session.scoring.state());
+  const context = workflow.getContext();
+  if (!context) return;
+  const state = session.scoring.state();
+  api.scoreSnapshot(context.tournamentId, context.refereeId, match.id, {
+    score1: state.t1Score, score2: state.t2Score
+  }).catch(() => { /* snapshots are best-effort; local state stays authoritative */ });
+}
+
+function timelineDots(timeline) {
+  const recent = timeline.slice(-40);
+  if (!recent.length) return `<span class="muted">尚未开始计分</span>`;
+  return recent.map((team) => `<span class="dot dot-t${team}"></span>`).join("");
+}
+
+function scoringPanel(match) {
+  const session = scoringSession(match);
+  const scoring = session.scoring;
+  const state = scoring.state();
+  const team1 = escapeHtml(match.team1?.name || "一方");
+  const team2 = escapeHtml(match.team2?.name || "另一方");
+  const serving = scoring.servingInfo();
+  const servingName = serving.team === 1 ? team1 : team2;
+  const bestOfThree = state.match.gameFormat !== 1;
+  const capLabel = state.match.capScore > 0 ? `封顶 ${state.match.capScore}` : "无封顶";
+  const notice = session.sideSwitchNotice
+    ? `<p class="notice error" role="alert">🔄 换边提醒：一方已达 ${Math.ceil(state.match.targetScore / 2)} 分，请指挥双方交换场地。</p>` : "";
+
+  const sideControls = (team) => {
+    const name = team === 1 ? team1 : team2;
+    const timeoutUsed = state.timeouts[team === 1 ? "t1" : "t2"] >= 1;
+    const medicalUsed = state.timeouts[team === 1 ? "medicalT1" : "medicalT2"] >= 1;
+    const disabled = state.gameEnded || state.matchEnded;
+    return `<div class="scoring-side">
+      <span class="side-name">${name}</span>
+      <strong class="side-score">${team === 1 ? state.t1Score : state.t2Score}</strong>
+      <button data-scoring-action="award" data-team="${team}" ${disabled ? "disabled" : ""}>+1 ${name}</button>
+      <div class="side-tools">
+        <button data-scoring-action="timeout" data-team="${team}" ${disabled || timeoutUsed ? "disabled" : ""}>${timeoutUsed ? "暂停已用" : "暂停"}</button>
+        <button data-scoring-action="medical" data-team="${team}" ${disabled || medicalUsed ? "disabled" : ""}>${medicalUsed ? "伤停已用" : "医疗伤停"}</button>
+      </div>
+    </div>`;
+  };
+
+  let endControls = "";
+  if (state.gameEnded && !state.matchEnded) {
+    endControls = `<button data-scoring-action="end-game" class="primary">确认本局结果${bestOfThree ? "，进入下一局" : ""}</button>`;
+  } else if (state.matchEnded) {
+    const final = scoring.finalScore();
+    endControls = `<p class="complete">比赛结束，局分 ${state.t1Wins} - ${state.t2Wins}（${state.results.map(escapeHtml).join("、")}）</p>
+      <form class="score-form"><label>${team1}<input name="score1" type="number" min="0" required value="${final.score1}"></label><label>${team2}<input name="score2" type="number" min="0" required value="${final.score2}"></label><button>录入比分并结束执行</button></form>`;
+  }
+
+  return `<div class="scoring-panel">
+    <div class="scoring-meta"><span>第 ${state.currentGame} 局${bestOfThree ? ` · 三局两胜 ${state.t1Wins}-${state.t2Wins}` : ""}</span><span>目标 ${state.match.targetScore} 分 · ${capLabel}</span></div>
+    ${notice}
+    <div class="scoring-board">
+      ${sideControls(1)}
+      <div class="serve-info"><span class="eyebrow">发球</span><strong>${servingName}</strong><span>${escapeHtml(serving.player)} · ${serving.court === "right" ? "右区" : "左区"}</span></div>
+      ${sideControls(2)}
+    </div>
+    <div class="timeline" aria-label="得分轨迹">${timelineDots(state.timeline)}</div>
+    <div class="scoring-actions">
+      <button data-scoring-action="undo">撤回上一分</button>
+      ${endControls}
+    </div>
+  </div>`;
+}
+
 function matchCard(match) {
   const team1 = escapeHtml(match.team1?.name || "一方");
   const team2 = escapeHtml(match.team2?.name || "另一方");
@@ -16,7 +118,7 @@ function matchCard(match) {
   const score2 = match.score2 ?? "–";
   const playingAction = ["constrained", "uncertain"].includes(match.courtCondition)
     ? `<p class="notice error">场地${match.courtCondition === "constrained" ? "受限" : "状态待确认"}，请明确中断比赛。</p><button data-action="interrupt">中断比赛</button>`
-    : `<form class="score-form"><label>${team1}<input name="score1" type="number" min="0" required></label><label>${team2}<input name="score2" type="number" min="0" required></label><button>录入比分并结束执行</button></form>`;
+    : scoringPanel(match);
   const interruptedAction = match.courtCondition === "available"
     ? `<p class="complete">场地已由主控报告恢复，请明确恢复比赛。</p><button data-action="resume">恢复比赛</button>`
     : `<p class="muted">比赛已中断，等待主控报告场地恢复。</p>`;
@@ -42,8 +144,13 @@ const view = {
   busy(matchId) { notice.textContent = `正在更新比赛 ${matchId}…`; notice.className = "notice"; },
   error(message) { notice.textContent = UiText.userFacingError(message); notice.className = "notice error"; },
   matches(matches) {
+    currentMatches = matches;
     notice.textContent = `已加载 ${matches.length} 场已分配比赛。`;
     notice.className = "notice";
+    // Matches that left play release their local scoring backup.
+    for (const [matchId] of scoringSessions) {
+      if (!matches.some((match) => String(match.id) === matchId && match.status === "playing")) releaseSession(matchId);
+    }
     list.innerHTML = matches.length ? matches.map(matchCard).join("") : `<div class="empty"><strong>当前任务已全部处理。</strong><p>目前没有已分配的比赛。</p></div>`;
   }
 };
@@ -64,13 +171,46 @@ list.addEventListener("click", (event) => {
       matchId: matchEl.dataset.matchId,
       dispatchVersion: Number(matchEl.dataset.dispatchVersion || 0)
     });
+    return;
+  }
+  const scoringButton = event.target.closest("button[data-scoring-action]");
+  if (!scoringButton) return;
+  const matchEl = scoringButton.closest(".match");
+  const matchId = matchEl.dataset.matchId;
+  const session = scoringSessions.get(matchId);
+  if (!session) return;
+  const team = Number(scoringButton.dataset.team);
+  const action = scoringButton.dataset.scoringAction;
+  let result = null;
+  if (action === "award") result = session.scoring.award(team);
+  if (action === "undo") {
+    if (!session.scoring.undo()) { view.error("没有可撤回的判罚记录"); return; }
+    session.sideSwitchNotice = false;
+  }
+  if (action === "timeout") result = session.scoring.requestTimeout(team);
+  if (action === "medical") result = session.scoring.requestMedical(team);
+  if (action === "end-game") {
+    session.scoring.endGame();
+    session.sideSwitchNotice = false;
+  }
+  if (result?.rejected === "ended") { view.error("本局比赛已结束，无法继续计分"); return; }
+  if (result && result.ok === false && result.reason === "quota") { view.error("该队额度已用尽"); return; }
+  if (result?.sideSwitch) session.sideSwitchNotice = true;
+  if (result?.gameWon) notice.textContent = "本局比赛已结束，请确认结果。", notice.className = "notice";
+  // Re-render only this card so other cards keep their state untouched.
+  const matchData = currentMatches.find((match) => String(match.id) === matchId);
+  if (matchData) {
+    matchEl.outerHTML = matchCard(matchData);
+    persistAndSnapshot(matchData, session);
   }
 });
 list.addEventListener("submit", (event) => {
   if (!event.target.matches(".score-form")) return;
   event.preventDefault();
   const values = new FormData(event.target);
-  workflow.run({ type: "score", matchId: event.target.closest(".match").dataset.matchId,
+  const matchId = event.target.closest(".match").dataset.matchId;
+  releaseSession(matchId);
+  workflow.run({ type: "score", matchId,
     score: { score1: Number(values.get("score1")), score2: Number(values.get("score2")) } });
 });
 

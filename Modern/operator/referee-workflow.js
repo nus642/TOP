@@ -45,7 +45,12 @@
         if (accountabilityFlow) accountability = accountabilityFlow.begin({ actorType: "referee", competitionId: context.tournamentId });
         return refresh();
       },
-      run
+      run,
+      // Read-only context accessor so the UI can scope auxiliary calls (e.g. live
+      // score snapshots) to the same tournament/referee as the workflow.
+      getContext() {
+        return context ? { ...context } : null;
+      }
     };
   }
   return { createRefereeWorkflow };

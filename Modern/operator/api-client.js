@@ -4,6 +4,10 @@
   if (typeof window !== "undefined") window.RefereeApi = api;
 })(function createModule() {
   function createRefereeApi({ fetchImpl = fetch, baseUrl = "/api", accountabilityContext } = {}) {
+    // Per-match snapshot controllers: a newer snapshot cancels any in-flight
+    // older one so stale writes cannot overtake newer score state (M2 ED-04).
+    const snapshotControllers = new Map();
+
     async function request(path, options) {
       const metadata = accountabilityContext ? accountabilityContext.headers() : {};
       const requestOptions = accountabilityContext
@@ -52,6 +56,23 @@
         return request(`/referee-workflow/${scope(tournamentId, refereeId)}/matches/${encodeURIComponent(matchId)}/score`, {
           method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(score)
         });
+      },
+      scoreSnapshot(tournamentId, refereeId, matchId, score) {
+        snapshotControllers.get(matchId)?.abort();
+        const options = {
+          method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(score)
+        };
+        if (typeof AbortController !== "undefined") {
+          const controller = new AbortController();
+          snapshotControllers.set(matchId, controller);
+          options.signal = controller.signal;
+        }
+        return request(`/referee-workflow/${scope(tournamentId, refereeId)}/matches/${encodeURIComponent(matchId)}/score-snapshot`, options)
+          .catch((error) => {
+            // A superseded snapshot is not an error: the newer write carries truth.
+            if (error?.name === "AbortError") return null;
+            throw error;
+          });
       }
     };
   }
