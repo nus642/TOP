@@ -54,10 +54,10 @@ test("thin workflow delegates actions and refreshes authoritative matches", asyn
 });
 
 test("API errors are exposed without inventing local workflow state", async () => {
-  const fetchImpl = async () => ({ ok: false, json: async () => ({ error: "Match is not scored" }) });
+  const fetchImpl = async () => ({ ok: false, status: 409, json: async () => ({ error: "Match is not scored" }) });
   await assert.rejects(
     createRefereeApi({ fetchImpl }).recordScore(3, "referee-7", 9, { score1: 11, score2: 8 }),
-    /Match is not scored/
+    (error) => error.message === "Match is not scored" && error.statusCode === 409
   );
 });
 
