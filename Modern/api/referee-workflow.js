@@ -37,6 +37,11 @@ router.post("/:tournamentId/referees/:refereeId/matches/:matchId/score", handler
   "recordScore",
   (req) => ({ score1: req.body.score1, score2: req.body.score2 })
 ));
+// Live score snapshot (M2 ED-04): per-point score write without state transition.
+router.put("/:tournamentId/referees/:refereeId/matches/:matchId/score-snapshot", handler(
+  "writeScoreSnapshot",
+  (req) => ({ score1: req.body.score1, score2: req.body.score2 })
+));
 
 // Referee can view their own assigned (awaiting acceptance) dispatch assignments
 router.get("/:tournamentId/referees/:refereeId/draft-assignments", async (req, res) => {

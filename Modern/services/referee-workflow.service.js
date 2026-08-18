@@ -37,6 +37,13 @@ function recordScore(tournamentId, refereeValue, matchId, data = {}) {
   );
 }
 
+// Live score snapshot (M2 ED-04): lightweight per-point score write that does
+// not transition match state. Match Operations remains the execution authority.
+function writeScoreSnapshot(tournamentId, refereeValue, matchId, data = {}) {
+  const actor = refereeActor(refereeValue);
+  return matchOperationsService.writeScoreSnapshot(tournamentId, matchId, actor, data);
+}
+
 function startMatch(tournamentId, refereeValue, matchId) {
   const actor = refereeActor(refereeValue);
   return matchOperationsService.startMatch(tournamentId, matchId, {
@@ -52,4 +59,4 @@ function resumeMatch(tournamentId, refereeValue, matchId, data = {}) {
   return matchOperationsService.resumeMatch(tournamentId, matchId, refereeActor(refereeValue), data);
 }
 
-module.exports = { acceptMatch, acceptDispatch, startMatch, recordScore, interruptMatch, resumeMatch };
+module.exports = { acceptMatch, acceptDispatch, startMatch, recordScore, writeScoreSnapshot, interruptMatch, resumeMatch };

@@ -165,6 +165,45 @@ function recordScore(tournamentId, matchId, data = {}) {
     (connection, tid, mid, match) => repository.recordScore(tid, mid, match.score1, match.score2, connection));
 }
 
+function snapshotScore(value, name) {
+  const score = Number(value);
+  if (!Number.isInteger(score) || score < 0) {
+    const error = new Error(`Valid non-negative integer ${name} is required`);
+    error.code = "VALIDATION_ERROR";
+    throw error;
+  }
+  return score;
+}
+
+// Lightweight live-score snapshot (M2 ED-04). Writes score1/score2 only - no
+// state machine transition, no transaction, no FOR UPDATE lock. The actor must
+// be the assigned referee and the match must be playing; otherwise reject.
+async function writeScoreSnapshot(tournamentValue, matchValue, actor, data = {}) {
+  const tournamentId = positiveId(tournamentValue, "tournament id");
+  const matchId = positiveId(matchValue, "match id");
+  const score1 = snapshotScore(data.score1, "score1");
+  const score2 = snapshotScore(data.score2, "score2");
+  const actorId = requiredRefereeId(actor && actor.actorId);
+  const record = await repository.findById(tournamentId, matchId);
+  if (!record) {
+    const error = new Error("Match not found");
+    error.code = "NOT_FOUND";
+    throw error;
+  }
+  if (record.refereeId == null || String(record.refereeId) !== actorId) {
+    const error = new Error("Only the assigned referee can write score snapshots");
+    error.code = "FORBIDDEN";
+    throw error;
+  }
+  const affectedRows = await repository.writeScoreSnapshot(tournamentId, matchId, score1, score2);
+  if (affectedRows === 0) {
+    const error = new Error("Score snapshot rejected: match is not playing");
+    error.code = "CONFLICT";
+    throw error;
+  }
+  return { matchId, score1, score2 };
+}
+
 function submitResult(tournamentId, matchId, actor, data = {}) {
   const tid = positiveId(tournamentId, "tournament id"); const mid = positiveId(matchId, "match id");
   return db.withTransaction(async (connection) => {
@@ -385,6 +424,7 @@ module.exports = {
   startMatch,
   getMatchOperationContext,
   recordScore,
+  writeScoreSnapshot,
   submitResult,
   interruptMatch,
   resumeMatch,

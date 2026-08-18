@@ -33,6 +33,8 @@ function createApp({ actorSessions = createActorSessionStore() } = {}) {
   app.use("/public", express.static(path.join(__dirname, "public")));
   app.use("/archive", express.static(path.join(__dirname, "archive")));
   app.use("/presentation", express.static(path.join(__dirname, "presentation")));
+// Local development tools only (e.g. dev-login.html); kept outside production assets.
+app.use("/dev", express.static(path.join(__dirname, "dev")));
 
   app.use("/api/competition", requireActorSession(actorSessions), scheduleImportRoutes);
   app.use("/api/competition", competitionRoutes);

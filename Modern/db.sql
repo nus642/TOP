@@ -70,6 +70,10 @@ CREATE TABLE IF NOT EXISTS matches (
     team2_name VARCHAR(100),
     score1 INT DEFAULT NULL,
     score2 INT DEFAULT NULL,
+    game_format TINYINT UNSIGNED NOT NULL DEFAULT 1,
+    score_rule VARCHAR(10) NOT NULL DEFAULT 'rally',
+    target_score SMALLINT UNSIGNED NOT NULL DEFAULT 21,
+    cap_score SMALLINT UNSIGNED NOT NULL DEFAULT 21,
     referee_id VARCHAR(100) DEFAULT NULL,
     assigned_at TIMESTAMP NULL DEFAULT NULL,
     dispatch_id VARCHAR(100) DEFAULT NULL,
@@ -102,6 +106,33 @@ DEALLOCATE PREPARE stmt;
 
 SET @col_exists = (SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='matches' AND COLUMN_NAME='dispatch_version');
 SET @sql = IF(@col_exists = 0, 'ALTER TABLE matches ADD COLUMN dispatch_version BIGINT DEFAULT NULL AFTER dispatch_id', 'SELECT 1');
+PREPARE stmt FROM @sql;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
+
+-- M2 Referee Match Operation Experience: static match-format configuration columns.
+-- Declared database exception per M2 boundary doc (column extension on existing
+-- matches table; static configuration facts, not match-state transitions).
+SET @col_exists = (SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='matches' AND COLUMN_NAME='game_format');
+SET @sql = IF(@col_exists = 0, 'ALTER TABLE matches ADD COLUMN game_format TINYINT UNSIGNED NOT NULL DEFAULT 1 AFTER score2', 'SELECT 1');
+PREPARE stmt FROM @sql;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
+
+SET @col_exists = (SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='matches' AND COLUMN_NAME='score_rule');
+SET @sql = IF(@col_exists = 0, 'ALTER TABLE matches ADD COLUMN score_rule VARCHAR(10) NOT NULL DEFAULT ''rally'' AFTER game_format', 'SELECT 1');
+PREPARE stmt FROM @sql;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
+
+SET @col_exists = (SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='matches' AND COLUMN_NAME='target_score');
+SET @sql = IF(@col_exists = 0, 'ALTER TABLE matches ADD COLUMN target_score SMALLINT UNSIGNED NOT NULL DEFAULT 21 AFTER score_rule', 'SELECT 1');
+PREPARE stmt FROM @sql;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
+
+SET @col_exists = (SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='matches' AND COLUMN_NAME='cap_score');
+SET @sql = IF(@col_exists = 0, 'ALTER TABLE matches ADD COLUMN cap_score SMALLINT UNSIGNED NOT NULL DEFAULT 21 AFTER target_score', 'SELECT 1');
 PREPARE stmt FROM @sql;
 EXECUTE stmt;
 DEALLOCATE PREPARE stmt;

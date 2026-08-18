@@ -34,9 +34,13 @@ async function createMatch(match, connection = db){
             team2_name,
             score1,
             score2,
+            game_format,
+            score_rule,
+            target_score,
+            cap_score,
             status
         )
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         `,
         [
             match.tournament_id,
@@ -50,6 +54,10 @@ async function createMatch(match, connection = db){
             match.team2_name,
             match.score1,
             match.score2,
+            match.game_format ?? 1,
+            match.score_rule ?? "rally",
+            match.target_score ?? 21,
+            match.cap_score ?? 21,
             match.status || "idle"
         ]
     );

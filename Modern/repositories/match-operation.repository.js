@@ -1,5 +1,16 @@
 const db = require("../database/db");
 
+// Static match-format configuration (M2 Referee Match Operation Experience).
+// Defaults match the declared database exception: single game / rally / 21 / 21.
+function formatOf(row) {
+  return {
+    gameFormat: Number(row.game_format ?? 1),
+    scoreRule: row.score_rule || "rally",
+    targetScore: Number(row.target_score ?? 21),
+    capScore: Number(row.cap_score ?? 21)
+  };
+}
+
 function map(row) {
   return row && {
     id: row.id,
@@ -16,7 +27,8 @@ function map(row) {
     resultConfirmedBy: row.result_confirmed_by,
     participantIds: [row.player1_id, row.player2_id, row.player3_id, row.player4_id]
       .filter((id) => id !== null && id !== undefined),
-    startedAt: row.started_at
+    startedAt: row.started_at,
+    format: formatOf(row)
   };
 }
 
@@ -49,7 +61,8 @@ function mapRefereeWork(row) {
       id: row.disruption_id,
       disposition: row.disruption_disposition,
       version: Number(row.disruption_version)
-    } : null
+    } : null,
+    format: formatOf(row)
   };
 }
 
@@ -196,6 +209,19 @@ async function recordScore(tournamentId, matchId, score1, score2, connection = d
   return findById(tournamentId, matchId, connection);
 }
 
+// Lightweight live-score snapshot write (M2 ED-04). Deliberately bypasses the
+// domain state machine and writes score1/score2 only; status stays 'playing'.
+// No transaction, no FOR UPDATE lock - safe for per-point high-frequency calls.
+// Returns affected row count: 0 means the match is not in 'playing' state.
+async function writeScoreSnapshot(tournamentId, matchId, score1, score2, connection = db) {
+  const [result] = await connection.query(
+    `UPDATE matches SET score1 = ?, score2 = ?
+     WHERE tournament_id = ? AND id = ? AND status = 'playing'`,
+    [score1, score2, tournamentId, matchId]
+  );
+  return result.affectedRows;
+}
+
 async function interrupt(tournamentId, matchId, connection = db) {
   await connection.query(
     `UPDATE matches SET status = 'interrupted' WHERE tournament_id = ? AND id = ?`,
@@ -238,6 +264,7 @@ module.exports = {
   reassignDispatch,
   start,
   recordScore,
+  writeScoreSnapshot,
   interrupt,
   resume,
   confirm,
