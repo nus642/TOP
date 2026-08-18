@@ -34,9 +34,9 @@
     function headers() {
       const context = current();
       return Object.freeze({
-        [HEADER_NAMES.actorId]: context.actorId,
-        [HEADER_NAMES.actorType]: context.actorType,
-        [HEADER_NAMES.competitionId]: context.competitionId
+        [HEADER_NAMES.actorId]: encodeURIComponent(context.actorId),
+        [HEADER_NAMES.actorType]: encodeURIComponent(context.actorType),
+        [HEADER_NAMES.competitionId]: encodeURIComponent(context.competitionId)
       });
     }
 
