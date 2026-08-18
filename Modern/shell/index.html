@@ -7,6 +7,20 @@
 <body><main>
   <header><span class="brand">TOP</span><span class="eyebrow">赛事运行</span><h1>赛事操作工作台</h1><p>登录后，从统一入口进入您本场赛事所需的工具。</p></header>
   <p id="status" class="status" role="status">正在确认登录身份…</p>
+  <section id="login-entry" hidden aria-labelledby="login-title">
+    <div class="experience"><span class="eyebrow">尚未登录</span><h2 id="login-title">选择角色进入赛事工作台</h2><p id="login-summary">当前无有效登录身份。选择您的角色并输入姓名后登录。裁判员请前往裁判工作台从花名册选择本人姓名。当前无密码认证，仅限赛日可信网络场景使用。</p></div>
+    <form id="login-form">
+      <label>角色<select name="actorType">
+        <option value="master">主控 • 赛事管理</option>
+        <option value="referee">裁判 • 比赛操作</option>
+        <option value="participant">选手 • 签到准备</option>
+      </select></label>
+      <label id="login-actor-label">姓名 / 编号<input name="actorId" required placeholder="例如：master-1"></label>
+      <label>比赛编号（可选）<input id="login-competition" name="competitionId" inputmode="numeric" placeholder="输入比赛 ID"></label>
+      <button class="action" type="submit">登录并进入工作台</button>
+    </form>
+    <p id="login-status" class="hint" aria-live="polite"></p>
+  </section>
   <section id="authenticated-content" hidden>
     <div id="accountability" class="landing-accountability"></div>
     <div class="experience" aria-labelledby="experience-title"><span class="eyebrow">当前任务</span><h2 id="experience-title"></h2><p id="experience-summary"></p></div>

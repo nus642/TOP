@@ -28,4 +28,74 @@ const view = {
 
 const shell = OperatorShell.createOperatorShell({ fetchImpl: fetch, storage: localStorage, view });
 competition.addEventListener("input", () => shell.selectCompetition(competition.value));
-shell.hydrate().catch(() => {});
+
+// Development bootstrap login entry: shown only when no authenticated session
+// exists. Referees are routed to the roster-based identity entry on the
+// referee workspace; master and participant identities are established
+// directly via the development-only foundation-establish boundary.
+const loginEntry = (() => {
+  const entry = document.querySelector("#login-entry");
+  const form = document.querySelector("#login-form");
+  const loginStatus = document.querySelector("#login-status");
+  const actorTypeSelect = form.elements.actorType;
+  const actorInput = form.elements.actorId;
+  const competitionInput = form.elements.competitionId;
+
+  function presetCompetition() {
+    const query = new URLSearchParams(window.location.search).get("competitionId");
+    return query || localStorage.getItem(ResponsibilityContext.COMPETITION_KEY) || "";
+  }
+
+  function setLoginStatus(message, isError = false) {
+    loginStatus.textContent = message;
+    loginStatus.className = isError ? "status error" : "hint";
+  }
+
+  function syncActorField() {
+    const isReferee = actorTypeSelect.value === "referee";
+    actorInput.required = !isReferee;
+    actorInput.disabled = isReferee;
+    actorInput.value = "";
+    actorInput.placeholder = isReferee ? "裁判员在裁判工作台从花名册选择本人姓名" : "例如：master-1";
+  }
+
+  actorTypeSelect.addEventListener("change", syncActorField);
+
+  form.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    const actorType = actorTypeSelect.value;
+    const competitionId = competitionInput.value.trim();
+    if (actorType === "referee") {
+      window.location.href = competitionId
+        ? `/operator/?competitionId=${encodeURIComponent(competitionId)}`
+        : "/operator/";
+      return;
+    }
+    const actorId = actorInput.value.trim();
+    if (!actorId) { setLoginStatus("请输入姓名 / 编号。", true); return; }
+    setLoginStatus("正在建立登录身份…");
+    try {
+      const response = await fetch("/api/session/foundation-establish", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ actorType, actorId })
+      });
+      const body = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(body.error || "身份建立失败");
+      if (competitionId) localStorage.setItem(ResponsibilityContext.COMPETITION_KEY, competitionId);
+      window.location.reload();
+    } catch (error) {
+      setLoginStatus(UiText.userFacingError(error), true);
+    }
+  });
+
+  return {
+    show() {
+      competitionInput.value = presetCompetition();
+      syncActorField();
+      entry.hidden = false;
+    }
+  };
+})();
+
+shell.hydrate().catch(() => loginEntry.show());
