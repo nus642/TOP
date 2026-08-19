@@ -32,6 +32,10 @@ async function main() {
     console.log('Created tournament', tournamentId);
   }
 
+  // 1b. Ensure tournament status is 'running' (required for match start)
+  await c.query("UPDATE tournaments SET status = 'running' WHERE id = ? AND status != 'running'", [tournamentId]);
+  console.log('Ensured tournament status is running');
+
   // 2. Players (use existing ones when available)
   [rows] = await c.query('SELECT id, name FROM players WHERE tournament_id = ? ORDER BY id LIMIT 4', [tournamentId]);
   for (let i = rows.length; i < 4; i++) {
@@ -76,6 +80,19 @@ async function main() {
     [rows] = await c.query('SELECT LAST_INSERT_ID() AS id');
     matchId = rows[0].id;
     console.log('Created accepted match', matchId);
+  }
+
+  // 6. Ensure match_schedules row exists (required for court availability check)
+  const [schedRows] = await c.query(
+    'SELECT id FROM match_schedules WHERE tournament_id = ? AND match_id = ?',
+    [tournamentId, matchId]
+  );
+  if (!schedRows.length) {
+    await c.query(
+      'INSERT INTO match_schedules (tournament_id, match_id, court_id, scheduled_at) VALUES (?, ?, ?, NOW())',
+      [tournamentId, matchId, 'Court A']
+    );
+    console.log('Created match_schedules row for match', matchId);
   }
 
   console.log(`\nReady. Log in via /dev/dev-login.html as "${REFEREE_ID}" (Referee), competition ${tournamentId}.`);

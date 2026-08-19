@@ -158,11 +158,11 @@ test("timeout quota resets per game", () => {
     format: { scoreRule: "rally", gameFormat: 3, targetScore: 2, capScore: 0 },
     teams: { team1: "X", team2: "Y" }, doubles: false
   });
-  assert.deepEqual(scoring.requestTimeout(1), { ok: true });
+  assert.equal(scoring.requestTimeout(1).ok, true);
   assert.equal(scoring.requestTimeout(1).reason, "quota");
   scoring.award(1); scoring.award(1);
   scoring.endGame();
-  assert.deepEqual(scoring.requestTimeout(1), { ok: true });
+  assert.equal(scoring.requestTimeout(1).ok, true);
 });
 
 test("medical timeout quota persists across games", () => {
@@ -220,10 +220,155 @@ test("courtLayout reports left/right players, server, and view flag", () => {
   assert.equal(layout.servingTeam, 1);
   assert.equal(layout.servingPlayer, "B"); // score 0 -> right court serves
   assert.equal(layout.viewSwapped, false);
+  // 首发/首接 tracking: initial server team and receiver
+  assert.equal(layout.initServTeam, 1);
+  assert.equal(layout.initServPlayer, "B"); // team1 right court = initial server
+  assert.equal(layout.initRevPlayer, "D"); // team2 right court player is initial receiver
 
   scoring.award(1); // serving side wins: positions swap to l=B, r=A
   layout = scoring.courtLayout();
   assert.deepEqual(layout.t1, { left: "B", right: "A" });
   assert.equal(layout.servingPlayer, "B"); // t1 score 1 (odd) -> left court serves
   assert.equal(layout.servingCourt, "left");
+  // 首发/首接 persists across score changes
+  assert.equal(layout.initServTeam, 1);
+  assert.equal(layout.initServPlayer, "B");
+  assert.equal(layout.initRevPlayer, "D");
+});
+
+test("首发/首接: initServTeam and initRevPlayer track initial serving setup", () => {
+  // Team 1 serves first: initServTeam=1, initRevPlayer=team2 right court
+  const scoring1 = doublesScoring({ targetScore: 11, capScore: 0 });
+  let state = scoring1.state();
+  assert.equal(state.initServTeam, 1);
+  assert.equal(state.initServPlayer, "B"); // team1 right court
+  assert.equal(state.initRevPlayer, "D"); // team2 right court
+
+  // Team 2 serves first: initServTeam=2, initRevPlayer=team1 right court
+  const scoring2 = createRallyScoring({
+    format: { scoreRule: "rally", gameFormat: 1, targetScore: 11, capScore: 0 },
+    teams: { team1Left: "A", team1Right: "B", team2Left: "C", team2Right: "D" },
+    doubles: true,
+    servTeam: 2
+  });
+  state = scoring2.state();
+  assert.equal(state.initServTeam, 2);
+  assert.equal(state.initServPlayer, "D"); // team2 right court
+  assert.equal(state.initRevPlayer, "B"); // team1 right court = "B"
+});
+
+test("首发/首接: undo restores initial server/receiver tracking", () => {
+  const scoring = doublesScoring({ targetScore: 11, capScore: 0 });
+  scoring.award(1);
+  scoring.award(2);
+  assert.ok(scoring.undo());
+  const state = scoring.state();
+  assert.equal(state.initServTeam, 1);
+  assert.equal(state.initServPlayer, "B");
+  assert.equal(state.initRevPlayer, "D");
+});
+
+// --- Opponent scoring (team 2 winning rallies) ---
+
+test("opponent scoring: team 2 winning swaps serve but not positions", () => {
+  const scoring = doublesScoring({ targetScore: 11, capScore: 0 });
+  // Team 1 starts serving. Team 2 wins the rally.
+  const events = scoring.award(2);
+  assert.equal(events.scored, true);
+  const state = scoring.state();
+  assert.equal(state.t2Score, 1);
+  assert.equal(state.servTeam, 2); // serve switches to team 2
+  // Receiving side winning does NOT swap positions
+  assert.deepEqual(state.teams.t1, { l: "A", r: "B" }); // unchanged
+  assert.deepEqual(state.teams.t2, { l: "C", r: "D" }); // unchanged
+});
+
+test("opponent scoring: team 2 serve win swaps team 2 positions", () => {
+  const scoring = doublesScoring({ targetScore: 11, capScore: 0 });
+  scoring.award(2); // team 2 gains serve
+  // Team 2 wins while serving -> their positions swap
+  scoring.award(2);
+  const state = scoring.state();
+  assert.equal(state.t2Score, 2);
+  assert.equal(state.servTeam, 2);
+  assert.deepEqual(state.teams.t2, { l: "D", r: "C" }); // swapped
+  assert.deepEqual(state.teams.t1, { l: "A", r: "B" }); // unchanged
+});
+
+test("opponent scoring: serve follows score parity for team 2", () => {
+  const scoring = doublesScoring({ targetScore: 11, capScore: 0 });
+  scoring.award(2); // team 2 gains serve. t2Score=1 (odd) -> left court serves
+  assert.equal(scoring.servingInfo().player, "C"); // left court = C
+  assert.equal(scoring.servingInfo().court, "left");
+  scoring.award(2); // team 2 wins serving rally, positions swap: l=D, r=C. t2Score=2 (even) -> right court
+  assert.equal(scoring.servingInfo().player, "C"); // right court after swap = C
+  assert.equal(scoring.servingInfo().court, "right");
+});
+
+// --- Undo position restoration ---
+
+test("undo restores both teams' positions after opponent scoring", () => {
+  const scoring = doublesScoring({ targetScore: 11, capScore: 0 });
+  scoring.award(1); // team 1 serve win: t1 swaps to l=B, r=A
+  scoring.award(2); // team 2 wins: no swap, serve to team 2
+  scoring.award(2); // team 2 serve win: t2 swaps to l=D, r=C
+  // Verify current state
+  let state = scoring.state();
+  assert.deepEqual(state.teams.t1, { l: "B", r: "A" });
+  assert.deepEqual(state.teams.t2, { l: "D", r: "C" });
+  assert.equal(state.servTeam, 2);
+  // Undo last point (team 2 serve win)
+  assert.ok(scoring.undo());
+  state = scoring.state();
+  assert.deepEqual(state.teams.t1, { l: "B", r: "A" }); // unchanged
+  assert.deepEqual(state.teams.t2, { l: "C", r: "D" }); // restored
+  assert.equal(state.servTeam, 2); // serve still with team 2
+  assert.equal(state.t2Score, 1);
+  // Undo again (team 2 receiving win)
+  assert.ok(scoring.undo());
+  state = scoring.state();
+  assert.deepEqual(state.teams.t1, { l: "B", r: "A" }); // still swapped from first award
+  assert.deepEqual(state.teams.t2, { l: "C", r: "D" }); // unchanged
+  assert.equal(state.servTeam, 1); // serve back to team 1
+  assert.equal(state.t1Score, 1);
+  assert.equal(state.t2Score, 0);
+});
+
+// --- Timeout timer ---
+
+test("timeout starts activeTimeout countdown and stopTimeout clears it", () => {
+  const scoring = doublesScoring({ targetScore: 11, capScore: 0 });
+  const result = scoring.requestTimeout(1);
+  assert.equal(result.ok, true);
+  assert.equal(result.timeoutSeconds, 60);
+  let state = scoring.state();
+  assert.deepEqual(state.activeTimeout, { team: 1, remaining: 60 });
+  // Stop the timeout
+  const stopResult = scoring.stopTimeout();
+  assert.equal(stopResult.ok, true);
+  state = scoring.state();
+  assert.equal(state.activeTimeout, null);
+});
+
+test("stopTimeout returns false when no timeout is active", () => {
+  const scoring = doublesScoring({ targetScore: 11, capScore: 0 });
+  assert.equal(scoring.stopTimeout(), false);
+});
+
+test("timeout quota still enforced with active timer", () => {
+  const scoring = doublesScoring({ targetScore: 11, capScore: 0 });
+  assert.equal(scoring.requestTimeout(1).ok, true);
+  assert.equal(scoring.requestTimeout(1).reason, "quota"); // already used
+});
+
+test("activeTimeout resets on new game in best-of-three", () => {
+  const scoring = createRallyScoring({
+    format: { scoreRule: "rally", gameFormat: 3, targetScore: 2, capScore: 0 },
+    teams: { team1: "X", team2: "Y" }, doubles: false
+  });
+  scoring.requestTimeout(1);
+  assert.equal(scoring.state().activeTimeout.team, 1);
+  scoring.award(1); scoring.award(1); // win game 1
+  scoring.endGame();
+  assert.equal(scoring.state().activeTimeout, null);
 });

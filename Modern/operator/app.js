@@ -17,6 +17,8 @@ let currentMatches = [];
 // Dedicated full-screen match view state (Legacy-style three-step flow).
 let engagedMatchId = null;
 let switchCountdown = null;
+let timeoutTimer = null; // { matchId, team, remaining, interval }
+let currentSignaturePad = null; // canvas signature pad instance for Step 3
 
 function scoringSession(match) {
   const key = String(match.id);
@@ -80,6 +82,37 @@ function clearSideSwitchCountdown(rerender = false) {
   if (switchCountdown?.interval) clearInterval(switchCountdown.interval);
   const matchId = switchCountdown?.matchId;
   switchCountdown = null;
+  // Clear the side-switch notice flag so the "换边提醒" banner dismisses
+  // when the countdown expires (fixes: notice lingering after timer ends).
+  if (matchId != null) {
+    const session = scoringSessions.get(String(matchId));
+    if (session) session.sideSwitchNotice = false;
+  }
+  if (rerender && matchId != null && String(engagedMatchId) === String(matchId)) {
+    const match = currentMatches.find((m) => String(m.id) === String(matchId));
+    if (match) renderMatchView(match);
+  }
+}
+
+// Timeout countdown: starts when the referee requests a timeout (60s),
+// and ends when the referee manually stops it ("结束暂停").
+function startTimeoutTimer(matchId, team) {
+  stopTimeoutTimer();
+  let remaining = 60;
+  timeoutTimer = { matchId, team, remaining, interval: null };
+  timeoutTimer.interval = setInterval(() => {
+    remaining -= 1;
+    if (timeoutTimer) timeoutTimer.remaining = remaining;
+    const badge = document.querySelector("#timeout-countdown");
+    if (badge) badge.textContent = formatCountdown(Math.max(remaining, 0));
+    if (remaining <= 0) stopTimeoutTimer(true);
+  }, 1000);
+}
+
+function stopTimeoutTimer(rerender = false) {
+  if (timeoutTimer?.interval) clearInterval(timeoutTimer.interval);
+  const matchId = timeoutTimer?.matchId;
+  timeoutTimer = null;
   if (rerender && matchId != null && String(engagedMatchId) === String(matchId)) {
     const match = currentMatches.find((m) => String(m.id) === String(matchId));
     if (match) renderMatchView(match);
@@ -115,12 +148,22 @@ function courtQuadrant(match, session) {
     const isDoubles = players.length > 1;
     const side = teamNum === 1 ? layout.t1 : layout.t2;
     const isServingSide = layout.servingTeam === teamNum;
+    // Persistent 首发/首接 badge per team (mirrors Legacy L865-866).
+    const teamBadge = layout.initServTeam === teamNum
+      ? `<span class="team-badge badge-serve-first">首发</span>`
+      : `<span class="team-badge badge-receive-first">首接</span>`;
     const slot = (playerName, courtKey) => {
-      const serving = isServingSide && layout.servingPlayer === playerName;
-      return `<div class="court-slot${serving ? " slot-serving" : ""}"><span class="slot-player">${escapeHtml(playerName || "—")}</span><span class="slot-court">${courtKey === "right" ? "右区" : "左区"}</span></div>`;
+      const isServing = isServingSide && layout.servingPlayer === playerName;
+      // Legacy L902: the player who started in the right court gets a "首发位" marker
+      // so the referee can verify positioning against physical markers (wristbands etc).
+      // Use explicitly tracked names (not current positions, which swap during play).
+      const initRightName = teamNum === layout.initServTeam ? layout.initServPlayer : layout.initRevPlayer;
+      const isInitRight = isDoubles && playerName === initRightName;
+      const initRightBadge = (isInitRight && isDoubles) ? `<span class="init-right-badge">[首发位]</span>` : "";
+      return `<div class="court-slot${isServing ? " slot-serving" : ""}"><span class="slot-player">${escapeHtml(playerName || "—")}</span><span class="slot-court">${courtKey === "right" ? "右区" : "左区"}</span>${initRightBadge}</div>`;
     };
     return `<div class="court-side">
-      <div class="court-team">${teamName}${isServingSide ? " · 发球" : ""}</div>
+      <div class="court-team">${teamName}${teamBadge}${isServingSide ? " · 发球" : ""}</div>
       <div class="court-slots">
         ${isDoubles ? slot(side.left, "left") + slot(side.right, "right") : slot(side.right, "right")}
       </div>
@@ -167,8 +210,31 @@ function renderConfirmStep(match, session) {
   return `<div class="confirm-card">
     <span class="eyebrow">步骤 3 · 确认比赛结果</span>
     <p class="complete">比赛结束，局分 ${state.t1Wins} - ${state.t2Wins}${state.results.length ? `（${state.results.map(escapeHtml).join("、")}）` : ""}</p>
-    <form class="score-form"><label>${team1}<input name="score1" type="number" min="0" required value="${final.score1}"></label><label>${team2}<input name="score2" type="number" min="0" required value="${final.score2}"></label><button class="primary">录入比分并结束执行</button></form>
+    <form class="score-form"><label>${team1}<input name="score1" type="number" min="0" required value="${final.score1}"></label><label>${team2}<input name="score2" type="number" min="0" required value="${final.score2}"></label><button class="primary" id="submit-score-btn">录入比分并结束执行</button></form>
+    <div class="signature-section">
+      <p class="sig-note">✍️ 赛果确认签名（胜方代表或裁判签字，防纠纷。未签名不可提交）</p>
+      <div class="sig-canvas-container" id="sig-canvas-container">
+        <canvas id="referee-sig-canvas" class="sig-canvas"></canvas>
+      </div>
+      <div class="sig-actions">
+        <button type="button" id="clear-sig-btn" class="sig-clear-btn">清空重签</button>
+      </div>
+    </div>
   </div>`;
+}
+
+// Mount the canvas-based signature pad after Step 3 renders.
+function mountSignaturePad() {
+  const canvas = document.getElementById("referee-sig-canvas");
+  if (!canvas || typeof SignaturePad === "undefined") return;
+  currentSignaturePad = SignaturePad.createSignaturePad(canvas);
+  // Clear button
+  const clearBtn = document.getElementById("clear-sig-btn");
+  if (clearBtn) {
+    clearBtn.addEventListener("click", () => {
+      if (currentSignaturePad) currentSignaturePad.clear();
+    });
+  }
 }
 
 // Step 2: live scoring with the four-quadrant court view.
@@ -182,6 +248,15 @@ function renderPlayingStep(match, session) {
   const team2 = escapeHtml(match.team2?.name || "另一方");
   const serving = scoring.servingInfo();
   const servingName = serving.team === 1 ? team1 : team2;
+  const receivingTeam = serving.team === 1 ? 2 : 1;
+  const receivingName = receivingTeam === 1 ? team1 : team2;
+  // Receiver follows the same parity rule: even score -> right court, odd -> left.
+  const receivingScore = receivingTeam === 1 ? state.t1Score : state.t2Score;
+  const receivingCourt = receivingScore % 2 === 0 ? "right" : "left";
+  const receivingPlayers = receivingTeam === 1 ? match.team1?.players || [] : match.team2?.players || [];
+  const receivingPlayer = state.match.doubles
+    ? (receivingCourt === "right" ? state.teams[receivingTeam === 1 ? "t1" : "t2"].r : state.teams[receivingTeam === 1 ? "t1" : "t2"].l)
+    : (receivingPlayers[0]?.name || "—");
   const bestOfThree = state.match.gameFormat !== 1;
   const capLabel = state.match.capScore > 0 ? `封顶 ${state.match.capScore}` : "无封顶";
   const leftTeam = state.viewSwapped ? 2 : 1;
@@ -189,6 +264,9 @@ function renderPlayingStep(match, session) {
 
   const countdownBadge = switchCountdown && String(switchCountdown.matchId) === String(match.id)
     ? `<div class="switch-countdown">🔄 半场换边休整 <strong id="switch-countdown">${formatCountdown(switchCountdown.remaining)}</strong></div>` : "";
+  // Timeout countdown badge with manual stop button (referee terminates).
+  const timeoutBadge = timeoutTimer && String(timeoutTimer.matchId) === String(match.id)
+    ? `<div class="timeout-countdown">⏱️ 暂停中 <strong id="timeout-countdown">${formatCountdown(timeoutTimer.remaining)}</strong> <button data-scoring-action="stop-timeout" class="timeout-stop-btn">结束暂停</button></div>` : "";
   const sideSwitchNotice = session.sideSwitchNotice
     ? `<p class="notice error" role="alert">🔄 换边提醒：一方已达 ${Math.ceil(state.match.targetScore / 2)} 分，请指挥双方交换场地。</p>` : "";
 
@@ -216,10 +294,14 @@ function renderPlayingStep(match, session) {
   return `<div class="scoring-panel">
     <div class="scoring-meta"><span>第 ${state.currentGame} 局${bestOfThree ? ` · 三局两胜 ${state.t1Wins}-${state.t2Wins}` : ""}</span><span>目标 ${state.match.targetScore} 分 · ${capLabel}</span></div>
     ${countdownBadge}
+    ${timeoutBadge}
     ${sideSwitchNotice}
     <div class="scoring-board">
       ${sideControls(leftTeam)}
-      <div class="serve-info"><span class="eyebrow">发球</span><strong>${servingName}</strong><span>${escapeHtml(serving.player)} · ${serving.court === "right" ? "右区" : "左区"}</span></div>
+      <div class="serve-receive-center">
+        <div class="serve-info"><span class="eyebrow">发球方</span><strong class="serve-team-name">${servingName}</strong><span class="serve-player">${escapeHtml(serving.player)}</span><span class="serve-court">${serving.court === "right" ? "右区" : "左区"}</span></div>
+        <div class="receive-info"><span class="eyebrow">接发方</span><strong class="receive-team-name">${receivingName}</strong><span class="receive-player">${escapeHtml(receivingPlayer)}</span><span class="receive-court">${receivingCourt === "right" ? "右区" : "左区"}</span></div>
+      </div>
       ${sideControls(rightTeam)}
     </div>
     ${courtQuadrant(match, session)}
@@ -268,6 +350,10 @@ function renderMatchView(match) {
     </div>
     ${body}
   </div>`;
+  // Mount signature pad when rendering Step 3 (confirm step)
+  if (match.status === "playing" && scoringSession(match).scoring.isMatchEnded()) {
+    mountSignaturePad();
+  }
 }
 
 function renderList() {
@@ -287,6 +373,7 @@ function openMatchView(matchId) {
 
 function closeMatchView() {
   clearSideSwitchCountdown();
+  stopTimeoutTimer();
   engagedMatchId = null;
   const viewEl = document.querySelector("#match-view");
   if (viewEl) { viewEl.hidden = true; viewEl.innerHTML = ""; }
@@ -364,7 +451,15 @@ function runScoringAction(matchId, action, team) {
     if (!session.scoring.undo()) { view.error("没有可撤回的判罚记录"); return; }
     session.sideSwitchNotice = false;
   }
-  if (action === "timeout") result = session.scoring.requestTimeout(team);
+  if (action === "timeout") {
+    result = session.scoring.requestTimeout(team);
+    if (result?.ok) startTimeoutTimer(matchId, team);
+  }
+  if (action === "stop-timeout") {
+    session.scoring.stopTimeout();
+    stopTimeoutTimer(true);
+    return; // stopTimeoutTimer already re-renders
+  }
   if (action === "medical") result = session.scoring.requestMedical(team);
   if (action === "end-game") {
     session.scoring.endGame();
@@ -416,11 +511,19 @@ matchView.addEventListener("click", (event) => {
 matchView.addEventListener("submit", (event) => {
   if (!event.target.matches(".score-form")) return;
   event.preventDefault();
+  // Validate signature: result cannot be submitted without a signature.
+  if (!currentSignaturePad || currentSignaturePad.isEmpty()) {
+    view.error("请先在签名板上签名确认赛果，未签名不可提交");
+    return;
+  }
   const values = new FormData(event.target);
   const matchId = event.target.closest(".match-view-inner").dataset.matchId;
+  const signatureData = currentSignaturePad.toDataURL();
   releaseSession(matchId);
+  currentSignaturePad = null;
   workflow.run({ type: "score", matchId,
-    score: { score1: Number(values.get("score1")), score2: Number(values.get("score2")) } });
+    score: { score1: Number(values.get("score1")), score2: Number(values.get("score2")) },
+    signature: signatureData });
 });
 
 // Referee identity entry: pick a name from the roster, then establish a session

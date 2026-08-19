@@ -22,6 +22,13 @@
   }
 
   function initialState({ format = {}, teams, doubles = false, servTeam = 1 } = {}) {
+    const positions = teamPositions(teams);
+    // Track the initial serving team and receiving team's right-court player
+    // so the UI can display persistent "首发" / "首接" badges throughout the game.
+    // Mirrors Legacy referee.html L865-866 and L902.
+    const initRevTeam = servTeam === 1 ? 2 : 1;
+    // The initial server is always the right-court player of the serving team.
+    const initServKey = servTeam === 1 ? "t1" : "t2";
     return {
       match: {
         scoreRule: format.scoreRule || "rally",
@@ -30,7 +37,10 @@
         gameFormat: Number(format.gameFormat ?? 1),
         doubles: Boolean(doubles)
       },
-      teams: teamPositions(teams),
+      teams: positions,
+      initServTeam: servTeam,
+      initServPlayer: positions[initServKey].r,
+      initRevPlayer: initRevTeam === 1 ? positions.t1.r : positions.t2.r,
       t1Score: 0,
       t2Score: 0,
       servTeam,
@@ -44,7 +54,11 @@
       t1Wins: 0,
       t2Wins: 0,
       results: [],
-      timeouts: { t1: 0, t2: 0, medicalT1: 0, medicalT2: 0 }
+      timeouts: { t1: 0, t2: 0, medicalT1: 0, medicalT2: 0 },
+      // Active timeout tracker: null when no timeout in progress,
+      // or { team, remaining } while the referee's countdown runs.
+      // The UI drives the actual interval; this records the snapshot.
+      activeTimeout: null
     };
   }
 
@@ -133,6 +147,9 @@
         servingTeam: serving.team,
         servingPlayer: serving.player,
         servingCourt: serving.court,
+        initServTeam: state.initServTeam,
+        initServPlayer: state.initServPlayer,
+        initRevPlayer: state.initRevPlayer,
         viewSwapped: state.viewSwapped
       };
     }
@@ -158,7 +175,18 @@
       if (state.timeouts[key] >= 1) return { ok: false, reason: "quota" };
       pushHistory();
       state.timeouts[key] += 1;
-      return { ok: true };
+      // Start a 60s timeout countdown (UI drives the interval).
+      state.activeTimeout = { team, remaining: 60 };
+      return { ok: true, timeoutSeconds: 60 };
+    }
+
+    // Referee actively stops the timeout when play resumes.
+    // Returns the elapsed seconds, or false if no timeout was active.
+    function stopTimeout() {
+      if (!state.activeTimeout) return false;
+      const elapsed = 60 - (state.activeTimeout.remaining || 0);
+      state.activeTimeout = null;
+      return { ok: true, elapsed };
     }
 
     // Medical timeout quota is per match (design ED-05), not per game.
@@ -203,6 +231,7 @@
         medicalT1: state.timeouts.medicalT1,
         medicalT2: state.timeouts.medicalT2
       };
+      state.activeTimeout = null;
       return { ended: true, matchEnded: false };
     }
 
@@ -210,6 +239,7 @@
       award,
       undo,
       requestTimeout,
+      stopTimeout,
       requestMedical,
       endGame,
       finalScore,
