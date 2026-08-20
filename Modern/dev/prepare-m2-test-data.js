@@ -67,15 +67,20 @@ async function main() {
   let matchId;
   if (existing.length) {
     matchId = existing[0].id;
-    console.log(`Test match already exists: id ${matchId} (status ${existing[0].status})`);
+    // Reset to accepted with responsibility_accepted_at set (required for start)
+    await c.query(
+      "UPDATE matches SET status = 'accepted', responsibility_accepted_at = NOW(), score1 = NULL, score2 = NULL, started_at = NULL, result_confirmed_at = NULL, result_confirmed_by = NULL WHERE id = ?",
+      [matchId]
+    );
+    console.log(`Reset test match: id ${matchId} to accepted`);
   } else {
     await c.query(`
       INSERT INTO matches
       (tournament_id, round_num, court, player1_id, player2_id, player3_id, player4_id,
        team1_name, team2_name, score1, score2, game_format, score_rule, target_score, cap_score,
-       status, referee_id, dispatch_id, dispatch_version)
+       status, referee_id, dispatch_id, dispatch_version, responsibility_accepted_at)
       VALUES (?, 1, 'Court A', ?, ?, ?, ?, 'Team Alpha', 'Team Beta', NULL, NULL, 1, 'rally', 11, 0,
-              'accepted', ?, NULL, 0)
+              'accepted', ?, NULL, 0, NOW())
     `, [tournamentId, ...playerIds, REFEREE_ID]);
     [rows] = await c.query('SELECT LAST_INSERT_ID() AS id');
     matchId = rows[0].id;
@@ -94,6 +99,13 @@ async function main() {
     );
     console.log('Created match_schedules row for match', matchId);
   }
+
+  // 7. Reset court_operating_conditions to 'available' (fixes leftover 'occupied' state)
+  await c.query(
+    "UPDATE court_operating_conditions SET condition_name = 'available', source_type = 'initial_baseline', source_reference = 'test-reset', actor_id = 'system', version = version + 1, last_chronology_id = last_chronology_id + 1 WHERE tournament_id = ? AND court_id = 'Court A'",
+    [tournamentId]
+  );
+  console.log('Reset Court A to available');
 
   console.log(`\nReady. Log in via /dev/dev-login.html as "${REFEREE_ID}" (Referee), competition ${tournamentId}.`);
   await c.end();

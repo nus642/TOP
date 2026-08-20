@@ -148,10 +148,6 @@ function courtQuadrant(match, session) {
     const isDoubles = players.length > 1;
     const side = teamNum === 1 ? layout.t1 : layout.t2;
     const isServingSide = layout.servingTeam === teamNum;
-    // Persistent 首发/首接 badge per team (mirrors Legacy L865-866).
-    const teamBadge = layout.initServTeam === teamNum
-      ? `<span class="team-badge badge-serve-first">首发</span>`
-      : `<span class="team-badge badge-receive-first">首接</span>`;
     const slot = (playerName, courtKey) => {
       const isServing = isServingSide && layout.servingPlayer === playerName;
       // Legacy L902: the player who started in the right court gets a "首发位" marker
@@ -160,12 +156,18 @@ function courtQuadrant(match, session) {
       const initRightName = teamNum === layout.initServTeam ? layout.initServPlayer : layout.initRevPlayer;
       const isInitRight = isDoubles && playerName === initRightName;
       const initRightBadge = (isInitRight && isDoubles) ? `<span class="init-right-badge">[首发位]</span>` : "";
+      // [首发位] badge on the player who started in the right court (Legacy L902).
+      // Removed redundant "首发"/"首接" badges — the [首发位] marker is sufficient.
       return `<div class="court-slot${isServing ? " slot-serving" : ""}"><span class="slot-player">${escapeHtml(playerName || "—")}</span><span class="slot-court">${courtKey === "right" ? "右区" : "左区"}</span>${initRightBadge}</div>`;
     };
     return `<div class="court-side">
-      <div class="court-team">${teamName}${teamBadge}${isServingSide ? " · 发球" : ""}</div>
+      <div class="court-team">${teamName}${isServingSide ? " · 发球" : ""}</div>
       <div class="court-slots">
-        ${isDoubles ? slot(side.left, "left") + slot(side.right, "right") : slot(side.right, "right")}
+        ${isDoubles
+          ? (teamNum === 1
+            ? slot(side.left, "left") + slot(side.right, "right")  // 左队：左区在上，右区在下
+            : slot(side.right, "right") + slot(side.left, "left")) // 右队：右区在上，左区在下（镜像）
+          : slot(side.right, "right")}
       </div>
     </div>`;
   };
@@ -208,6 +210,9 @@ function renderConfirmStep(match, session) {
   const team1 = escapeHtml(match.team1?.name || "一方");
   const team2 = escapeHtml(match.team2?.name || "另一方");
   return `<div class="confirm-card">
+    <div class="confirm-actions-row">
+      <button type="button" data-action="back-to-scoring" class="back-to-scoring-btn">← 返回计分修改</button>
+    </div>
     <span class="eyebrow">步骤 3 · 确认比赛结果</span>
     <p class="complete">比赛结束，局分 ${state.t1Wins} - ${state.t2Wins}${state.results.length ? `（${state.results.map(escapeHtml).join("、")}）` : ""}</p>
     <form class="score-form"><label>${team1}<input name="score1" type="number" min="0" required value="${final.score1}"></label><label>${team2}<input name="score2" type="number" min="0" required value="${final.score2}"></label><button class="primary" id="submit-score-btn">录入比分并结束执行</button></form>
@@ -261,9 +266,21 @@ function renderPlayingStep(match, session) {
   const capLabel = state.match.capScore > 0 ? `封顶 ${state.match.capScore}` : "无封顶";
   const leftTeam = state.viewSwapped ? 2 : 1;
   const rightTeam = state.viewSwapped ? 1 : 2;
+  // When viewSwapped, the court labels in the serve info panel must flip
+  // to match the on-screen visual position (court quadrant already handles this).
+  const displayServingCourt = state.viewSwapped
+    ? (serving.court === "right" ? "left" : "right")
+    : serving.court;
+  const displayReceivingCourt = state.viewSwapped
+    ? (receivingCourt === "right" ? "left" : "right")
+    : receivingCourt;
+  // Disable all scoring actions during an active timeout or side-switch countdown.
+  const timeoutActive = timeoutTimer && String(timeoutTimer.matchId) === String(match.id);
+  const switchActive = switchCountdown && String(switchCountdown.matchId) === String(match.id);
+  const actionsDisabled = timeoutActive || switchActive;
 
   const countdownBadge = switchCountdown && String(switchCountdown.matchId) === String(match.id)
-    ? `<div class="switch-countdown">🔄 半场换边休整 <strong id="switch-countdown">${formatCountdown(switchCountdown.remaining)}</strong></div>` : "";
+    ? `<div class="switch-countdown">🔄 半场换边休整 <strong id="switch-countdown">${formatCountdown(switchCountdown.remaining)}</strong> <button data-scoring-action="stop-switch" class="switch-stop-btn">结束换边</button></div>` : "";
   // Timeout countdown badge with manual stop button (referee terminates).
   const timeoutBadge = timeoutTimer && String(timeoutTimer.matchId) === String(match.id)
     ? `<div class="timeout-countdown">⏱️ 暂停中 <strong id="timeout-countdown">${formatCountdown(timeoutTimer.remaining)}</strong> <button data-scoring-action="stop-timeout" class="timeout-stop-btn">结束暂停</button></div>` : "";
@@ -278,10 +295,10 @@ function renderPlayingStep(match, session) {
     return `<div class="scoring-side">
       <span class="side-name">${name}</span>
       <strong class="side-score">${team === 1 ? state.t1Score : state.t2Score}</strong>
-      <button data-scoring-action="award" data-team="${team}" ${disabled ? "disabled" : ""}>+1 ${name}</button>
+      <button data-scoring-action="award" data-team="${team}" ${disabled || actionsDisabled ? "disabled" : ""}>+1 ${name}</button>
       <div class="side-tools">
-        <button data-scoring-action="timeout" data-team="${team}" ${disabled || timeoutUsed ? "disabled" : ""}>${timeoutUsed ? "暂停已用" : "暂停"}</button>
-        <button data-scoring-action="medical" data-team="${team}" ${disabled || medicalUsed ? "disabled" : ""}>${medicalUsed ? "伤停已用" : "医疗伤停"}</button>
+        <button data-scoring-action="timeout" data-team="${team}" ${disabled || timeoutUsed || actionsDisabled ? "disabled" : ""}>${timeoutUsed ? "暂停已用" : "暂停"}</button>
+        <button data-scoring-action="medical" data-team="${team}" ${disabled || medicalUsed || actionsDisabled ? "disabled" : ""}>${medicalUsed ? "伤停已用" : "医疗伤停"}</button>
       </div>
     </div>`;
   };
@@ -299,16 +316,16 @@ function renderPlayingStep(match, session) {
     <div class="scoring-board">
       ${sideControls(leftTeam)}
       <div class="serve-receive-center">
-        <div class="serve-info"><span class="eyebrow">发球方</span><strong class="serve-team-name">${servingName}</strong><span class="serve-player">${escapeHtml(serving.player)}</span><span class="serve-court">${serving.court === "right" ? "右区" : "左区"}</span></div>
-        <div class="receive-info"><span class="eyebrow">接发方</span><strong class="receive-team-name">${receivingName}</strong><span class="receive-player">${escapeHtml(receivingPlayer)}</span><span class="receive-court">${receivingCourt === "right" ? "右区" : "左区"}</span></div>
+        <div class="serve-info"><span class="eyebrow">发球方</span><strong class="serve-team-name">${servingName}</strong><span class="serve-player">${escapeHtml(serving.player)}</span><span class="serve-court">${displayServingCourt === "right" ? "右区" : "左区"}</span></div>
+        <div class="receive-info"><span class="eyebrow">接发方</span><strong class="receive-team-name">${receivingName}</strong><span class="receive-player">${escapeHtml(receivingPlayer)}</span><span class="receive-court">${displayReceivingCourt === "right" ? "右区" : "左区"}</span></div>
       </div>
       ${sideControls(rightTeam)}
     </div>
     ${courtQuadrant(match, session)}
     <div class="timeline" aria-label="得分轨迹">${timelineDots(state.timeline)}</div>
     <div class="scoring-actions">
-      <button data-scoring-action="undo">撤回上一分</button>
-      <button data-scoring-action="toggle-view">🔄 视角互换</button>
+      <button data-scoring-action="undo" ${actionsDisabled ? "disabled" : ""}>撤回上一分</button>
+      <button data-scoring-action="toggle-view" ${actionsDisabled ? "disabled" : ""}>🔄 视角互换</button>
       ${endControls}
     </div>
   </div>`;
@@ -348,6 +365,7 @@ function renderMatchView(match) {
       <button data-action="close-view" class="back-btn">← 返回任务列表</button>
       <div class="match-view-title"><h2>${team1} <span>对</span> ${team2}</h2><span class="step-badge">${escapeHtml(stepLabel)}</span></div>
     </div>
+    <div id="match-view-error" class="match-view-error" hidden></div>
     ${body}
   </div>`;
   // Mount signature pad when rendering Step 3 (confirm step)
@@ -364,6 +382,12 @@ function renderList() {
 
 function openMatchView(matchId) {
   engagedMatchId = matchId;
+  // Full-screen match view: hide all shell elements except the match view.
+  const shell = document.querySelector(".shell");
+  if (shell) shell.classList.add("match-view-active");
+  // Also hide the identity entry card (outside .shell) during match view.
+  const identityEntry = document.querySelector("#identity-entry");
+  if (identityEntry) identityEntry.classList.add("match-view-active");
   list.hidden = true;
   const viewEl = document.querySelector("#match-view");
   if (viewEl) viewEl.hidden = false;
@@ -375,6 +399,12 @@ function closeMatchView() {
   clearSideSwitchCountdown();
   stopTimeoutTimer();
   engagedMatchId = null;
+  // Restore shell elements.
+  const shell = document.querySelector(".shell");
+  if (shell) shell.classList.remove("match-view-active");
+  // Restore identity entry visibility.
+  const identityEntry = document.querySelector("#identity-entry");
+  if (identityEntry) identityEntry.classList.remove("match-view-active");
   const viewEl = document.querySelector("#match-view");
   if (viewEl) { viewEl.hidden = true; viewEl.innerHTML = ""; }
   list.hidden = false;
@@ -412,7 +442,15 @@ function matchCard(match) {
 const view = {
   loading() { notice.textContent = "正在加载比赛任务…"; notice.className = "notice"; },
   busy(matchId) { notice.textContent = `正在更新比赛 ${matchId}…`; notice.className = "notice"; },
-  error(message) { notice.textContent = UiText.userFacingError(message); notice.className = "notice error"; },
+  error(message) {
+    notice.textContent = UiText.userFacingError(message); notice.className = "notice error";
+    // Also show error in match view when in full-screen mode.
+    const matchErrorEl = document.getElementById("match-view-error");
+    if (matchErrorEl) {
+      matchErrorEl.textContent = UiText.userFacingError(message);
+      matchErrorEl.hidden = false;
+    }
+  },
   matches(matches) {
     currentMatches = matches;
     notice.textContent = `已加载 ${matches.length} 场已分配比赛。`;
@@ -460,6 +498,10 @@ function runScoringAction(matchId, action, team) {
     stopTimeoutTimer(true);
     return; // stopTimeoutTimer already re-renders
   }
+  if (action === "stop-switch") {
+    clearSideSwitchCountdown(true);
+    return; // clearSideSwitchCountdown already re-renders
+  }
   if (action === "medical") result = session.scoring.requestMedical(team);
   if (action === "end-game") {
     session.scoring.endGame();
@@ -496,6 +538,16 @@ matchView.addEventListener("click", (event) => {
   if (button) {
     const inner = button.closest(".match-view-inner");
     if (button.dataset.action === "close-view") { closeMatchView(); return; }
+    if (button.dataset.action === "back-to-scoring") {
+      // Go back from Step 3 (confirm) to Step 2 (playing) for corrections.
+      const inner = button.closest(".match-view-inner");
+      const matchId = inner?.dataset.matchId;
+      const session = scoringSessions.get(String(matchId));
+      if (session) session.scoring.undoEndGame();
+      const match = currentMatches.find((m) => String(m.id) === String(matchId));
+      if (match) { renderMatchView(match); }
+      return;
+    }
     workflow.run({
       type: button.dataset.action,
       matchId: inner?.dataset.matchId,

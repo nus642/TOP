@@ -75,6 +75,13 @@
       positions.l = tmp;
     }
 
+    // Swap both teams' internal left/right positions when sides are switched.
+    // This ensures the server appears in the correct court on screen after viewSwapped flips.
+    function swapBothTeamsPositions() {
+      swapPositions(1);
+      swapPositions(2);
+    }
+
     // Rally rule: next server is located by the serving team's own score parity
     // (even -> right court, odd -> left court). Mirrors Legacy award() L1039-1041.
     function servingInfo() {
@@ -127,6 +134,9 @@
         // Mirror Legacy L1051: switching ends flips the referee's on-screen view
         // so the team that walked to the opposite end renders on the other side.
         state.viewSwapped = !state.viewSwapped;
+        // Also swap each team's internal left/right positions so the server
+        // appears in the correct court on screen after the view flip.
+        swapBothTeamsPositions();
         events.sideSwitch = true;
       }
       if (isGameWon()) {
@@ -210,6 +220,8 @@
       if (!state.gameEnded || state.matchEnded) return { ended: false };
       if (state.t1Score > state.t2Score) state.t1Wins += 1; else state.t2Wins += 1;
       state.results.push(`G${state.currentGame}: ${state.t1Score} - ${state.t2Score}`);
+      // Save history so undoEndGame() can restore it for corrections.
+      state.savedHistory = state.history;
       state.history = [];
 
       const bestOfThree = state.match.gameFormat !== 1;
@@ -235,6 +247,28 @@
       return { ended: true, matchEnded: false };
     }
 
+    // Reverse the last endGame() call so the referee can return to scoring
+    // from the confirm-results page for corrections.
+    function undoEndGame() {
+      if (!state.matchEnded || !state.results.length) return false;
+      const lastResult = state.results.pop();
+      // Parse "G1: 11 - 4" to restore scores.
+      const m = lastResult.match(/G\d+:\s*(\d+)\s*-\s*(\d+)/);
+      if (m) {
+        state.t1Score = Number(m[1]);
+        state.t2Score = Number(m[2]);
+      }
+      // Decrement the win that was added by endGame().
+      if (state.t1Score > state.t2Score) state.t1Wins -= 1; else state.t2Wins -= 1;
+      state.matchEnded = false;
+      state.gameEnded = true;
+      // Restore the saved history so the referee can undo points.
+      state.history = state.savedHistory || [];
+      state.savedHistory = undefined;
+      state.timeline = [];
+      return true;
+    }
+
     return {
       award,
       undo,
@@ -242,6 +276,7 @@
       stopTimeout,
       requestMedical,
       endGame,
+      undoEndGame,
       finalScore,
       servingInfo,
       courtLayout,
