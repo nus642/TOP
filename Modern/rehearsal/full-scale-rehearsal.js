@@ -21,6 +21,7 @@ const fs = require("node:fs");
 const path = require("node:path");
 const assert = require("node:assert/strict");
 const { randomUUID } = require("node:crypto");
+const { assertPublicScoreboardMatches } = require("./assertions");
 
 const BASE_URL = process.env.BASE_URL || "http://localhost:3000";
 const STATE_FILE = path.join(__dirname, ".rehearsal-state.json");
@@ -138,6 +139,7 @@ async function runWave({ label, matchIds, refereeNames, masterCookie, competitio
   step(`${label}. 裁判并发接单`);
   const refereeCookies = await Promise.all(refereeNames.map((name) => establish(name, "referee")));
   let wave = (await overview(masterCookie, competitionId)).filter((m) => matchIds.includes(m.matchId));
+  assert.equal(wave.length, matchIds.length, `${label}: expected ${matchIds.length} dispatched matches in overview, got ${wave.length}`);
   await Promise.all(wave.map((match, i) =>
     call("POST", `/api/referee-workflow/${competitionId}/referees/${encodeURIComponent(refereeNames[i])}/matches/${match.matchId}/accept`, {
       cookie: refereeCookies[i],
@@ -175,6 +177,7 @@ async function runWave({ label, matchIds, refereeNames, masterCookie, competitio
   ));
   const afterConfirm = await overview(masterCookie, competitionId);
   const confirmed = afterConfirm.filter((m) => matchIds.includes(m.matchId));
+  assert.equal(confirmed.length, matchIds.length, `${label}: expected ${matchIds.length} confirmed matches, got ${confirmed.length}`);
   confirmed.forEach((m) => assert.equal(dispatchStatusOf(m), "confirmed", `${label}: match ${m.matchId} should be confirmed`));
   console.log(`${label}: ${matchIds.length} 场赛果全部确认`);
 
@@ -265,11 +268,10 @@ async function runFullRehearsal() {
 
   // Public scoreboard verification: both waves visible
   step("6d. 公开记分屏验证（两轮赛果均进入公开投影）");
-  const { json: publicMatches } = await call("GET", `/api/public/competitions/${competitionId}/matches`);
+  const { json: publicScoreboardJson } = await call("GET", `/api/public/competitions/${competitionId}/matches`);
   const confirmedIds = [...wave1MatchIds, ...wave2MatchIds];
-  const publicConfirmed = publicMatches.filter((m) => confirmedIds.includes(m.matchId));
-  assert.equal(publicConfirmed.length, 12, "public scoreboard must show 12 confirmed matches");
-  console.log(`公开记分屏：${publicConfirmed.length} 场已确认赛果可见`);
+  const publicConfirmed = assertPublicScoreboardMatches(publicScoreboardJson, confirmedIds, { label: "公开记分屏" });
+  console.log(`公开记分屏：${publicConfirmed.length} 场已确认赛果可见（status=confirmed, confirmed=true）`);
 
   step("7. 中途撤回 + 换派（第三轮第 1 场）");
   const allAfterWaves = await overview(masterCookie, competitionId);
