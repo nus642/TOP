@@ -161,12 +161,15 @@ function courtQuadrant(match, session) {
       const initRightBadge = (isInitRight && isDoubles) ? `<span class="init-right-badge">[首发位]</span>` : "";
       return `<div class="court-slot${isServing ? " slot-serving" : ""}"><span class="slot-player">${escapeHtml(playerName || "—")}</span><span class="slot-court">${areaLabel}</span>${initRightBadge}</div>`;
     };
-    // Slot placement follows the referee's current vantage point:
-    // - team1 at its home side: right court renders bottom, left court top;
-    // - team2 mirrored: right court renders top, left court bottom;
-    // - when the view is flipped (180° rotation), each player moves to the
-    //   diagonally opposite box and the 左区/右区 labels invert accordingly.
-    const topIsRight = (teamNum === 1) !== flipped;
+    // Slot placement follows the overhead court geometry (net vertical, the
+    // referee's vantage only rotates the whole picture):
+    // - team1 faces east, so its right court is south (bottom), left court top;
+    // - team2 faces west, so its right court is north (top), left court bottom;
+    //   (Legacy slotTL/BL/TR/BR uses the same mapping.)
+    // - a flipped view is a 180° rotation: top/bottom and team sides both invert,
+    //   but 左区/右区 labels stay physical (they are defined by the players'
+    //   orientation, not by where the referee stands).
+    const topIsRight = (teamNum === 2) !== flipped;
     const topPlayer = topIsRight ? side.right : side.left;
     const bottomPlayer = topIsRight ? side.left : side.right;
     const topLabel = topIsRight ? "右区" : "左区";
@@ -176,7 +179,7 @@ function courtQuadrant(match, session) {
       <div class="court-slots">
         ${isDoubles
           ? slot(topPlayer, topLabel) + slot(bottomPlayer, bottomLabel)
-          : slot(side.right, flipped ? "左区" : "右区")}
+          : slot(side.right, "右区")}
       </div>
     </div>`;
   };
@@ -275,14 +278,9 @@ function renderPlayingStep(match, session) {
   const capLabel = state.match.capScore > 0 ? `封顶 ${state.match.capScore}` : "无封顶";
   const leftTeam = state.viewSwapped ? 2 : 1;
   const rightTeam = state.viewSwapped ? 1 : 2;
-  // When viewSwapped, the court labels in the serve info panel must flip
-  // to match the on-screen visual position (court quadrant already handles this).
-  const displayServingCourt = state.viewSwapped
-    ? (serving.court === "right" ? "left" : "right")
-    : serving.court;
-  const displayReceivingCourt = state.viewSwapped
-    ? (receivingCourt === "right" ? "left" : "right")
-    : receivingCourt;
+  // 左区/右区 are physical court properties (defined by the players' orientation),
+  // so the serve/receive panel reports them as-is regardless of the referee's
+  // vantage point — matching the quadrant view's labels.
   // Disable all scoring actions during an active timeout or side-switch countdown.
   const timeoutActive = timeoutTimer && String(timeoutTimer.matchId) === String(match.id);
   const switchActive = switchCountdown && String(switchCountdown.matchId) === String(match.id);
@@ -325,8 +323,8 @@ function renderPlayingStep(match, session) {
     <div class="scoring-board">
       ${sideControls(leftTeam)}
       <div class="serve-receive-center">
-        <div class="serve-info"><span class="eyebrow">发球方</span><strong class="serve-team-name">${servingName}</strong><span class="serve-player">${escapeHtml(serving.player)}</span><span class="serve-court">${displayServingCourt === "right" ? "右区" : "左区"}</span></div>
-        <div class="receive-info"><span class="eyebrow">接发方</span><strong class="receive-team-name">${receivingName}</strong><span class="receive-player">${escapeHtml(receivingPlayer)}</span><span class="receive-court">${displayReceivingCourt === "right" ? "右区" : "左区"}</span></div>
+        <div class="serve-info"><span class="eyebrow">发球方</span><strong class="serve-team-name">${servingName}</strong><span class="serve-player">${escapeHtml(serving.player)}</span><span class="serve-court">${serving.court === "right" ? "右区" : "左区"}</span></div>
+        <div class="receive-info"><span class="eyebrow">接发方</span><strong class="receive-team-name">${receivingName}</strong><span class="receive-player">${escapeHtml(receivingPlayer)}</span><span class="receive-court">${receivingCourt === "right" ? "右区" : "左区"}</span></div>
       </div>
       ${sideControls(rightTeam)}
     </div>
