@@ -1,13 +1,14 @@
+require('dotenv').config();
 const mysql = require('mysql2/promise');
 const fs = require('fs');
 const path = require('path');
 
 const dbConfig = {
-    host: 'localhost',
-    port: 3306,
-    user: 'root',
-    password: '123456',          // 与 server.js 保持一致
-    database: 'nhpa',
+    host: process.env.MYSQL_HOST || 'localhost',
+    port: parseInt(process.env.MYSQL_PORT) || 3306,
+    user: process.env.MYSQL_USER || 'root',
+    password: process.env.MYSQL_PASS || '123456',
+    database: process.env.MYSQL_DB || 'nhpa',
     multipleStatements: true
 };
 

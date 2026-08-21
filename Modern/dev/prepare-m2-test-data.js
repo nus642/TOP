@@ -6,6 +6,7 @@
 //   4. check-ins for the four players
 //   5. one accepted doubles match assigned to referee-test-1
 // Usage: node dev/prepare-m2-test-data.js
+require('dotenv').config({ path: require('path').join(__dirname, '..', '.env') });
 const mysql = require('mysql2/promise');
 
 const REFEREE_ID = 'referee-test-1';
@@ -16,7 +17,7 @@ async function main() {
     host: process.env.MYSQL_HOST || 'localhost',
     port: Number(process.env.MYSQL_PORT || 3306),
     user: process.env.MYSQL_USER || 'root',
-    password: process.env.MYSQL_PASSWORD || '123456',
+    password: process.env.MYSQL_PASS || '123456',
     database: process.env.MYSQL_DB || 'nhpa'
   });
 
