@@ -27,14 +27,18 @@ function createApp({ actorSessions = createActorSessionStore() } = {}) {
   const app = express();
   app.use(cors());
   app.use(bodyParser.json());
-  app.use("/shell", express.static(path.join(__dirname, "shell")));
-  app.use("/operator", express.static(path.join(__dirname, "operator")));
-  app.use("/participant", express.static(path.join(__dirname, "participant")));
-  app.use("/public", express.static(path.join(__dirname, "public")));
-  app.use("/archive", express.static(path.join(__dirname, "archive")));
-  app.use("/presentation", express.static(path.join(__dirname, "presentation")));
+  // UI bundles change often during M2 iteration; force revalidation so
+  // browsers never serve a stale cached app.js (heuristic caching broke
+  // manual testing flows).
+  const uiOptions = { etag: true, setHeaders: (res) => res.setHeader("Cache-Control", "no-cache") };
+  app.use("/shell", express.static(path.join(__dirname, "shell"), uiOptions));
+  app.use("/operator", express.static(path.join(__dirname, "operator"), uiOptions));
+  app.use("/participant", express.static(path.join(__dirname, "participant"), uiOptions));
+  app.use("/public", express.static(path.join(__dirname, "public"), uiOptions));
+  app.use("/archive", express.static(path.join(__dirname, "archive"), uiOptions));
+  app.use("/presentation", express.static(path.join(__dirname, "presentation"), uiOptions));
 // Local development tools only (e.g. dev-login.html); kept outside production assets.
-app.use("/dev", express.static(path.join(__dirname, "dev")));
+app.use("/dev", express.static(path.join(__dirname, "dev"), uiOptions));
 
   app.use("/api/competition", requireActorSession(actorSessions), scheduleImportRoutes);
   app.use("/api/competition", competitionRoutes);

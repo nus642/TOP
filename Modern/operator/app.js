@@ -36,6 +36,12 @@ function scoringSession(match) {
     key: `top-referee-scoring:${key}`
   });
   const restored = backup.load();
+  // A backup with zero points recorded carries no real progress (e.g. left
+  // over from a previous start); a fresh start applies the toss selections
+  // instead of restoring those stale defaults.
+  const untouched = restored?.match
+    && (!restored.timeline || restored.timeline.length === 0)
+    && !restored.t1Score && !restored.t2Score;
   const t1Players = match.team1?.players || [];
   const t2Players = match.team2?.players || [];
   const toss = preMatchToss.get(key) || {};
@@ -46,7 +52,7 @@ function scoringSession(match) {
   const t1RightName = rightFor(t1Players, toss.t1Right);
   const t2RightName = rightFor(t2Players, toss.t2Right);
   const scoring = RefereeScoring.createRallyScoring({
-    restore: restored,
+    restore: untouched ? null : restored,
     format: match.format,
     teams: {
       team1: match.team1?.name,
