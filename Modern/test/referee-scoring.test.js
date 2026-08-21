@@ -273,6 +273,23 @@ test("courtLayout reports left/right players, server, and view flag", () => {
   assert.equal(layout.initRevPlayer, "D");
 });
 
+test("on-site toss: initial serving team and view come from pre-match choices", () => {
+  const scoring = createRallyScoring({
+    format: { scoreRule: "rally", gameFormat: 1, targetScore: 11, capScore: 0 },
+    teams: { team1Left: "A", team1Right: "B", team2Left: "C", team2Right: "D" },
+    doubles: true,
+    servTeam: 2,       // toss: team2 serves first
+    viewSwapped: true  // toss: team2 occupies the referee's left end
+  });
+  const layout = scoring.courtLayout();
+  assert.equal(layout.viewSwapped, true);
+  assert.equal(layout.servingTeam, 2);
+  assert.equal(layout.servingPlayer, "D"); // team2 right-court player serves first
+  assert.equal(layout.initServTeam, 2);
+  assert.equal(layout.initServPlayer, "D");
+  assert.equal(layout.initRevPlayer, "B"); // team1 right-court player receives first
+});
+
 test("首发/首接: initServTeam and initRevPlayer track initial serving setup", () => {
   // Team 1 serves first: initServTeam=1, initRevPlayer=team2 right court
   const scoring1 = doublesScoring({ targetScore: 11, capScore: 0 });

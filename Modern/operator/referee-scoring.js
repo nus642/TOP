@@ -21,7 +21,7 @@
     };
   }
 
-  function initialState({ format = {}, teams, doubles = false, servTeam = 1 } = {}) {
+  function initialState({ format = {}, teams, doubles = false, servTeam = 1, viewSwapped = false } = {}) {
     const positions = teamPositions(teams);
     // Track the initial serving team and receiving team's right-court player
     // so the UI can display persistent "首发" / "首接" badges throughout the game.
@@ -47,7 +47,9 @@
       timeline: [],
       history: [],
       halfSwitched: false,
-      viewSwapped: false,
+      // On-site toss outcome: which end each team occupies sets the initial
+      // view (Legacy init_ba). Defaults to team1 on the referee's left.
+      viewSwapped: Boolean(viewSwapped),
       gameEnded: false,
       matchEnded: false,
       currentGame: 1,

@@ -19,7 +19,14 @@ let engagedMatchId = null;
 let switchCountdown = null;
 let timeoutTimer = null; // { matchId, team, remaining, interval }
 let currentSignaturePad = null; // canvas signature pad instance for Step 3
+// On-site toss outcomes captured in Step 1 (which end each team occupies,
+// first server, doubles right-court players). Applied when the match's
+// scoring session is first created; mirrors Legacy's pre-match modal
+// (init_ba / serve / t1Stance+t2Stance).
+const preMatchToss = new Map();
 
+// On-site toss selections only matter when a fresh scoring state is created;
+// a restored localStorage backup already carries its own initial setup.
 function scoringSession(match) {
   const key = String(match.id);
   let session = scoringSessions.get(key);
@@ -31,19 +38,28 @@ function scoringSession(match) {
   const restored = backup.load();
   const t1Players = match.team1?.players || [];
   const t2Players = match.team2?.players || [];
+  const toss = preMatchToss.get(key) || {};
+  const rightFor = (players, chosenName) => {
+    if (players.length < 2) return players[0]?.name;
+    return players.find((p) => p.name === chosenName)?.name || players[0]?.name;
+  };
+  const t1RightName = rightFor(t1Players, toss.t1Right);
+  const t2RightName = rightFor(t2Players, toss.t2Right);
   const scoring = RefereeScoring.createRallyScoring({
     restore: restored,
     format: match.format,
     teams: {
       team1: match.team1?.name,
       team2: match.team2?.name,
-      // players[0] starts in the right court (initial server at score 0).
-      team1Right: t1Players[0]?.name,
-      team1Left: t1Players[1]?.name || t1Players[0]?.name,
-      team2Right: t2Players[0]?.name,
-      team2Left: t2Players[1]?.name || t2Players[0]?.name
+      // The player chosen at the toss to stand in the right court starts there.
+      team1Right: t1RightName,
+      team1Left: t1Players.find((p) => p.name !== t1RightName)?.name || t1Players[0]?.name,
+      team2Right: t2RightName,
+      team2Left: t2Players.find((p) => p.name !== t2RightName)?.name || t2Players[0]?.name
     },
-    doubles: t1Players.length > 1 || t2Players.length > 1
+    doubles: t1Players.length > 1 || t2Players.length > 1,
+    servTeam: toss.serveTeam || 1,
+    viewSwapped: Boolean(toss.t1OnRight)
   });
   session = { scoring, backup, sideSwitchNotice: false };
   scoringSessions.set(key, session);
@@ -54,6 +70,24 @@ function releaseSession(matchId) {
   const session = scoringSessions.get(String(matchId));
   if (session) session.backup.clear();
   scoringSessions.delete(String(matchId));
+  preMatchToss.delete(String(matchId));
+}
+
+// Capture the on-site toss outcomes from the Step 1 form right before the
+// start action transitions the match to playing (Legacy pre-match modal:
+// init_ba / serve / t1Stance+t2Stance). The scoring session picks them up
+// when it is first created.
+function capturePreMatchToss(matchId) {
+  if (matchId == null) return;
+  const viewEl = document.querySelector("#match-view");
+  if (!viewEl) return;
+  const checked = (name) => viewEl.querySelector(`input[name="${name}"]:checked`)?.value;
+  preMatchToss.set(String(matchId), {
+    t1OnRight: checked("setup-side") === "t2-left",
+    serveTeam: Number(checked("setup-serve") || 1),
+    t1Right: checked("setup-t1-stance"),
+    t2Right: checked("setup-t2-stance")
+  });
 }
 
 function persistAndSnapshot(match, session) {
@@ -196,21 +230,46 @@ function playersLine(team) {
   return names.length ? names.join("、") : escapeHtml(team?.name || "—");
 }
 
-// Step 1: pre-match confirmation (backend-authoritative format, read-only).
+// Step 1: pre-match confirmation (backend-authoritative format, read-only)
+// plus the on-site toss outcomes — ends, first server and doubles stances are
+// decided at the court (coin toss), never dispatched by the master console.
 function renderSetupStep(match) {
   const format = match.format || {};
-  const doubles = (match.team1?.players?.length || 0) > 1 || (match.team2?.players?.length || 0) > 1;
+  const t1Name = escapeHtml(match.team1?.name || "一方");
+  const t2Name = escapeHtml(match.team2?.name || "另一方");
+  const t1Players = match.team1?.players || [];
+  const t2Players = match.team2?.players || [];
+  const doubles = t1Players.length > 1 || t2Players.length > 1;
   const capLabel = format.capScore > 0 ? `封顶 ${format.capScore}` : "无封顶";
+  const radio = (name, value, label, checked) =>
+    `<label class="toss-option"><input type="radio" name="${name}" value="${escapeHtml(value)}"${checked ? " checked" : ""}> ${escapeHtml(label)}</label>`;
+  const stanceField = (label, name, players) =>
+    `<div class="toss-field"><span class="toss-label">${escapeHtml(label)}</span><div class="toss-options">${players.map((p, i) => radio(name, p.name, p.name, i === 0)).join("")}</div></div>`;
   return `<div class="setup-card">
     <span class="eyebrow">步骤 1 · 确认比赛信息</span>
     <dl class="setup-info">
-      <div><dt>对阵</dt><dd>${escapeHtml(match.team1?.name || "一方")} 对 ${escapeHtml(match.team2?.name || "另一方")}</dd></div>
-      <div><dt>${escapeHtml(match.team1?.name || "一方")}</dt><dd>${playersLine(match.team1)}</dd></div>
-      <div><dt>${escapeHtml(match.team2?.name || "另一方")}</dt><dd>${playersLine(match.team2)}</dd></div>
+      <div><dt>对阵</dt><dd>${t1Name} 对 ${t2Name}</dd></div>
+      <div><dt>${t1Name}</dt><dd>${playersLine(match.team1)}</dd></div>
+      <div><dt>${t2Name}</dt><dd>${playersLine(match.team2)}</dd></div>
       <div><dt>场地 / 轮次</dt><dd>${escapeHtml(match.court || "场地待定")} · 第 ${escapeHtml(match.roundNumber || "—")} 轮</dd></div>
       <div><dt>赛制</dt><dd>目标 ${format.targetScore ?? 21} 分 · ${capLabel} · ${doubles ? "双打" : "单打"}</dd></div>
     </dl>
-    <p class="muted">赛制由主控下发，确认无误后开始比赛。</p>
+    <p class="muted">赛制由主控下发，确认无误后登记现场挑边结果并开始比赛。</p>
+    <fieldset class="toss-setup">
+      <legend>🪙 现场挑边结果（掷硬币）</legend>
+      <div class="toss-field"><span class="toss-label">1. 方位（主裁左手边是哪队）</span><div class="toss-options">
+        ${radio("setup-side", "t1-left", `${match.team1?.name || "一方"} 在左侧`, true)}
+        ${radio("setup-side", "t2-left", `${match.team2?.name || "另一方"} 在左侧`, false)}
+      </div></div>
+      <div class="toss-field"><span class="toss-label">2. 发球权（第一回合发球方）</span><div class="toss-options">
+        ${radio("setup-serve", "1", `${match.team1?.name || "一方"} 首发`, true)}
+        ${radio("setup-serve", "2", `${match.team2?.name || "另一方"} 首发`, false)}
+      </div></div>
+      ${doubles ? `<div class="toss-field"><span class="toss-label">3. 双打首发站位（站己方右区/偶数区的人）</span>
+        ${stanceField(match.team1?.name || "一方", "setup-t1-stance", t1Players)}
+        ${stanceField(match.team2?.name || "另一方", "setup-t2-stance", t2Players)}
+      </div>` : ""}
+    </fieldset>
     <button data-action="start" class="primary">开始比赛</button>
   </div>`;
 }
@@ -555,6 +614,7 @@ matchView.addEventListener("click", (event) => {
   if (button) {
     const inner = button.closest(".match-view-inner");
     if (button.dataset.action === "close-view") { closeMatchView(); return; }
+    if (button.dataset.action === "start") capturePreMatchToss(inner?.dataset.matchId);
     if (button.dataset.action === "back-to-scoring") {
       // Go back from Step 3 (confirm) to Step 2 (playing) for corrections.
       const inner = button.closest(".match-view-inner");
