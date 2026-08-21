@@ -79,6 +79,32 @@ function releaseSession(matchId) {
   preMatchToss.delete(String(matchId));
 }
 
+// Coin-flip mini widget: randomly decides ends and first server, then fills
+// the toss radios — the referee still reviews/overrides before starting.
+function flipCoin(inner) {
+  if (!inner) return;
+  const btn = inner.querySelector('[data-action="flip-coin"]');
+  const resultEl = inner.querySelector("#coin-result");
+  if (btn) { btn.disabled = true; btn.textContent = "🪙 抛掷中…"; }
+  const match = currentMatches.find((m) => String(m.id) === String(inner.dataset.matchId));
+  const t1 = match?.team1?.name || "一方";
+  const t2 = match?.team2?.name || "另一方";
+  setTimeout(() => {
+    const side = Math.random() < 0.5 ? "t1-left" : "t2-left";
+    const serve = Math.random() < 0.5 ? "1" : "2";
+    const check = (name, value) => {
+      const el = inner.querySelector(`input[name="${name}"][value="${value}"]`);
+      if (el) el.checked = true;
+    };
+    check("setup-side", side);
+    check("setup-serve", serve);
+    const sideName = side === "t1-left" ? t1 : t2;
+    const serveName = serve === "1" ? t1 : t2;
+    if (resultEl) resultEl.textContent = `掷硬币结果：${serveName} 首发 · ${sideName} 在主裁左手边（已自动填入，可修改）`;
+    if (btn) { btn.disabled = false; btn.textContent = "🪙 再掷一次"; }
+  }, 650);
+}
+
 // Capture the on-site toss outcomes from the Step 1 form right before the
 // start action transitions the match to playing (Legacy pre-match modal:
 // init_ba / serve / t1Stance+t2Stance). The scoring session picks them up
@@ -247,10 +273,22 @@ function renderSetupStep(match) {
   const t2Players = match.team2?.players || [];
   const doubles = t1Players.length > 1 || t2Players.length > 1;
   const capLabel = format.capScore > 0 ? `封顶 ${format.capScore}` : "无封顶";
+  // Prefill from the live session when correcting the toss mid-match, else
+  // from previously captured choices (defaults on first entry).
+  const session = scoringSessions.get(String(match.id));
+  const state = session?.scoring.state();
+  const resume = Boolean(session && state && match.status === "playing"
+    && (!state.timeline || state.timeline.length === 0) && !state.t1Score && !state.t2Score);
+  const toss = state
+    ? { t1OnRight: state.viewSwapped, serveTeam: state.initServTeam, t1Right: state.teams.t1.r, t2Right: state.teams.t2.r }
+    : (preMatchToss.get(String(match.id)) || {});
+  const serveTeam = Number(toss.serveTeam || 1);
+  const t1RightName = toss.t1Right || t1Players[0]?.name;
+  const t2RightName = toss.t2Right || t2Players[0]?.name;
   const radio = (name, value, label, checked) =>
     `<label class="toss-option"><input type="radio" name="${name}" value="${escapeHtml(value)}"${checked ? " checked" : ""}> ${escapeHtml(label)}</label>`;
-  const stanceField = (label, name, players) =>
-    `<div class="toss-field"><span class="toss-label">${escapeHtml(label)}</span><div class="toss-options">${players.map((p, i) => radio(name, p.name, p.name, i === 0)).join("")}</div></div>`;
+  const stanceField = (label, name, players, rightName) =>
+    `<div class="toss-field"><span class="toss-label">${escapeHtml(label)}</span><div class="toss-options">${players.map((p) => radio(name, p.name, p.name, p.name === rightName)).join("")}</div></div>`;
   return `<div class="setup-card">
     <span class="eyebrow">步骤 1 · 确认比赛信息</span>
     <dl class="setup-info">
@@ -261,22 +299,27 @@ function renderSetupStep(match) {
       <div><dt>赛制</dt><dd>目标 ${format.targetScore ?? 21} 分 · ${capLabel} · ${doubles ? "双打" : "单打"}</dd></div>
     </dl>
     <p class="muted">赛制由主控下发，确认无误后登记现场挑边结果并开始比赛。</p>
+    <div class="coin-row">
+      <button type="button" data-action="flip-coin" class="coin-btn">🪙 抛硬币随机决定方位与发球权</button>
+      <span id="coin-result" class="coin-result" aria-live="polite"></span>
+    </div>
     <fieldset class="toss-setup">
       <legend>🪙 现场挑边结果（掷硬币）</legend>
       <div class="toss-field"><span class="toss-label">1. 方位（主裁左手边是哪队）</span><div class="toss-options">
-        ${radio("setup-side", "t1-left", `${match.team1?.name || "一方"} 在左侧`, true)}
-        ${radio("setup-side", "t2-left", `${match.team2?.name || "另一方"} 在左侧`, false)}
+        ${radio("setup-side", "t1-left", `${match.team1?.name || "一方"} 在左侧`, !toss.t1OnRight)}
+        ${radio("setup-side", "t2-left", `${match.team2?.name || "另一方"} 在左侧`, Boolean(toss.t1OnRight))}
       </div></div>
       <div class="toss-field"><span class="toss-label">2. 发球权（第一回合发球方）</span><div class="toss-options">
-        ${radio("setup-serve", "1", `${match.team1?.name || "一方"} 首发`, true)}
-        ${radio("setup-serve", "2", `${match.team2?.name || "另一方"} 首发`, false)}
+        ${radio("setup-serve", "1", `${match.team1?.name || "一方"} 首发`, serveTeam === 1)}
+        ${radio("setup-serve", "2", `${match.team2?.name || "另一方"} 首发`, serveTeam === 2)}
       </div></div>
       ${doubles ? `<div class="toss-field"><span class="toss-label">3. 双打首发站位（站己方右区/偶数区的人）</span>
-        ${stanceField(match.team1?.name || "一方", "setup-t1-stance", t1Players)}
-        ${stanceField(match.team2?.name || "另一方", "setup-t2-stance", t2Players)}
+        ${stanceField(match.team1?.name || "一方", "setup-t1-stance", t1Players, t1RightName)}
+        ${stanceField(match.team2?.name || "另一方", "setup-t2-stance", t2Players, t2RightName)}
       </div>` : ""}
     </fieldset>
-    <button data-action="start" class="primary">开始比赛</button>
+    <button data-action="${resume ? "resume-setup" : "start"}" class="primary">${resume ? "继续比赛" : "开始比赛"}</button>
+    ${resume ? `<p class="muted">尚未开始计分，更正挑边结果后点「继续比赛」返回执裁。</p>` : ""}
   </div>`;
 }
 
@@ -396,6 +439,7 @@ function renderPlayingStep(match, session) {
     ${courtQuadrant(match, session)}
     <div class="timeline" aria-label="得分轨迹">${timelineDots(state.timeline)}</div>
     <div class="scoring-actions">
+      ${state.timeline.length === 0 && !state.t1Score && !state.t2Score ? '<button data-scoring-action="edit-setup">🪙 重新编辑挑边</button>' : ""}
       <button data-scoring-action="undo" ${actionsDisabled ? "disabled" : ""}>撤回上一分</button>
       <button data-scoring-action="toggle-view" ${actionsDisabled ? "disabled" : ""}>🔄 视角互换</button>
       ${endControls}
@@ -417,6 +461,11 @@ function renderMatchView(match) {
     if (session.scoring.isMatchEnded()) {
       stepLabel = "确认结果";
       body = renderConfirmStep(match, session);
+    } else if (session.setupMode) {
+      // Pre-scoring toss correction: same form as Step 1, prefilled from the
+      // live session, with a "continue" button instead of "start".
+      stepLabel = "更正挑边";
+      body = renderSetupStep(match);
     } else {
       stepLabel = "执裁中";
       body = renderPlayingStep(match, session);
@@ -566,6 +615,17 @@ function runScoringAction(matchId, action, team) {
   const session = scoringSessions.get(matchId);
   if (!session) return;
   let result = null;
+  if (action === "edit-setup") {
+    const state = session.scoring.state();
+    if (state.timeline.length || state.t1Score || state.t2Score) {
+      view.error("已开始计分，无法更改挑边结果");
+      return;
+    }
+    session.setupMode = true;
+    const matchData = currentMatches.find((match) => String(match.id) === matchId);
+    if (matchData) renderMatchView(matchData);
+    return;
+  }
   if (action === "award") result = session.scoring.award(team);
   if (action === "undo") {
     if (!session.scoring.undo()) { view.error("没有可撤回的判罚记录"); return; }
@@ -620,6 +680,17 @@ matchView.addEventListener("click", (event) => {
   if (button) {
     const inner = button.closest(".match-view-inner");
     if (button.dataset.action === "close-view") { closeMatchView(); return; }
+    if (button.dataset.action === "flip-coin") { flipCoin(inner); return; }
+    if (button.dataset.action === "resume-setup") {
+      // Toss corrected pre-scoring: drop the untouched session/backup and
+      // recreate it from the corrected choices.
+      const matchId = inner?.dataset.matchId;
+      releaseSession(matchId);
+      capturePreMatchToss(matchId);
+      const match = currentMatches.find((m) => String(m.id) === String(matchId));
+      if (match) renderMatchView(match);
+      return;
+    }
     if (button.dataset.action === "start") capturePreMatchToss(inner?.dataset.matchId);
     if (button.dataset.action === "back-to-scoring") {
       // Go back from Step 3 (confirm) to Step 2 (playing) for corrections.

@@ -133,7 +133,9 @@ test("M2 operator UI exposes the bounded Master and Referee recovery course", ()
   assert.match(master, /提交可追溯报告/);
   assert.match(master, /记录延后协调/);
   assert.match(master, /等待裁判明确中断/);
-  assert.match(referee, /data-action="start"/);
+  assert.match(referee, /dataset\.action === "start"/);
+  assert.match(referee, /flip-coin/);
+  assert.match(referee, /resume-setup/);
   assert.match(referee, /data-action="interrupt"/);
   assert.match(referee, /data-action="resume"/);
   assert.match(referee, /等待主控报告场地恢复/);
