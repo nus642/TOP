@@ -134,12 +134,15 @@ function startSideSwitchCountdown(matchId) {
 }
 
 // Four-quadrant on-court position view (mirrors Legacy slotTL/BL/TR/BR). The
-// screen side a team occupies flips with viewSwapped, and the serving player's
-// slot is highlighted.
+// internal position model is always the physical right/left court; viewSwapped
+// only re-mirrors the picture at render time — a 180° walk around the net puts
+// each team on the opposite screen side AND each player in the diagonally
+// opposite service box (front/back and right/left both flip).
 function courtQuadrant(match, session) {
   const layout = session.scoring.courtLayout();
-  const leftTeam = layout.viewSwapped ? 2 : 1;
-  const rightTeam = layout.viewSwapped ? 1 : 2;
+  const flipped = layout.viewSwapped;
+  const leftTeam = flipped ? 2 : 1;
+  const rightTeam = flipped ? 1 : 2;
 
   const sideHtml = (teamNum) => {
     const team = teamNum === 1 ? match.team1 : match.team2;
@@ -148,7 +151,7 @@ function courtQuadrant(match, session) {
     const isDoubles = players.length > 1;
     const side = teamNum === 1 ? layout.t1 : layout.t2;
     const isServingSide = layout.servingTeam === teamNum;
-    const slot = (playerName, courtKey) => {
+    const slot = (playerName, areaLabel) => {
       const isServing = isServingSide && layout.servingPlayer === playerName;
       // Legacy L902: the player who started in the right court gets a "首发位" marker
       // so the referee can verify positioning against physical markers (wristbands etc).
@@ -156,18 +159,24 @@ function courtQuadrant(match, session) {
       const initRightName = teamNum === layout.initServTeam ? layout.initServPlayer : layout.initRevPlayer;
       const isInitRight = isDoubles && playerName === initRightName;
       const initRightBadge = (isInitRight && isDoubles) ? `<span class="init-right-badge">[首发位]</span>` : "";
-      // [首发位] badge on the player who started in the right court (Legacy L902).
-      // Removed redundant "首发"/"首接" badges — the [首发位] marker is sufficient.
-      return `<div class="court-slot${isServing ? " slot-serving" : ""}"><span class="slot-player">${escapeHtml(playerName || "—")}</span><span class="slot-court">${courtKey === "right" ? "右区" : "左区"}</span>${initRightBadge}</div>`;
+      return `<div class="court-slot${isServing ? " slot-serving" : ""}"><span class="slot-player">${escapeHtml(playerName || "—")}</span><span class="slot-court">${areaLabel}</span>${initRightBadge}</div>`;
     };
+    // Slot placement follows the referee's current vantage point:
+    // - team1 at its home side: right court renders bottom, left court top;
+    // - team2 mirrored: right court renders top, left court bottom;
+    // - when the view is flipped (180° rotation), each player moves to the
+    //   diagonally opposite box and the 左区/右区 labels invert accordingly.
+    const topIsRight = (teamNum === 1) !== flipped;
+    const topPlayer = topIsRight ? side.right : side.left;
+    const bottomPlayer = topIsRight ? side.left : side.right;
+    const topLabel = topIsRight ? "右区" : "左区";
+    const bottomLabel = topIsRight ? "左区" : "右区";
     return `<div class="court-side">
       <div class="court-team">${teamName}${isServingSide ? " · 发球" : ""}</div>
       <div class="court-slots">
         ${isDoubles
-          ? (teamNum === 1
-            ? slot(side.left, "left") + slot(side.right, "right")  // 左队：左区在上，右区在下
-            : slot(side.right, "right") + slot(side.left, "left")) // 右队：右区在上，左区在下（镜像）
-          : slot(side.right, "right")}
+          ? slot(topPlayer, topLabel) + slot(bottomPlayer, bottomLabel)
+          : slot(side.right, flipped ? "左区" : "右区")}
       </div>
     </div>`;
   };
@@ -396,6 +405,12 @@ function openMatchView(matchId) {
 }
 
 function closeMatchView() {
+  // Persist the scoring backup so re-entering the match (or reloading the
+  // page) restores the score instead of starting from zero.
+  if (engagedMatchId != null) {
+    const session = scoringSessions.get(String(engagedMatchId));
+    if (session) session.backup.save(session.scoring.state());
+  }
   clearSideSwitchCountdown();
   stopTimeoutTimer();
   engagedMatchId = null;
@@ -455,9 +470,13 @@ const view = {
     currentMatches = matches;
     notice.textContent = `已加载 ${matches.length} 场已分配比赛。`;
     notice.className = "notice";
-    // Matches that left play release their local scoring backup.
+    // Local scoring backups are only released once the result is in (scored /
+    // confirmed). Any earlier status — interrupted, or a mid-flow reset back
+    // to accepted — keeps the backup, so re-entering the match restores the
+    // referee's score instead of zeroing it.
     for (const [matchId] of scoringSessions) {
-      if (!matches.some((match) => String(match.id) === matchId && match.status === "playing")) releaseSession(matchId);
+      const match = matches.find((candidate) => String(candidate.id) === matchId);
+      if (!match || ["scored", "confirmed"].includes(match.status)) releaseSession(matchId);
     }
     // If a dedicated match view is engaged, keep it in focus across refreshes.
     const engaged = engagedMatchId != null

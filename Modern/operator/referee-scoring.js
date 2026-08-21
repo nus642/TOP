@@ -75,13 +75,6 @@
       positions.l = tmp;
     }
 
-    // Swap both teams' internal left/right positions when sides are switched.
-    // This ensures the server appears in the correct court on screen after viewSwapped flips.
-    function swapBothTeamsPositions() {
-      swapPositions(1);
-      swapPositions(2);
-    }
-
     // Rally rule: next server is located by the serving team's own score parity
     // (even -> right court, odd -> left court). Mirrors Legacy award() L1039-1041.
     function servingInfo() {
@@ -131,12 +124,11 @@
       const switchPoint = Math.ceil(state.match.targetScore / 2);
       if (maxScore === switchPoint && !state.halfSwitched) {
         state.halfSwitched = true;
-        // Mirror Legacy L1051: switching ends flips the referee's on-screen view
-        // so the team that walked to the opposite end renders on the other side.
+        // Mirror Legacy L1051: switching ends only flips the referee's on-screen
+        // view. The internal left/right position model stays untouched — the
+        // even/odd serve rule stays valid, and the quadrant view re-mirrors at
+        // render time (Legacy keeps gameState.t1/t2 unchanged as well).
         state.viewSwapped = !state.viewSwapped;
-        // Also swap each team's internal left/right positions so the server
-        // appears in the correct court on screen after the view flip.
-        swapBothTeamsPositions();
         events.sideSwitch = true;
       }
       if (isGameWon()) {

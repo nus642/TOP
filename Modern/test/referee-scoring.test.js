@@ -205,11 +205,48 @@ test("side switch at half score flips viewSwapped and undo restores it", () => {
   assert.equal(scoring.state().viewSwapped, false);
 });
 
+test("half switch only flips the view: positions and serve parity stay intact", () => {
+  const scoring = doublesScoring({ targetScore: 11, capScore: 0 });
+  for (let i = 0; i < 6; i++) scoring.award(1); // t1 wins all six; 6 = ceil(11/2)
+  const before = scoring.courtLayout();
+  assert.equal(before.viewSwapped, true);
+  // The internal position model must NOT be swapped by the side switch
+  // (Legacy keeps gameState.t1/t2 untouched; only viewBa flips).
+  assert.deepEqual(before.t1, { left: "A", right: "B" }); // six rally-win swaps = back to start
+  assert.deepEqual(before.t2, { left: "C", right: "D" }); // never served, unchanged
+  // Even score -> right court; odd -> left. Regression: odd must stay LEFT.
+  assert.equal(before.servingPlayer, "B"); // t1 score 6 (even) -> right court
+  assert.equal(before.servingCourt, "right");
+  scoring.award(2); // sideout: t2 wins the rally, their score becomes 1 (odd)
+  const after = scoring.courtLayout();
+  assert.equal(after.servingTeam, 2);
+  assert.equal(after.servingPlayer, "C"); // t2 score 1 (odd) -> left court
+  assert.equal(after.servingCourt, "left");
+  scoring.award(2); // t2 wins again: score 2 (even), serving partners swap
+  const even = scoring.courtLayout();
+  assert.equal(even.servingPlayer, "C"); // same server, now from the right court
+  assert.equal(even.servingCourt, "right");
+});
+
 test("toggleView flips viewSwapped manually", () => {
   const scoring = doublesScoring({ targetScore: 11, capScore: 0 });
   assert.equal(scoring.toggleView(), true);
   assert.equal(scoring.state().viewSwapped, true);
   assert.equal(scoring.toggleView(), false);
+});
+
+test("toggleView only re-mirrors the view, never the position model", () => {
+  const scoring = doublesScoring({ targetScore: 11, capScore: 0 });
+  scoring.award(1); // positions swap once: t1 l=B r=A
+  const before = scoring.courtLayout();
+  scoring.toggleView();
+  const after = scoring.courtLayout();
+  assert.equal(after.viewSwapped, true);
+  // Physical positions and serve info are untouched by the view flip.
+  assert.deepEqual(after.t1, before.t1);
+  assert.deepEqual(after.t2, before.t2);
+  assert.equal(after.servingPlayer, before.servingPlayer);
+  assert.equal(after.servingCourt, before.servingCourt);
 });
 
 test("courtLayout reports left/right players, server, and view flag", () => {
