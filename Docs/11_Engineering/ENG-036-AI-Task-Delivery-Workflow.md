@@ -130,3 +130,10 @@ This workflow standard does not change:
 - Modern runtime code
 - Database schema
 - API behavior
+## Relationship to Handoff Packages
+
+This document owns the AI task-delivery workflow: the expected reviewable outputs and local application flow for AI-produced changes.
+
+A task-specific handoff package may collect the task brief, executive summary, full report, local review notes, status, and patch evidence for a specific assignment. Such a package complements this workflow. It does not replace `ENG-035-AI-Development-Workflow.md`, does not redefine the ChatGPT/Codex/local Git roles, and should not duplicate this document's delivery rules.
+
+If a future `TES-Handoff-Protocol.md` is added, it should define only the durable handoff package structure and should reference this document for AI task-delivery semantics.
