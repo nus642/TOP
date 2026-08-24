@@ -276,6 +276,7 @@
                                         <button onclick="document.getElementById('teamSignFile').click()" id="importTeamSignBtn" class="tool-btn primary flex-1 min-w-[110px]">📥 1.导入大名单</button>
                                         <button onclick="document.getElementById('teamExcelFile').click()" id="importTeamBtn" class="tool-btn primary flex-1 min-w-[110px]">📊 2.日程建房</button>
                                         <a href="team_lineup.html" target="_blank" class="tool-btn primary flex-1 min-w-[110px]">📋 领队排阵界面</a>
+                                        <button onclick="window.open('players.html?code='+encodeURIComponent(currentEventCode))" class="tool-btn primary flex-1 min-w-[110px]">📂 运动员名单</button>
                                         <button onclick="openAddMemberModal()" class="tool-btn green flex-1 min-w-[110px]">➕ 补录队伍/队员</button>
                                     </div>
                                     <button id="pushTeamMatchesBtn" onclick="handlePushTeamMatches()" class="w-full bg-gradient-to-r from-amber-600 to-orange-600 py-2.5 rounded-lg text-xs font-black shadow-lg hover:opacity-90 active:scale-95 transition-all text-white tracking-widest border border-amber-400/50 mt-1">⚡ 扫描核碰领队交卷，下发比赛至裁判池</button>
@@ -417,7 +418,7 @@
                         <div class="p-5">
                             <div class="flex justify-between items-center mb-4">
                                 <h2 id="radarTitle" class="text-sm font-bold text-indigo-300 flex items-center gap-2"><span>👁️</span> 监控雷达 <span class="text-[10px] text-slate-400 ml-1 font-normal">(签到统计)</span></h2>
-                                <button onclick="window.open('players.html?code='+$('currentEventCode').innerText)" class="btn-lib">📂 进名单库</button>
+                                <button onclick="window.open('players.html?code='+encodeURIComponent(currentEventCode))" class="btn-lib">📂 进名单库</button>
                             </div>
                             <div id="indRadarStats" class="radar-stats"></div>
                         </div>

@@ -8,7 +8,7 @@
 
 const { describe, it } = require('node:test');
 const assert = require('node:assert/strict');
-const { parseCSV, processImport, resolveTeamPrefix } = require('./team-code-logic');
+const { parseCSV, processImport, resolveTeamPrefix, buildPlayersUrl } = require('./team-code-logic');
 
 // ======================== 辅助函数 ========================
 
@@ -306,5 +306,27 @@ describe('team_code 冻结修复', () => {
     const prefixes = r.players.map(p => resolveTeamPrefix(p));
     assert.equal(new Set(prefixes).size, 1, '同队所有人队伍编号相同');
     assert.equal(prefixes[0], 'T01');
+  });
+
+  // ==================== URL 构建 ====================
+
+  // ---------- 17. URL 包含 code 且禁止凭据 ----------
+  it('T17: buildPlayersUrl — 仅含 code，禁止 pwd/password', () => {
+    const url = buildPlayersUrl('TEST01');
+    assert.ok(url.startsWith('players.html?'), '应以 players.html? 开头');
+    assert.ok(url.includes('code=TEST01'), '应包含 code');
+    assert.ok(!url.includes('pwd'), 'URL 不得包含 pwd');
+    assert.ok(!url.includes('password'), 'URL 不得包含 password');
+    assert.ok(!url.includes('referee_password'), 'URL 不得包含 referee_password');
+  });
+
+  // ---------- 18. URL 特殊字符编码且无凭据泄漏 ----------
+  it('T18: buildPlayersUrl — 特殊字符编码，无明文密码', () => {
+    const url = buildPlayersUrl('ABC&123');
+    assert.ok(url.includes('code=ABC%26123'), '& 应被 encodeURIComponent 编码');
+    const parsed = new URLSearchParams(url.split('?')[1]);
+    assert.equal(parsed.get('code'), 'ABC&123');
+    // 安全断言：URL 中不得出现任何凭据字段
+    assert.ok(!/pwd|password|secret|token|auth/i.test(url), 'URL 不得含任何凭据关键词');
   });
 });

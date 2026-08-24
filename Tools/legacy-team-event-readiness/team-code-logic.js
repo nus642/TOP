@@ -145,11 +145,20 @@
     return '—';
   }
 
+  /**
+   * 构建 players.html 导航 URL（与 master.html 按钮逻辑一致）
+   * 安全约束：仅传递 event code，禁止在 URL 中出现任何认证凭据
+   */
+  function buildPlayersUrl(eventCode) {
+    return 'players.html?code=' + encodeURIComponent(eventCode);
+  }
+
   // 导出（兼容 Node.js 和浏览器）
   var exported = {
     parseCSV: parseCSV,
     processImport: processImport,
     resolveTeamPrefix: resolveTeamPrefix,
+    buildPlayersUrl: buildPlayersUrl,
     NAME_REGEX: NAME_REGEX,
     TEAM_REGEX: TEAM_REGEX,
     GROUP_REGEX: GROUP_REGEX,
