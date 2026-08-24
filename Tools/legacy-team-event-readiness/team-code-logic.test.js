@@ -8,7 +8,7 @@
 
 const { describe, it } = require('node:test');
 const assert = require('node:assert/strict');
-const { parseCSV, processImport } = require('./team-code-logic');
+const { parseCSV, processImport, resolveTeamPrefix } = require('./team-code-logic');
 
 // ======================== 辅助函数 ========================
 
@@ -276,5 +276,35 @@ describe('team_code 冻结修复', () => {
       assert.ok(!p.id_code.includes('恒兆'), `id_code 不含中文队名: ${p.id_code}`);
       assert.ok(!p.id_code.includes('飞鹰'), `id_code 不含中文队名: ${p.id_code}`);
     }
+  });
+
+  // ==================== 队伍编号显示选择逻辑 ====================
+
+  // ---------- 13. 有 team_code 时优先使用 ----------
+  it('T13: resolveTeamPrefix — 有 team_code 时直接返回', () => {
+    assert.equal(resolveTeamPrefix({ team_code: 'T01', id_code: 'T01-03' }), 'T01');
+  });
+
+  // ---------- 14. 无 team_code 时回退到 id_code 前缀 ----------
+  it('T14: resolveTeamPrefix — 旧数据无 team_code，回退 id_code 前缀', () => {
+    // 旧数据 id_code 格式为 "完整队名-序号"，回退后仍含序号（与 players.html 原始行为一致）
+    assert.equal(resolveTeamPrefix({ id_code: '恒兆国际-01' }), '恒兆国际-01');
+    assert.equal(resolveTeamPrefix({ id_code: 'T02-05' }), 'T02-05');
+  });
+
+  // ---------- 15. 两者都无时返回占位符 ----------
+  it('T15: resolveTeamPrefix — 无 team_code 且无 id_code → "—"', () => {
+    assert.equal(resolveTeamPrefix({ name: '张三' }), '—');
+    assert.equal(resolveTeamPrefix({ id_code: 'P001' }), '—');  // 无 '-' 分隔
+    assert.equal(resolveTeamPrefix(null), '—');
+  });
+
+  // ---------- 16. 同队所有球员显示相同 team_code ----------
+  it('T16: 同队 3 人显示相同队伍编号', () => {
+    const csv = `姓名,队名,组别\n张三,猛虎队,公开组\n李四,猛虎队,公开组\n王五,猛虎队,公开组\n`;
+    const r = runImport(csv);
+    const prefixes = r.players.map(p => resolveTeamPrefix(p));
+    assert.equal(new Set(prefixes).size, 1, '同队所有人队伍编号相同');
+    assert.equal(prefixes[0], 'T01');
   });
 });

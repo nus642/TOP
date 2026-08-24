@@ -131,10 +131,25 @@
     };
   }
 
+  /**
+   * 队伍编号显示选择逻辑（与 players.html renderTable 一致）
+   * 优先使用 team_code，旧数据缺 team_code 时回退到 id_code 前缀
+   */
+  function resolveTeamPrefix(player) {
+    if (!player) return '—';
+    if (player.team_code) return player.team_code;
+    if (player.id_code && player.id_code.includes('-')) {
+      var parts = player.id_code.split('-');
+      if (parts.length >= 2) return parts.slice(0, 2).join('-');
+    }
+    return '—';
+  }
+
   // 导出（兼容 Node.js 和浏览器）
   var exported = {
     parseCSV: parseCSV,
     processImport: processImport,
+    resolveTeamPrefix: resolveTeamPrefix,
     NAME_REGEX: NAME_REGEX,
     TEAM_REGEX: TEAM_REGEX,
     GROUP_REGEX: GROUP_REGEX,
