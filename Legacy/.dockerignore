@@ -1,0 +1,10 @@
+Dockerfile
+.dockerignore
+code.zip
+*.sql
+*.bak
+*.log
+docker-compose.yml
+docker-compose.*.yml
+test.php
+.git
