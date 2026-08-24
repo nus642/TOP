@@ -223,9 +223,11 @@ function renderTable() {
                 let sigBtn = p.checked_in
                     ? `<button onclick="viewSignature('${p.name}')" class="text-blue-400 hover:text-blue-300 text-xs font-bold underline underline-offset-4 decoration-blue-900">调阅真迹</button>`
                     : `<span class="text-slate-600 text-xs">—</span>`;
-                // ====== 提取完整队伍编号 ======
+                // ====== 队伍编号：优先 team_code，旧数据回退到 id_code 前缀 ======
                 let teamPrefix = '—';
-                if (p.id_code && p.id_code.includes('-')) {
+                if (p.team_code) {
+                    teamPrefix = p.team_code;
+                } else if (p.id_code && p.id_code.includes('-')) {
                     const parts = p.id_code.split('-');
                     if (parts.length >= 2) {
                         teamPrefix = parts.slice(0, 2).join('-');

@@ -276,6 +276,7 @@
                                         <button onclick="document.getElementById('teamSignFile').click()" id="importTeamSignBtn" class="tool-btn primary flex-1 min-w-[110px]">📥 1.导入大名单</button>
                                         <button onclick="document.getElementById('teamExcelFile').click()" id="importTeamBtn" class="tool-btn primary flex-1 min-w-[110px]">📊 2.日程建房</button>
                                         <a href="team_lineup.html" target="_blank" class="tool-btn primary flex-1 min-w-[110px]">📋 领队排阵界面</a>
+                                        <button onclick="window.open('players.html?code='+encodeURIComponent(currentEventCode))" class="tool-btn primary flex-1 min-w-[110px]">📂 运动员名单</button>
                                         <button onclick="openAddMemberModal()" class="tool-btn green flex-1 min-w-[110px]">➕ 补录队伍/队员</button>
                                     </div>
                                     <button id="pushTeamMatchesBtn" onclick="handlePushTeamMatches()" class="w-full bg-gradient-to-r from-amber-600 to-orange-600 py-2.5 rounded-lg text-xs font-black shadow-lg hover:opacity-90 active:scale-95 transition-all text-white tracking-widest border border-amber-400/50 mt-1">⚡ 扫描核碰领队交卷，下发比赛至裁判池</button>
@@ -417,7 +418,7 @@
                         <div class="p-5">
                             <div class="flex justify-between items-center mb-4">
                                 <h2 id="radarTitle" class="text-sm font-bold text-indigo-300 flex items-center gap-2"><span>👁️</span> 监控雷达 <span class="text-[10px] text-slate-400 ml-1 font-normal">(签到统计)</span></h2>
-                                <button onclick="window.open('players.html?code='+$('currentEventCode').innerText)" class="btn-lib">📂 进名单库</button>
+                                <button onclick="window.open('players.html?code='+encodeURIComponent(currentEventCode))" class="btn-lib">📂 进名单库</button>
                             </div>
                             <div id="indRadarStats" class="radar-stats"></div>
                         </div>
@@ -2352,9 +2353,31 @@ let teamCodeDisplay = displayCode ? `<span onclick="editTeamCode('${room}', '${t
                     let nameIdx = headers.findIndex(h => NAME_REGEX.test(String(h)));
                     let teamIdx = headers.findIndex(h => /队名|单位|学校|队伍/.test(String(h)));
                     let groupIdx = headers.findIndex(h => /项目名称|组别|所在小组|项目/i.test(String(h)));
-                    let teamCounters = {};
+                    let teamCodeMap = {};
+                    let teamPlayerCounters = {};
+                    let globalTeamCounter = 0;
                     let currentTeamName = '未知队伍', currentGroupName = '系统池';
                     
+                    // 预填：从已有球员继承 team_code 和序号
+                    dbPlayers.forEach(p => {
+                        if (p.team_code && p.team && !teamCodeMap[p.team]) {
+                            teamCodeMap[p.team] = p.team_code;
+                            if (p.team_code !== 'T' + String(globalTeamCounter).padStart(2, '0')) {
+                                let n = parseInt(p.team_code.replace(/^T/, ''), 10);
+                                if (!isNaN(n) && n >= globalTeamCounter) globalTeamCounter = n;
+                            }
+                        }
+                        if (p.id_code && p.team) {
+                            const pts = p.id_code.split('-');
+                            if (pts.length >= 2) {
+                                const seq = parseInt(pts[pts.length - 1], 10);
+                                if (!isNaN(seq) && seq > (teamPlayerCounters[p.team] || 0)) {
+                                    teamPlayerCounters[p.team] = seq;
+                                }
+                            }
+                        }
+                    });
+
                     for (let i = hIdx + 1; i < rows.length; i++) {
                         let name = String(rows[i][nameIdx] || '').trim();
                         if (!name) continue;
@@ -2363,14 +2386,20 @@ let teamCodeDisplay = displayCode ? `<span onclick="editTeamCode('${room}', '${t
                         let rowGroup = groupIdx !== -1 ? String(rows[i][groupIdx] || '').trim() : '';
                         if (rowTeam) currentTeamName = rowTeam.replace(/[\r\n]+/g, '');
                         if (rowGroup) currentGroupName = rowGroup.replace(/[\r\n]+/g, '');
-                        if (!teamCounters[currentTeamName]) teamCounters[currentTeamName] = 0;
+                        // ★ fix: 同队共享 team_code，不再使用完整队名作为前缀 ★
+                        if (!teamCodeMap[currentTeamName]) {
+                            globalTeamCounter++;
+                            teamCodeMap[currentTeamName] = 'T' + String(globalTeamCounter).padStart(2, '0');
+                        }
+                        let teamCode = teamCodeMap[currentTeamName];
+                        if (!teamPlayerCounters[currentTeamName]) teamPlayerCounters[currentTeamName] = 0;
                         let names = name.split(SPLIT_REGEX).map(s => s.trim()).filter(s => s);
                         names.forEach(n => {
                             let exists = dbPlayers.find(p => p.name === n && p.team === currentTeamName);
                             if (!exists) {
-                                teamCounters[currentTeamName]++;
-                                let id_code = `${currentTeamName}-${String(teamCounters[currentTeamName]).padStart(2, '0')}`;
-                                dbPlayers.push({ id_code, group: currentGroupName, position: dbPlayers.length + 1, name: n, team: currentTeamName, checked_in: false });
+                                teamPlayerCounters[currentTeamName]++;
+                                let id_code = `${teamCode}-${String(teamPlayerCounters[currentTeamName]).padStart(2, '0')}`;
+                                dbPlayers.push({ id_code, team_code: teamCode, group: currentGroupName, position: dbPlayers.length + 1, name: n, team: currentTeamName, checked_in: false });
                                 added++;
                             }
                         });
