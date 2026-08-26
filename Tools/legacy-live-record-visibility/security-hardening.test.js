@@ -74,23 +74,23 @@ describe('accept_task 服务端安全加固', () => {
 describe('release_task_acceptance 待开赛释放', () => {
   const src = readSource('data.php');
 
-  it('T42: release_task_acceptance API 存在并只释放 status=待开赛', () => {
+  it('T42: release_task_acceptance API 存在并只释放归属当前裁判的待开赛投影', () => {
     assert.ok(src.includes("case 'release_task_acceptance':"), '应定义 release_task_acceptance');
-    // 只释放待开赛状态
-    const releaseSection = src.match(/case 'release_task_acceptance':[\s\S]{0,3500}break;/);
-    assert.ok(releaseSection);
+    // 完整 case 段（到下一个 case 为止）
+    const releaseSection = src.match(/case 'release_task_acceptance':[\s\S]{0,5000}?case '/);
+    assert.ok(releaseSection, '应找到 release_task_acceptance 完整实现');
     assert.ok(releaseSection[0].includes("'待开赛'"), '应检查 status=待开赛');
-    assert.ok(releaseSection[0].includes('unset($live[$court])') || releaseSection[0].includes("unset(\$live[\$court])"),
-      '应 unset live_scores 中对应 court');
+    assert.ok(releaseSection[0].includes('unset($live[$target_court])'),
+      '应 unset live_scores 中归属当前裁判的投影');
+    assert.ok(releaseSection[0].includes('无权释放'), '归属其他裁判的投影应拒绝释放');
   });
 
   it('T43: 比赛中不得被 release_task_acceptance 清除', () => {
-    const section = readSource('data.php').match(/case 'release_task_acceptance':[\s\S]{0,3500}break;/);
+    const section = readSource('data.php').match(/case 'release_task_acceptance':[\s\S]{0,5000}?case '/);
     assert.ok(section);
-    // 非待开赛直接返回 success 但不删除；或只处理待开赛
-    const isPendingMatch = section[0].includes("待开赛");
-    assert.ok(isPendingMatch,
-      '应检查 status=待开赛');
+    // 非待开赛（比赛中）→ 显式拒绝，不得删除投影或改裁判状态
+    assert.ok(section[0].includes('比赛已开始') && section[0].includes('禁止普通释放'),
+      '比赛中释放应被拒绝');
   });
 });
 
@@ -98,16 +98,17 @@ describe('release_task_acceptance 待开赛释放', () => {
 describe('Checkin greeting 安全与确定性', () => {
   const checkinSrc = readSource('checkin.html');
 
-  it('T44: fetchGreetingBody 包含 bannedWords 过滤（早上好/下午好/晚上好/日期词）', () => {
+  it('T44: fetchGreetingBody 包含 bannedPatterns 过滤（具体日期/时段问候词）', () => {
     assert.ok(checkinSrc.includes('fetchGreetingBody'), '应定义 fetchGreetingBody');
-    assert.ok(checkinSrc.includes("'早上好'") || checkinSrc.includes('"早上好"'),
-      'ban 列表应含"早上好"');
-    assert.ok(checkinSrc.includes("'下午好'") || checkinSrc.includes('"下午好"'),
-      'ban 列表应含"下午好"');
-    assert.ok(checkinSrc.includes("'晚上好'") || checkinSrc.includes('"晚上好"'),
-      'ban 列表应含"晚上好"');
-    assert.ok(checkinSrc.includes("'月'") || checkinSrc.includes('"月"'),
-      'ban 列表应含"月"（日期词）');
+    // [SECOND HARDENING] 单字禁用词会误杀「比赛日、今日、年轻、岁月」，改用 bannedPatterns 正则具体模式
+    assert.ok(checkinSrc.includes('bannedPatterns'), '应定义 bannedPatterns 正则列表');
+    assert.ok(checkinSrc.includes('早上好') && checkinSrc.includes('下午好') && checkinSrc.includes('晚上好'),
+      '应过滤时段问候词 早上好/下午好/晚上好');
+    assert.ok(checkinSrc.includes('\\d{1,2}月\\d{1,2}日'),
+      '应以正则匹配具体日期模式（如“8月25日”）');
+    assert.ok(checkinSrc.includes('\\d{4}年'),
+      '应以正则匹配具体年份模式（如“2026年”）');
+    assert.ok(!checkinSrc.includes('const bannedWords'), '不得保留单字 bannedWords 列表（会误杀正常表达）');
     assert.ok(checkinSrc.includes('console.warn') && checkinSrc.includes('过期时间词'),
       'AI 正文违规时应 console.warn 并返回 null');
   });

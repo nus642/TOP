@@ -723,9 +723,10 @@
             window.syncInputs(); showToast('✅ 参数已成功写入终端内存'); $('taskArea').classList.add('hidden');
             // [P1-2 FIXUP] 接受任务即写入 live_scores——Master 场地卡在开赛前显示"待开赛"
             // 真实队名、task id、裁判；正式开赛后 sync_live_score 覆盖为"比赛中"。
+            // [SECOND HARDENING] 传递 referee_id 供服务端幂等/归属冲突检测。
             (async () => {
                 try {
-                    await apiPost('accept_task', { match_id: t.id, court: t.court, t1: t.t1, t2: t.t2, ref: `[${currentRefLevel}] ${currentRefereeName}` });
+                    await apiCall('accept_task', { match_id: t.id, court: t.court, t1: t.t1, t2: t.t2, ref: `[${currentRefLevel}] ${currentRefereeName}`, referee_id: currentRefereeId });
                 } catch(e) {}
             })();
         };
@@ -799,15 +800,48 @@
         };
 
         window.backToStep1 = async () => {
-            // [P1-2 RELEASE] 退回步骤1时释放待开赛投影（如果当前是待开赛状态）。
-            // 已进入比赛中的状态（status=比赛中）不会在此被清除。
-            showStep(1);
-            try {
-                if (currentMatch && currentMatch.id && sysMode !== 'local') {
-                    await apiPost('release_task_acceptance', { referee_id: currentRefereeId });
+            // [SECOND HARDENING] 严格顺序（任何一步失败即 fail closed，不继续清理后续状态）：
+            // 确认当前比赛状态 → 若比赛中：阻断并 return → 若待开赛：release_task_acceptance
+            // → release 成功后才 updateRefereeStatus('空闲') → 最后清理本地 pendingTask/UI。
+            // 注意：不得以"比分是否大于 0"判断是否开赛，必须以场地投影 status 为准。
+            if (currentMatch && currentMatch.id && sysMode !== 'local') {
+                // 1. 确认当前比赛状态；get_full_dashboard 失败 → fail closed 阻断
+                let courtStatus = null;
+                try {
+                    const dashboard = await apiGet('get_full_dashboard');
+                    if (!dashboard || dashboard.status === 'error' || !dashboard.courts) {
+                        alert('⚠️ 无法确认当前比赛状态（网络/服务异常）。\n为防止误清进行中的比赛，已阻断退回操作。\n请恢复连接后重试。');
+                        return;
+                    }
+                    const courtInfo = dashboard.courts[currentMatch.court];
+                    courtStatus = courtInfo ? (courtInfo.status || '') : '';
+                } catch (e) {
+                    alert('⚠️ 无法确认当前比赛状态（网络异常）。\n已阻断退回操作，请恢复连接后重试。');
+                    return;
                 }
-                await updateRefereeStatus('空闲', currentMatch ? currentMatch.court : null);
-            } catch(e){}
+                // 2. 比赛中（即使比分 0-0）→ 阻断普通退回
+                if (courtStatus === '比赛中') {
+                    alert('🚨 规则阻断拦截：\n当前比赛已在进行中！\n\n如需中断比赛，请使用正式中断或完赛流程。\n禁止通过“退回步骤1”清除执裁状态。');
+                    return;
+                }
+                // 3. 待开赛阶段 → 释放投影；失败即阻断，不得继续清裁判状态
+                try {
+                    const rel = await apiCall('release_task_acceptance', { referee_id: currentRefereeId, match_id: currentMatch.id });
+                    if (!rel || rel.status !== 'success') {
+                        alert('⚠️ 释放待开赛投影失败，已阻断退回操作。\n请重试或联系主控。');
+                        return;
+                    }
+                } catch (e) {
+                    alert('⚠️ 释放待开赛投影失败（网络异常），已阻断退回操作。');
+                    return;
+                }
+                // 4. release 成功后才将裁判置为空闲（court 传 null：投影已由 release 删除，
+                // 避免 referee_update_status 的"空闲+场地"分支误删其他投影）
+                try { await updateRefereeStatus('空闲', null); } catch(e) {}
+            }
+            // 5. 最后清理本地状态与 UI（本地模式/无任务时直接回到步骤1）
+            window.pendingTask = null;
+            showStep(1);
         };
         window.backToStep2 = async () => { showStep(2); try { await updateRefereeStatus('执裁中', currentMatch.court); } catch(e){} };
 
@@ -1088,9 +1122,9 @@
 
             if (maxScore === switchPoint && !matchState.halfSwitched) {
                 setTimeout(() => {
-                    alert(`🔥 场地交换提示：\n\n一方已达到 ${switchPoint} 分！\n请指挥双方交换场地并休整 60 秒。\n\n⚠️ 【重要提醒】：交换场地时，请提醒选手将球拍留在当前场地内！`);
+                    alert(`🔥 场地交换提示：\n\n一方已达到 ${switchPoint} 分！\n请指挥双方交换场地并休整 60 秒。\n\n⚠️ 【重要提醒】：双方选手请携带球拍交换场区，确认站位后继续比赛。`);
                     gameState.viewBa = !gameState.viewBa; matchState.halfSwitched = true; renderGame(); backupState();
-                    startTimer(60, '🔄 半场换边休整：球拍请放在场内');
+                    startTimer(60, '🔄 交换场区（官方暂停 60 秒）：请双方选手携带球拍交换场区，确认站位后继续比赛。');
                 }, 300);
             }
 

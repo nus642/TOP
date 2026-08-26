@@ -68,8 +68,10 @@ describe('P1 FIXUP: 接受任务后待开赛状态', () => {
     assert.ok(src.includes("'status' => '待开赛'"), 'live_scores 中 status 应为待开赛');
     assert.ok(src.includes("'match_name'"), '应包含队伍名称');
     assert.ok(src.includes("'score' => '0-0'"), '比分为 0-0');
-    // [FIXUP] 加固后 ref 变量被内联为 trim($req['ref'] ?? '')
-    assert.ok(src.includes("'referee' => trim($req['ref']"), '应包含裁判信息（内联赋值）');
+    // [SECOND HARDENING] referee 改为服务端 $referee_id（normalizeId($req['referee_id'] ?? ...)），不信任客户端 ref
+    assert.ok(src.includes("'referee' => $referee_id"),
+      '应包含裁判信息（使用服务端 $referee_id 变量）');
+    assert.ok(src.includes("normalizeId($req['referee_id']"), '应从请求读取 referee_id 并归一化');
   });
 
   it('T30: master.html 场地卡渲染 isLive 扩展至待开赛', () => {

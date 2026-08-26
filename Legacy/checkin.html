@@ -253,11 +253,17 @@
                 const res = await fetch(`${API}?action=ai_generate_greeting&event_code=${eventCode}&_t=${Date.now()}`);
                 const data = await res.json();
                 if (data.status === 'success' && data.greeting_body) {
-                    // 安全过滤：AI 返回正文若包含具体日期或时段问候词，拒绝该正文
-                    const bannedWords = ['早上好', '下午好', '晚上好', '夜深了', '月', '日', '年'];
-                    for (const word of bannedWords) {
-                        if (data.greeting_body.includes(word)) {
-                            console.warn('[Checkin] AI 正文包含过期时间词，拒绝并改用空正文');
+                    // [SECOND HARDENING] 安全过滤：AI 返回正文若包含具体日期或时段问候词，拒绝该正文。
+                    // 不使用单字「年/月/日」作禁用词（会误杀「比赛日、今日、年轻、岁月」等正常表达），
+                    // 改用具体模式匹配：
+                    const bannedPatterns = [
+                        /\d{1,2}月\d{1,2}日/,             // 具体日期：如 "8月25日"
+                        /\d{4}年/,                        // 具体年份：如 "2026年"
+                        /早上好|下午好|晚上好|夜深了/  // 时段问候词（易过期）
+                    ];
+                    for (const pattern of bannedPatterns) {
+                        if (pattern.test(data.greeting_body)) {
+                            console.warn('[Checkin] AI 正文包含过期时间词或具体日期，拒绝并改用空正文');
                             cachedGreetingBody = null;
                             hasFetchedOnce = true;
                             return;

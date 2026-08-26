@@ -510,36 +510,66 @@ switch ($action) {
         echo json_encode(['status' => 'success']); break;
     case 'delete_task': $tasks = kv_get($event_code, 'tasks', []); $normId = normalizeId($req['match_id']); unset($tasks[$normId]); kv_set($event_code, 'tasks', $tasks); echo json_encode(['status' => 'success']); break;
     case 'update_task_court':
+        // [P2 FIXUP + SECOND HARDENING] 更换比赛场地（Master 改场）：迁移 live_scores 投影。
+        // - 目标场地被其他 task 占用 → 拒绝且零写入（含 tasks KV）
+        // - 同场地重复提交 → 幂等 success
+        // - 比分权威回退：旧场地 live_scores.score → task.live_score → task.score → 0-0
+        // - 不复制 pause/timeout 等 stale 状态
         $match_id = normalizeId($req['match_id'] ?? '');
         $new_court = trim($req['court'] ?? '');
         if (!$match_id || !$new_court) { echo json_encode(['status' => 'error', 'message' => '缺少比赛ID或场地号']); break; }
         $tasks = kv_get($event_code, 'tasks', []);
-        $found = false;
-        foreach ($tasks as $key => &$task) {
-            if (normalizeId($key) === $match_id) { $task['court'] = $new_court; $found = true; break; }
+        $task = null; $task_key = null;
+        foreach ($tasks as $key => $t) {
+            if (normalizeId($key) === $match_id) { $task = $t; $task_key = $key; break; }
         }
-        if (!$found) { echo json_encode(['status' => 'error', 'message' => '未找到该比赛']); break; }
-        kv_set($event_code, 'tasks', $tasks);
+        if (!$task) { echo json_encode(['status' => 'error', 'message' => '未找到该比赛']); break; }
         $live = kv_get($event_code, 'live_scores', []);
         $old_court = null;
-        foreach ($live as $court => $info) {
-            if (isset($info['match_id']) && normalizeId($info['match_id']) === $match_id) { $old_court = $court; break; }
+        foreach ($live as $c => $info) {
+            if (isset($info['match_id']) && normalizeId($info['match_id']) === $match_id) { $old_court = $c; break; }
         }
-        if ($old_court && $old_court !== $new_court) {
-            // [P2 FIXUP + SWAP COURT CLEAR] 换场时不复制 pause/timeout 等 stale 状态。
-            // 只保留 match_id/status/match_name/referee/court/is_team；重置 score 为 0-0。
-            // 确保新场地不会有旧半场的暂停计时器或球拍放场内提示。
-            $live[$new_court] = [
-                'match_id' => $live[$old_court]['match_id'],
-                'status' => $live[$old_court]['status'] ?? '比赛中',
-                'match_name' => $live[$old_court]['match_name'],
-                'score' => '0-0', // 换场不重置比分，但清除所有非核心元数据
-                'referee' => $live[$old_court]['referee'],
-                'court' => $new_court,
-                'is_team' => $live[$old_court]['is_team'] ?? false,
-            ];
-            unset($live[$old_court]);
-            kv_set($event_code, 'live_scores', $live);
+        // 幂等：live 投影或 task 已在目标场地 → 不重复迁移（覆盖"无投影仅 task"的重复提交）
+        if (($old_court !== null && $old_court === $new_court) || trim($task['court'] ?? '') === $new_court) {
+            echo json_encode(['status' => 'success', 'idempotent' => true]);
+            break;
+        }
+        // 目标场地被其他 task 占用 → 拒绝且零写入（不得先写 tasks KV）
+        if (isset($live[$new_court]) && normalizeId($live[$new_court]['match_id'] ?? '') !== $match_id) {
+            $occ = $live[$new_court]['match_id'];
+            echo json_encode(['status' => 'error', 'message' => "场地 #{$new_court} 已被其他任务（{$occ}）占用，禁止改场"]);
+            break;
+        }
+        $tasks[$task_key]['court'] = $new_court;
+        kv_set($event_code, 'tasks', $tasks);
+        if ($old_court !== $new_court) {
+            $src = ($old_court !== null && isset($live[$old_court])) ? $live[$old_court] : null;
+            $has_authoritative_score = isset($task['live_score']) && $task['live_score'] !== '';
+            if ($src !== null || $has_authoritative_score) {
+                // 比分权威回退链：旧投影 score → task.live_score → task.score → 0-0
+                if ($src !== null && isset($src['score'])) {
+                    $new_score = $src['score'];
+                } else if ($has_authoritative_score) {
+                    $new_score = $task['live_score'];
+                } else if (isset($task['score']) && $task['score'] !== '') {
+                    $new_score = $task['score'];
+                } else {
+                    $new_score = '0-0';
+                }
+                $live[$new_court] = [
+                    'match_id' => ($src['match_id'] ?? '') !== '' ? $src['match_id'] : $match_id,
+                    'status' => $src['status'] ?? ((($task['status'] ?? '') !== '') ? $task['status'] : '比赛中'),
+                    'match_name' => ($src['match_name'] ?? '') !== '' ? $src['match_name'] : trim(($task['t1'] ?? '') . ' vs ' . ($task['t2'] ?? '')),
+                    'score' => $new_score,
+                    'referee' => $src['referee'] ?? ($task['referee'] ?? ''),
+                    'court' => $new_court,
+                    'is_team' => $src['is_team'] ?? ($task['is_team'] ?? false),
+                ];
+                if ($old_court !== null) unset($live[$old_court]);
+                kv_set($event_code, 'live_scores', $live);
+            }
+            // 既无 live 投影也无 live_score（未开赛任务）：只更新 task.court（已在上方完成），
+            // 不伪造投影——避免把未开始的任务伪造成"比赛中"。
         }
         echo json_encode(['status' => 'success']);
         break;
@@ -568,27 +598,39 @@ switch ($action) {
             break;
         }
 
-        // 3. 幂等性检查：如果该 court 已被当前 task 接受过，直接返回 success
+        // [SECOND HARDENING] referee_id 用于幂等与归属冲突检测（不信任客户端 court/t1/t2）
+        $referee_id = normalizeId($req['referee_id'] ?? trim($req['ref'] ?? ''));
+
+        // 3. 归属检查：该 task 若已有待开赛投影
+        //    - 相同 task + 相同 referee → 幂等返回 success（不产生重复投影）
+        //    - 相同 task + 不同 referee → 冲突拒绝，原裁判归属保持
         $live = kv_get($event_code, 'live_scores', []);
-        if (isset($live[$assigned_court]) && ($live[$assigned_court]['match_id'] ?? '') === $match_id && ($live[$assigned_court]['status'] ?? '') === '待开赛') {
-            echo json_encode(['status' => 'success', 'idempotent' => true]);
-            break;
+        foreach ($live as $court => $info) {
+            if (normalizeId($info['match_id'] ?? '') === $match_id && ($info['status'] ?? '') === '待开赛') {
+                if ($referee_id !== '' && normalizeId($info['referee'] ?? '') === $referee_id) {
+                    echo json_encode(['status' => 'success', 'idempotent' => true]);
+                } else {
+                    $other = $info['referee'] ?? '未知';
+                    echo json_encode(['status' => 'error', 'message' => "该任务已被裁判 {$other} 接受，不可重复领取"]);
+                }
+                break 2;
+            }
         }
 
-        // 4. 防冲突：如果该 court 已被其他 task 占用的待开赛，拒绝覆盖
-        if (isset($live[$assigned_court]) && ($live[$assigned_court]['status'] ?? '') === '待开赛') {
+        // 4. 防冲突：该 court 已被其他 task 的投影占用（不限状态）→ 拒绝覆盖，原比赛不被覆盖
+        if (isset($live[$assigned_court]) && normalizeId($live[$assigned_court]['match_id'] ?? '') !== $match_id) {
             $other_match = $live[$assigned_court]['match_id'];
-            echo json_encode(['status' => 'error', 'message' => "场地 #{$assigned_court} 已有其他任务（{$other_match}）处于待开赛状态，无法覆盖"]);
+            echo json_encode(['status' => 'error', 'message' => "场地 #{$assigned_court} 已被其他任务（{$other_match}）占用，无法覆盖"]);
             break;
         }
 
-        // 5. 使用服务端权威数据（不信任客户端）
+        // 5. 使用服务端权威数据写入（不信任客户端）；已领取任务不再进入其他裁判可领取列表（见 get_personal_task 过滤）
         $live[$assigned_court] = [
             'match_id' => $match_id,
             'status' => '待开赛',
             'match_name' => ($task['t1'] ?? '') . ' vs ' . ($task['t2'] ?? ''),
             'score' => '0-0',
-            'referee' => trim($req['ref'] ?? ''),
+            'referee' => $referee_id,
             'court' => $assigned_court,
             'is_team' => $task['is_team'] ?? false,
             'accepted_at' => date('Y-m-d H:i:s'),
@@ -597,46 +639,49 @@ switch ($action) {
         echo json_encode(['status' => 'success', 'idempotent' => false]);
         break;
     case 'release_task_acceptance':
-        // [P1-2 RELEASE] 释放待开赛投影（裁判切换任务/退出时）。
-        // - 只允许释放当前 referee 对当前 court 的待开赛投影
-        // - 已进入比赛中的状态（status=比赛中）不得被普通退出清除
-        // - 完赛后仍按现有 save_score 清理（不受影响）
+        // [P1-2 RELEASE + SECOND HARDENING] 只释放属于当前 referee 的待开赛投影。
+        // - 带 match_id：校验投影归属；归属其他裁判 → 拒绝；已开赛 → 拒绝（不得清除比赛中投影）
+        // - 无可释放投影 → 幂等 success（released=false），零写入
+        // - 释放成功：删除投影并把该裁判设回空闲（referees KV 以 name 为主键）
         $referee_id = normalizeId($req['referee_id'] ?? '');
         if (!$referee_id) { echo json_encode(['status' => 'error', 'message' => '缺少裁判ID']); break; }
+        $req_match = normalizeId($req['match_id'] ?? '');
 
-        $refs = kv_get($event_code, 'referees', []);
-        $target_ref = null;
-        foreach ($refs as $r) {
-            if (normalizeId($r['id']) === $referee_id && $r['status'] === '执裁中') {
-                $target_ref = $r;
+        $live = kv_get($event_code, 'live_scores', []);
+        $target_court = null;
+        foreach ($live as $court => $info) {
+            $is_mine = ($referee_id !== '' && normalizeId($info['referee'] ?? '') === $referee_id);
+            if ($req_match !== '') {
+                if (normalizeId($info['match_id'] ?? '') !== $req_match) continue;
+                if (($info['status'] ?? '') !== '待开赛') {
+                    echo json_encode(['status' => 'error', 'message' => '比赛已开始，禁止普通释放；请使用正式中断或完赛流程']);
+                    break 2;
+                }
+                if (!$is_mine) {
+                    echo json_encode(['status' => 'error', 'message' => '该任务由其他裁判接受，无权释放']);
+                    break 2;
+                }
+                $target_court = $court;
                 break;
             }
+            if ($is_mine && ($info['status'] ?? '') === '待开赛') { $target_court = $court; break; }
         }
-        if (!$target_ref || !$target_ref['current_court']) {
-            echo json_encode(['status' => 'success']); // 无场地可释放，幂等返回 success
+        if ($target_court === null) {
+            echo json_encode(['status' => 'success', 'released' => false]); // 无可释放投影：幂等且零写入
             break;
         }
-
-        $court = $target_ref['current_court'];
-        $live = kv_get($event_code, 'live_scores', []);
-        if (!isset($live[$court]) || ($live[$court]['status'] ?? '') !== '待开赛') {
-            echo json_encode(['status' => 'success']); // 非待开赛不可释放（可能是比赛中或已完赛）
-            break;
-        }
-
-        unset($live[$court]);
+        unset($live[$target_court]);
         kv_set($event_code, 'live_scores', $live);
-
-        // 将裁判状态设回空闲
+        $refs = kv_get($event_code, 'referees', []);
         foreach ($refs as $idx => $r) {
-            if (normalizeId($r['id']) === $referee_id) {
+            if (normalizeId($r['name'] ?? '') === $referee_id) {
                 $refs[$idx]['status'] = '空闲';
                 $refs[$idx]['current_court'] = '';
                 break;
             }
         }
         kv_set($event_code, 'referees', $refs);
-        echo json_encode(['status' => 'success']);
+        echo json_encode(['status' => 'success', 'released' => true, 'court' => $target_court]);
         break;
     case 'clear_all_tasks': kv_set($event_code, 'tasks', []); echo json_encode(['status' => 'success']); break;
     case 'delete_team_room':
@@ -746,6 +791,18 @@ switch ($action) {
             $tasks[$mid]['live_score'] = $req['score_text'];
             $tasks[$mid]['status'] = $req['status'];
             kv_set($event_code, 'tasks', $tasks);
+        }
+        // [SECOND HARDENING] live_scores 投影必须跟随开赛/比分同步状态，
+        // 否则接受后的"待开赛"投影在开赛后不会升级为"比赛中"，导致 release/退回判断失真。
+        $live = kv_get($event_code, 'live_scores', []);
+        $norm_mid = normalizeId($mid);
+        foreach ($live as $court => $info) {
+            if (normalizeId($info['match_id'] ?? '') === $norm_mid) {
+                $live[$court]['status'] = $req['status'];
+                $live[$court]['score'] = $req['score_text'];
+                kv_set($event_code, 'live_scores', $live);
+                break;
+            }
         }
         echo json_encode(['status' => 'success']); break;
     case 'save_score':
