@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
@@ -23,7 +23,7 @@
         .btn-press:active { transform: scale(0.96); }
         button:disabled { cursor: not-allowed; opacity: 0.5; filter: grayscale(50%); }
         .toast { position: fixed; top: 20px; left: 50%; transform: translateX(-50%); background: #1e293b; border: 1px solid #3b82f6; padding: 0.75rem 1.5rem; border-radius: 2rem; font-size: 0.9rem; font-weight: bold; z-index: 9999; box-shadow: 0 10px 25px rgba(0,0,0,0.5); text-align: center; transition: opacity 0.3s; }
-        
+
         /* 勿扰提醒模态框 */
 .dnd-modal-overlay {
     background: rgba(0, 0, 0, 0.92);
@@ -130,7 +130,7 @@
     </div>
 
     <div id="mainApp" class="hidden-section">
-        
+
         <div id="chiefMessageBlock" class="bg-indigo-900/60 border border-indigo-500/50 p-3 rounded-xl mb-3 flex items-start gap-2 shadow-inner transition-all duration-300">
             <span class="animate-pulse text-indigo-400 text-base mt-0.5">👑</span>
             <div class="flex-1 min-w-0">
@@ -168,7 +168,7 @@
                     <button onclick="handleTaskAccept()" id="acceptTaskBtn" class="bg-emerald-600 w-full py-3 rounded-lg text-sm font-bold btn-press shadow-lg">将参数载入工作台</button>
                 </div>
             </div>
-            
+
             <!-- 已删除 "展开野赛/自由组局备用通道" 模块，详见修改说明 -->
 
             <div class="section-card">
@@ -184,7 +184,7 @@
                     <select id="matchTypeSel" onchange="syncInputs()" class="input-base col-span-2 text-sm font-bold bg-slate-900"><option value="doubles">👥 双打模式</option><option value="singles">👤 单打模式</option></select>
                 </div>
             </div>
-            
+
             <div class="section-card space-y-3">
                 <div class="bg-blue-900/10 p-3 rounded-xl border border-blue-500/20">
                     <input type="text" id="t1Name" oninput="syncInputs()" class="input-base mb-2 font-bold text-blue-400" placeholder="左/蓝方 队名">
@@ -201,7 +201,7 @@
                     </div>
                 </div>
             </div>
-            
+
             <button onclick="handleStartSetup(event)" class="w-full bg-amber-500 hover:bg-amber-400 text-slate-900 font-black py-4 rounded-xl text-lg shadow-[0_4px_15px_rgba(245,158,11,0.4)] btn-press">▶ 校验全员检录并进场</button>
         </div>
 
@@ -210,12 +210,12 @@
                 <button id="prepTimerBtn" onclick="togglePrepTimer()" class="bg-indigo-600 px-4 py-2 rounded-lg text-sm font-bold btn-press text-white shadow-md border border-indigo-400/30">⏱️ 热身倒数</button>
                 <span id="prepTimer" class="text-2xl font-mono font-black text-amber-400 bg-black/40 px-3 py-1 rounded-lg border border-black/50">00:00</span>
             </div>
-            
+
             <div class="flex gap-3 mb-4 items-center">
                 <button id="flipCoinBtn" onclick="rollCoin()" class="bg-slate-700 w-1/3 h-16 rounded-2xl font-black text-sm btn-press shadow-lg border border-slate-500 text-slate-200">🪙<br>裁判抛币</button>
                 <div id="coinResult" class="bg-slate-900 w-2/3 h-16 flex items-center justify-center rounded-2xl font-black text-3xl text-yellow-500 border border-slate-700 shadow-inner tracking-widest transition-all duration-300">等待抛掷</div>
             </div>
-            
+
             <div class="section-card space-y-4">
                 <div>
                     <label class="text-[11px] font-black text-blue-400 mb-2 block tracking-widest">1. 方位 (主裁左手边是哪队？)</label>
@@ -239,7 +239,7 @@
                     </div>
                 </div>
             </div>
-            
+
             <div class="flex gap-3">
                 <button onclick="backToStep1()" class="bg-slate-700 w-1/3 py-3.5 rounded-xl font-bold btn-press shadow-md border border-slate-500">← 退回</button>
                 <button onclick="confirmAndStart()" class="bg-emerald-600 w-2/3 py-3.5 rounded-xl font-black text-lg shadow-[0_5px_15px_rgba(16,185,129,0.3)] btn-press">✓ 确认开赛</button>
@@ -257,7 +257,7 @@
                     <button onclick="backToStep2()" class="text-[10px] text-slate-400 underline mt-1 btn-press">退回重设</button>
                 </div>
             </div>
-            
+
             <div class="grid grid-cols-2 gap-3 mb-2">
                 <div class="bg-gradient-to-b from-slate-800 to-slate-900 p-4 rounded-[1.5rem] text-center border-b-[6px] border-blue-600 shadow-xl relative overflow-hidden">
                     <div id="leftTeamName" class="text-xs font-bold text-blue-400 mb-1 truncate flex justify-center items-center relative z-10"></div>
@@ -280,7 +280,7 @@
                 </div>
                 <div id="timelineT2" class="w-full h-2 bg-slate-900 rounded-sm flex overflow-hidden border border-slate-700 shadow-inner"></div>
             </div>
-            
+
             <div class="bg-slate-800/60 p-3 rounded-[1.25rem] mb-4 border border-slate-700 shadow-inner">
                 <div class="flex justify-between h-36 items-center px-1">
                     <div class="w-[42%] flex flex-col justify-around h-full"><div id="slotTL" class="slot-box mb-2"></div><div id="slotBL" class="slot-box"></div></div>
@@ -288,38 +288,38 @@
                     <div class="w-[42%] flex flex-col justify-around h-full"><div id="slotTR" class="slot-box mb-2"></div><div id="slotBR" class="slot-box"></div></div>
                 </div>
             </div>
-            
+
             <div class="grid grid-cols-2 gap-3 mb-3">
                 <button id="pointLeft" onclick="award(true)" class="bg-blue-600 py-6 rounded-[1.25rem] font-black text-xl shadow-[0_6px_0_rgba(37,99,235,0.4)] active:shadow-[0_0px_0_rgba(37,99,235,0.4)] active:translate-y-[6px] transition-all">左方得分 +1</button>
                 <button id="pointRight" onclick="award(false)" class="bg-emerald-600 py-6 rounded-[1.25rem] font-black text-xl shadow-[0_6px_0_rgba(16,185,129,0.4)] active:shadow-[0_0px_0_rgba(16,185,129,0.4)] active:translate-y-[6px] transition-all">右方得分 +1</button>
             </div>
-            
+
             <div class="grid grid-cols-2 gap-3 mb-3">
                 <button id="timeoutLeft" onclick="requestTimeout(true)" class="bg-slate-800 py-3.5 rounded-xl text-xs font-bold text-blue-300 border border-blue-500/30 btn-press shadow-sm">⏱️ 左队请求暂停</button>
                 <button id="timeoutRight" onclick="requestTimeout(false)" class="bg-slate-800 py-3.5 rounded-xl text-xs font-bold text-emerald-300 border border-emerald-500/30 btn-press shadow-sm">⏱️ 右队请求暂停</button>
             </div>
-            
+
             <div class="grid grid-cols-2 gap-3 mb-4">
                 <button id="medTimeoutLeft" onclick="requestMedical(true)" class="bg-red-950/50 py-3.5 rounded-xl text-xs font-bold text-red-400 border border-red-500/40 btn-press shadow-md">🏥 左队医疗伤停</button>
                 <button id="medTimeoutRight" onclick="requestMedical(false)" class="bg-red-950/50 py-3.5 rounded-xl text-xs font-bold text-red-400 border border-red-500/40 btn-press shadow-md">🏥 右队医疗伤停</button>
             </div>
-            
+
             <div class="grid grid-cols-2 gap-3 mb-4 p2-only">
                 <button onclick="forceSwap(true)" class="bg-orange-900/30 border border-orange-500/40 py-3 rounded-xl text-[11px] font-bold text-orange-300 btn-press">🔄 左队强行换位</button>
                 <button onclick="forceSwap(false)" class="bg-orange-900/30 border border-orange-500/40 py-3 rounded-xl text-[11px] font-bold text-orange-300 btn-press">🔄 右队强行换位</button>
             </div>
-            
+
             <div class="mb-3">
                 <button id="cancelTimerBtn" onclick="triggerManualCancel()" class="w-full bg-red-800/50 border border-red-500/40 py-3 rounded-xl text-xs font-bold text-red-300 btn-press shadow-md flex items-center justify-center gap-2 transition-all hover:bg-red-800/70">
                     <span>⏹️</span> 解除当前所有倒计时面板
                 </button>
             </div>
-            
+
             <div class="grid grid-cols-2 gap-3 mt-auto mb-4">
                 <button id="undoPoint" onclick="undoLastPoint()" class="bg-slate-800 py-4 rounded-xl text-xs font-bold text-slate-300 btn-press shadow-md border border-slate-600 flex items-center justify-center gap-2"><span>↩️</span> 撤回上一回合</button>
                 <button onclick="toggleRefereeView()" class="bg-indigo-900/50 border border-indigo-500/40 py-4 rounded-xl text-[11px] font-bold text-indigo-300 btn-press shadow-md tracking-wider">🔄 裁判视角互换</button>
             </div>
-            
+
             <button id="endGameBtn" onclick="endCurrentGame()" class="hidden w-full bg-gradient-to-r from-red-600 to-rose-600 text-white py-5 mt-2 rounded-[1.25rem] font-black text-xl shadow-[0_5px_20px_rgba(225,29,72,0.5)] btn-press tracking-widest border border-red-400/50 animate-pulse flex flex-col items-center justify-center gap-1">
                 <span>🏁 局点达成：结算该局</span>
                 <span class="text-[10px] font-normal text-red-100 tracking-normal opacity-80">(若全场结束，请务必向选手回收用球及比赛手环)</span>
@@ -332,7 +332,7 @@
                 <div class="text-[10px] font-black text-slate-400 tracking-[0.3em] uppercase mb-4 border-b border-slate-700 pb-2 mt-2">Final Summary</div>
                 <div id="finalScore" class="text-[4rem] font-black text-yellow-500 mb-2 italic drop-shadow-md">0 - 0</div>
                 <pre id="reportText" class="bg-[#0f172a] p-4 rounded-xl text-left text-[11px] mb-5 text-emerald-400 border border-emerald-900/50 whitespace-pre-wrap leading-relaxed shadow-inner overflow-hidden break-words font-mono"></pre>
-                
+
                 <div class="border-t border-slate-700 pt-4 mt-2 w-full" id="signatureBoxArea">
                     <h3 class="font-black text-emerald-200 mb-2 text-sm flex items-center justify-center gap-1"><span>✍️</span> 赛果确认签名 (胜方/裁判)</h3>
                     <p class="text-[10px] text-slate-400 mb-2">请胜方代表或主裁判在此签名，防纠纷</p>
@@ -341,9 +341,9 @@
                     </div>
                     <button id="clearRefereeSigBtn" onclick="clearSignature()" class="bg-slate-700 hover:bg-slate-600 px-4 py-2 rounded text-xs font-bold btn-press mt-1 w-full text-slate-300">清空画板重新写</button>
                 </div>
-                
+
                 <button id="submitReport" onclick="submitFinalReport()" class="bg-gradient-to-r from-emerald-600 to-teal-600 w-full py-4 rounded-xl font-black text-base mb-3 shadow-[0_4px_15px_rgba(16,185,129,0.3)] btn-press tracking-widest mt-4">☁️ 签名确认并上传战果</button>
-                
+
                 <div class="grid grid-cols-2 gap-3 mb-6">
                     <button onclick="copyReportText()" class="bg-slate-800 border border-slate-600 py-3.5 rounded-xl text-xs font-bold btn-press text-slate-300">📋 手动复制战报</button>
                     <button onclick="reEditScore()" class="bg-slate-700 border border-slate-500 py-3.5 rounded-xl text-xs font-bold btn-press text-white shadow-md">✏️ 撤销完赛修改比分</button>
@@ -384,48 +384,48 @@
 
         const API = '/data.php';
         const BACKUP_KEY = 'pickle_referee_backup_v5';
-        
+
         const urlParams = new URLSearchParams(window.location.search);
         let sysMode = 'ind';
 
         let eventCode = null, currentRefereeId = null, currentRefereeName = '', currentRefLevel = 'L1';
         let currentMatch = {};
-        
+
         let matchState = { t1Score: 0, t2Score: 0, t1Wins: 0, t2Wins: 0, currentGame: 1, history: [], timeline: [], halfSwitched: false, over: false };
         let gameState = { viewBa: false, servTeam: 1, initServTeam: 1, servNum: 2, court: 'Right', t1: { r: '', l: '' }, t2: { r: '', l: '' }, initRightP1: '', initRightP2: '', servingPlayer: '' };
-        
+
         let timeoutUsed = { t1: false, t2: false, medicalT1: false, medicalT2: false };
-        
+
         let activeTimer = null, prepInterval = null, prepSec = 0, playerDB = [];
         let refereeSigCanvas = null, refereeSigCtx = null, isRefereeDrawing = false;
         let hasSigned = false;
 
-        function showToast(msg, err = false) { 
-            const t = $('toast'); t.innerText = msg; 
+        function showToast(msg, err = false) {
+            const t = $('toast'); t.innerText = msg;
             t.className = `toast ${err ? 'border-red-500 bg-red-900 text-red-100' : 'border-blue-500 bg-slate-900 text-blue-100'}`;
-            t.classList.remove('hidden'); setTimeout(() => t.classList.add('hidden'), 3000); 
+            t.classList.remove('hidden'); setTimeout(() => t.classList.add('hidden'), 3000);
         }
 
         const getRadio = function(n) { const el = document.querySelector(`input[name="${n}"]:checked`); return el ? el.value : ''; };
         function normalizeId(id) { return String(id).toUpperCase().replace(/\s+/g, '').replace(/VS/ig, 'VS'); }
 
-        async function apiCall(action, data = {}) { 
+        async function apiCall(action, data = {}) {
             if (sysMode === 'local') return { status: 'success' };
-            data.action = action; if (eventCode) data.event_code = eventCode; 
+            data.action = action; if (eventCode) data.event_code = eventCode;
             try { const res = await fetch(API, { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(data) }); return res.json(); } catch(e) { return { status: 'error', message: '网络连接异常' }; }
         }
 
-        async function apiGet(action, params = {}) { 
-            if (sysMode === 'local') return { status: 'success', data: [] }; 
-            let url = `${API}?action=${action}&event_code=${eventCode||''}&_t=${Date.now()}`; 
-            for(let k in params) url += `&${k}=${encodeURIComponent(params[k])}`; 
+        async function apiGet(action, params = {}) {
+            if (sysMode === 'local') return { status: 'success', data: [] };
+            let url = `${API}?action=${action}&event_code=${eventCode||''}&_t=${Date.now()}`;
+            for(let k in params) url += `&${k}=${encodeURIComponent(params[k])}`;
             try { const res = await fetch(url); return res.json(); } catch(e) { return { status: 'error', message: '网络连接异常' }; }
         }
 
-        function backupState() { 
-            if(currentMatch && currentMatch.id && !matchState.over) { 
-                try { localStorage.setItem(BACKUP_KEY, JSON.stringify({ step: getCurrentStep(), currentMatch, matchState, gameState, timeoutUsed })); } catch(e) { } 
-            } 
+        function backupState() {
+            if(currentMatch && currentMatch.id && !matchState.over) {
+                try { localStorage.setItem(BACKUP_KEY, JSON.stringify({ step: getCurrentStep(), currentMatch, matchState, gameState, timeoutUsed })); } catch(e) { }
+            }
         }
         function clearBackup() { localStorage.removeItem(BACKUP_KEY); }
         function getCurrentStep() { for(let i=1; i<=4; i++) if(!$(`step${i}`).classList.contains('hidden-section')) return i; return 1; }
@@ -439,17 +439,17 @@
                         const m = data.currentMatch;
                         if(confirm(`🛡️ 【容灾恢复】\n检测到意外中断比赛：\n[${m.t1Name} VS ${m.t2Name}]\n是否恢复比分？`)) {
                             currentMatch = data.currentMatch; matchState = data.matchState;
-                            if(!matchState.timeline) matchState.timeline = []; 
+                            if(!matchState.timeline) matchState.timeline = [];
                             gameState = data.gameState; timeoutUsed = data.timeoutUsed || {t1:false, t2:false, medicalT1:false, medicalT2:false};
-                            
+
                             if(data.step === 2) {
                                 $('label-init-ba-f').innerText = `${currentMatch.t1Name} (左)`; $('label-init-ba-t').innerText = `${currentMatch.t2Name} (左)`;
                                 $('serveLabel1').innerText = `${currentMatch.t1Name} 首发`; $('serveLabel2').innerText = `${currentMatch.t2Name} 首发`; showStep(2);
-                            } else if(data.step === 3) { 
-                                renderGame(); showStep(3); $('recoveryBadge').classList.remove('hidden'); 
+                            } else if(data.step === 3) {
+                                renderGame(); showStep(3); $('recoveryBadge').classList.remove('hidden');
                                 if(matchState.over) $('endGameBtn').classList.remove('hidden');
                             } else showStep(data.step);
-                            
+
                             updateRefereeStatus('执裁中', currentMatch.court); syncLiveScore(); return true;
                         } else clearBackup();
                     }
@@ -461,12 +461,12 @@
         window.initSignatureBoard = function() {
             const canvas = $('refereeSigCanvas');
             if(!canvas) return;
-            const rect = canvas.parentElement.getBoundingClientRect(); 
+            const rect = canvas.parentElement.getBoundingClientRect();
             if(rect.width > 0) {
-                refereeSigCanvas = canvas; 
+                refereeSigCanvas = canvas;
                 canvas.width = rect.width;
-                canvas.height = 150; 
-                
+                canvas.height = 150;
+
                 refereeSigCtx = canvas.getContext('2d');
                 refereeSigCtx.fillStyle = '#ffffff';
                 refereeSigCtx.fillRect(0, 0, canvas.width, canvas.height);
@@ -474,15 +474,15 @@
                 refereeSigCtx.lineWidth = 3;
                 refereeSigCtx.lineCap = 'round';
                 refereeSigCtx.lineJoin = 'round';
-                
+
                 if(canvas.getAttribute('data-init') === 'true') return;
                 canvas.setAttribute('data-init', 'true');
-                
+
                 const getPos = e => { const r = canvas.getBoundingClientRect(); const cx = e.touches ? e.touches[0].clientX : e.clientX; const cy = e.touches ? e.touches[0].clientY : e.clientY; return { x: cx - r.left, y: cy - r.top }; };
                 const startDraw = e => { isRefereeDrawing = true; hasSigned = true; refereeSigCtx.beginPath(); refereeSigCtx.moveTo(getPos(e).x, getPos(e).y); e.preventDefault(); };
                 const draw = e => { if (isRefereeDrawing) { const pos = getPos(e); refereeSigCtx.lineTo(pos.x, pos.y); refereeSigCtx.stroke(); } e.preventDefault(); };
                 const stopDraw = () => { isRefereeDrawing = false; };
-                
+
                 canvas.addEventListener('mousedown', startDraw); canvas.addEventListener('mousemove', draw); canvas.addEventListener('mouseup', stopDraw); canvas.addEventListener('mouseout', stopDraw);
                 canvas.addEventListener('touchstart', startDraw, { passive: false }); canvas.addEventListener('touchmove', draw, { passive: false }); canvas.addEventListener('touchend', stopDraw);
             } else {
@@ -490,22 +490,22 @@
             }
         };
 
-        window.clearSignature = () => { 
-            if(refereeSigCtx && refereeSigCanvas) { 
+        window.clearSignature = () => {
+            if(refereeSigCtx && refereeSigCanvas) {
                 refereeSigCtx.fillStyle = '#ffffff';
-                refereeSigCtx.fillRect(0, 0, refereeSigCanvas.width, refereeSigCanvas.height); 
-                hasSigned = false; 
+                refereeSigCtx.fillRect(0, 0, refereeSigCanvas.width, refereeSigCanvas.height);
+                hasSigned = false;
             } else {
                 const canvas = $('refereeSigCanvas');
-                if(canvas) { 
-                    const ctx = canvas.getContext('2d'); 
+                if(canvas) {
+                    const ctx = canvas.getContext('2d');
                     ctx.fillStyle = '#ffffff';
-                    ctx.fillRect(0, 0, canvas.width, canvas.height); 
-                    hasSigned = false; 
+                    ctx.fillRect(0, 0, canvas.width, canvas.height);
+                    hasSigned = false;
                 }
             }
         };
-        
+
         async function generateReportWithSignature(reportText, finalScoreText, signatureImageData) {
             return new Promise((resolve) => {
                 const canvas = document.createElement('canvas'); const ctx = canvas.getContext('2d'); canvas.width = 800; canvas.height = 600;
@@ -518,7 +518,7 @@
                 ctx.fillStyle = '#1a5c2e'; ctx.font = 'bold 14px "SimHei", sans-serif'; ctx.fillText('确认签名', 50, y + 20);
                 const sigImg = new Image();
                 sigImg.onload = () => { ctx.drawImage(sigImg, 50, y + 35, 200, 60); ctx.font = '10px "SimHei", sans-serif'; ctx.fillStyle = '#888888'; ctx.fillText('本战报已签名确认，真实有效', 50, y + 110); resolve(canvas.toDataURL('image/jpeg', 0.8)); };
-                sigImg.onerror = () => { resolve(canvas.toDataURL('image/jpeg', 0.8)); }; 
+                sigImg.onerror = () => { resolve(canvas.toDataURL('image/jpeg', 0.8)); };
                 sigImg.src = signatureImageData;
             });
         }
@@ -526,24 +526,24 @@
         // ======================== 【安全加固】登录与会话管理 ========================
         window.onload = async () => {
             if (sysMode === 'local') {
-                $('sysBadge').innerText = '单机离线模式'; 
-                $('loginPanel').classList.add('hidden-section'); 
+                $('sysBadge').innerText = '单机离线模式';
+                $('loginPanel').classList.add('hidden-section');
                 $('mainApp').classList.remove('hidden-section');
-                
-                $('cloudPullBlock').classList.add('hidden-section'); 
+
+                $('cloudPullBlock').classList.add('hidden-section');
                 $('chiefMessageBlock').classList.add('hidden-section');
                 $('refereeInfoBar').classList.add('hidden-section');
-                
-                currentRefLevel = 'Local'; 
-                currentRefereeId = 'local_admin'; 
-                currentRefereeName = '单机执裁者'; 
-                $('currentRefereeName').innerText = currentRefereeName; 
-                
+
+                currentRefLevel = 'Local';
+                currentRefereeId = 'local_admin';
+                currentRefereeName = '单机执裁者';
+                $('currentRefereeName').innerText = currentRefereeName;
+
                 if(localStorage.getItem('pickle_def_court')) $('courtNo').value = localStorage.getItem('pickle_def_court');
                 if(localStorage.getItem('pickle_def_target')) $('targetScore').value = localStorage.getItem('pickle_def_target');
                 if(localStorage.getItem('pickle_def_format')) $('gameFormat').value = localStorage.getItem('pickle_def_format');
                 if(localStorage.getItem('pickle_def_meth')) $('scoreRule').value = localStorage.getItem('pickle_def_meth');
-                
+
                 if(!checkAndRestoreBackup()) showStep(1);
                 return;
             }
@@ -664,9 +664,9 @@
             apiCall('sync_live_score', { court: currentMatch.court, score_text: displayScore, status: '比赛中', match_name: `${currentMatch.t1Name} vs ${currentMatch.t2Name}`, match_id: currentMatch.id, players: playersText, t1: currentMatch.t1Name, t2: currentMatch.t2Name });
         }
 
-        async function updateRefereeStatus(status, court=null) { 
+        async function updateRefereeStatus(status, court=null) {
             if (sysMode === 'local') return;
-            try { 
+            try {
                 await apiCall('referee_update_status', { referee_id: currentRefereeId, status, court });
                 const badge = $('refStateBadge'); badge.innerText = status;
                 badge.className = status === '空闲' ? 'bg-emerald-900 text-emerald-400 px-2 py-1 rounded ml-auto font-bold border border-emerald-700/50' : 'bg-amber-900 text-amber-400 px-2 py-1 rounded ml-auto font-bold border border-amber-700/50';
@@ -680,9 +680,9 @@
                 const data = await apiGet('get_personal_tasks');
                 if (data.status === 'success' && data.tasks && Object.keys(data.tasks).length > 0) {
                     const select = $('taskSelect'); select.innerHTML = '<option value="">-- 请选择任务 --</option>';
-                    for (const [id, task] of Object.entries(data.tasks)) { 
+                    for (const [id, task] of Object.entries(data.tasks)) {
                         if((sysMode === 'team' && task.is_team) || (sysMode !== 'team' && !task.is_team)){
-                            const option = document.createElement('option'); option.value = normalizeId(id); option.textContent = `${id} (${task.t1} vs ${task.t2})`; select.appendChild(option); 
+                            const option = document.createElement('option'); option.value = normalizeId(id); option.textContent = `${id} (${task.t1} vs ${task.t2})`; select.appendChild(option);
                         }
                     }
                 } else { $('taskSelect').innerHTML = '<option value="">暂无待办任务</option>'; }
@@ -695,7 +695,7 @@
             const matchId = normalizeId(rawId);
             const btn = $('refreshTaskBtn'); btn.innerText = "提取中...";
             try {
-                const data = await apiGet('get_personal_task', { match_id: matchId }); 
+                const data = await apiGet('get_personal_task', { match_id: matchId });
                 if (data.status === 'success' && data.data) {
                     window.pendingTask = data.data; let fmtDesc = data.data.format == 3 ? '三局两胜' : '单局制';
                     // [P1-1 FIXUP] 提取时清除 localStorage 覆盖：上次自由赛的场地残留不得污染本次任务。
@@ -732,14 +732,14 @@
 
         window.syncInputs = () => { const isD = $('matchTypeSel').value === 'doubles'; document.querySelectorAll('.p2-only').forEach(el => { if(isD) el.classList.remove('hidden'); else el.classList.add('hidden'); }); };
 
-        window.handleQuickLoad = () => { 
+        window.handleQuickLoad = () => {
             showToast('该功能已移除，请使用本地模式 (mode=local) 进行自由组局', true);
         };
 
-        function showStep(step){ 
-            for(let i=1; i<=4; i++) { $(`step${i}`).classList.add('hidden-section'); } 
-            $(`step${step}`).classList.remove('hidden-section'); 
-            backupState(); 
+        function showStep(step){
+            for(let i=1; i<=4; i++) { $(`step${i}`).classList.add('hidden-section'); }
+            $(`step${step}`).classList.remove('hidden-section');
+            backupState();
         }
 
         window.handleStartSetup = async (event) => {
@@ -784,9 +784,9 @@
             }
 
             localStorage.setItem('pickle_def_court', $('courtNo').value); localStorage.setItem('pickle_def_target', $('targetScore').value); localStorage.setItem('pickle_def_cap', $('capScore').value); localStorage.setItem('pickle_def_format', $('gameFormat').value); localStorage.setItem('pickle_def_meth', $('scoreRule').value);
-            currentMatch = { 
+            currentMatch = {
                 id: $('matchIdInput2').value || `LOC-${Date.now().toString().slice(-4)}`, court: $('courtNo').value || '1',
-                t1Name: $('t1Name').value.trim()||'左方', t2Name: $('t2Name').value.trim()||'右方', t1p1: $('t1p1').value.trim()||'A', t1p2: $('t1p2').value.trim()||'B', t2p1: $('t2p1').value.trim()||'C', t2p2: $('t2p2').value.trim()||'D', 
+                t1Name: $('t1Name').value.trim()||'左方', t2Name: $('t2Name').value.trim()||'右方', t1p1: $('t1p1').value.trim()||'A', t1p2: $('t1p2').value.trim()||'B', t2p1: $('t2p1').value.trim()||'C', t2p2: $('t2p2').value.trim()||'D',
                 format: parseInt($('gameFormat').value), meth: $('scoreRule').value, type: $('matchTypeSel').value, target: parseInt($('targetScore').value)||21, cap: parseInt($('capScore').value)||0, ref: `[${currentRefLevel}] ${currentRefereeName}`,
                 is_team: window.pendingTask ? (window.pendingTask.is_team || false) : (sysMode === 'team')
             };
@@ -798,29 +798,39 @@
             try { await updateRefereeStatus('执裁中', currentMatch.court); } catch(e){} showStep(2);
         };
 
-        window.backToStep1 = async () => { showStep(1); try { await updateRefereeStatus('空闲', currentMatch.court); } catch(e){} };
+        window.backToStep1 = async () => {
+            // [P1-2 RELEASE] 退回步骤1时释放待开赛投影（如果当前是待开赛状态）。
+            // 已进入比赛中的状态（status=比赛中）不会在此被清除。
+            showStep(1);
+            try {
+                if (currentMatch && currentMatch.id && sysMode !== 'local') {
+                    await apiPost('release_task_acceptance', { referee_id: currentRefereeId });
+                }
+                await updateRefereeStatus('空闲', currentMatch ? currentMatch.court : null);
+            } catch(e){}
+        };
         window.backToStep2 = async () => { showStep(2); try { await updateRefereeStatus('执裁中', currentMatch.court); } catch(e){} };
 
         function stopPrepCounting() { if(prepInterval){ clearInterval(prepInterval); prepInterval=null; } const btn = $('prepTimerBtn'); btn.innerText = "⏱️ 热身倒数"; btn.classList.remove('bg-red-700', 'border-red-500'); btn.classList.add('bg-indigo-600'); }
         window.togglePrepTimer = () => {
-            if(prepInterval) { stopPrepCounting(); } else { 
+            if(prepInterval) { stopPrepCounting(); } else {
                 const btn = $('prepTimerBtn'); btn.innerText = "⏹️ 截停倒数"; btn.classList.remove('bg-indigo-600'); btn.classList.add('bg-red-700', 'border-red-500');
-                prepSec = 0; prepInterval = setInterval(() => { prepSec++; let m = Math.floor(prepSec/60), s = prepSec%60; $('prepTimer').innerText = `${m.toString().padStart(2,'0')}:${s.toString().padStart(2,'0')}`; }, 1000); 
+                prepSec = 0; prepInterval = setInterval(() => { prepSec++; let m = Math.floor(prepSec/60), s = prepSec%60; $('prepTimer').innerText = `${m.toString().padStart(2,'0')}:${s.toString().padStart(2,'0')}`; }, 1000);
             }
         };
 
         window.rollCoin = () => {
-            const btn = $('flipCoinBtn'); btn.disabled = true; 
+            const btn = $('flipCoinBtn'); btn.disabled = true;
             const cr = $('coinResult');
             cr.innerText = '🎲 翻滚中'; cr.classList.add('text-white', 'scale-110'); cr.classList.remove('text-yellow-500');
-            let c = 0, i = setInterval(() => { 
-                cr.innerText = c % 2 === 0 ? '🔺 正面' : '🔻 反面'; c++; 
-                if(c > 12){ 
-                    clearInterval(i); 
-                    cr.innerText = Math.random() < 0.5 ? '👑 正面' : '🌙 反面'; 
-                    cr.classList.remove('text-white', 'scale-110'); cr.classList.add('text-yellow-500'); 
-                    btn.disabled = false; 
-                } 
+            let c = 0, i = setInterval(() => {
+                cr.innerText = c % 2 === 0 ? '🔺 正面' : '🔻 反面'; c++;
+                if(c > 12){
+                    clearInterval(i);
+                    cr.innerText = Math.random() < 0.5 ? '👑 正面' : '🌙 反面';
+                    cr.classList.remove('text-white', 'scale-110'); cr.classList.add('text-yellow-500');
+                    btn.disabled = false;
+                }
             }, 80);
         };
 
@@ -849,44 +859,44 @@
 
         async function executeStartMatch() {
             stopPrepCounting();
-            let viewBa = getRadio('init_ba') === 't'; 
-            let serveTeam = parseInt(getRadio('serve') || 1); 
+            let viewBa = getRadio('init_ba') === 't';
+            let serveTeam = parseInt(getRadio('serve') || 1);
             let initServNum = (currentMatch.type === 'doubles' && currentMatch.meth === 'sideout') ? 2 : 1;
             gameState = { viewBa: viewBa, servTeam: serveTeam, initServTeam: serveTeam, servNum: initServNum, court: 'Right', t1: { r:'', l:'' }, t2: { r:'', l:'' }, initRightP1: '', initRightP2: '', servingPlayer: '' };
-            
-            if(currentMatch.type === 'doubles'){ 
-                let t1s = $('t1Stance').value, t2s = $('t2Stance').value; 
-                let p11 = currentMatch.t1p1, p12 = currentMatch.t1p2 || p11; 
+
+            if(currentMatch.type === 'doubles'){
+                let t1s = $('t1Stance').value, t2s = $('t2Stance').value;
+                let p11 = currentMatch.t1p1, p12 = currentMatch.t1p2 || p11;
                 let p21 = currentMatch.t2p1, p22 = currentMatch.t2p2 || p21;
-                gameState.t1.r = t1s === 'P1' ? p11 : p12; 
-                gameState.t1.l = t1s === 'P1' ? p12 : p11; 
-                gameState.t2.r = t2s === 'P1' ? p21 : p22; 
-                gameState.t2.l = t2s === 'P1' ? p22 : p21; 
-            } else { 
-                gameState.t1.r = gameState.t1.l = currentMatch.t1p1; 
-                gameState.t2.r = gameState.t2.l = currentMatch.t2p1; 
+                gameState.t1.r = t1s === 'P1' ? p11 : p12;
+                gameState.t1.l = t1s === 'P1' ? p12 : p11;
+                gameState.t2.r = t2s === 'P1' ? p21 : p22;
+                gameState.t2.l = t2s === 'P1' ? p22 : p21;
+            } else {
+                gameState.t1.r = gameState.t1.l = currentMatch.t1p1;
+                gameState.t2.r = gameState.t2.l = currentMatch.t2p1;
             }
-            gameState.initRightP1 = gameState.t1.r; 
+            gameState.initRightP1 = gameState.t1.r;
             gameState.initRightP2 = gameState.t2.r;
             gameState.servingPlayer = (serveTeam === 1) ? gameState.t1.r : gameState.t2.r;
-            if (currentMatch.type === 'singles') { 
-                gameState.servingPlayer = (serveTeam === 1) ? currentMatch.t1p1 : currentMatch.t2p1; 
+            if (currentMatch.type === 'singles') {
+                gameState.servingPlayer = (serveTeam === 1) ? currentMatch.t1p1 : currentMatch.t2p1;
             }
 
-            matchState.t1Score = 0; 
-            matchState.t2Score = 0; 
-            matchState.history = []; 
-            matchState.timeline = []; 
-            matchState.halfSwitched = false; 
-            timeoutUsed = { t1: false, t2: false, medicalT1: false, medicalT2: false }; 
-            matchState.over = false; 
-            
+            matchState.t1Score = 0;
+            matchState.t2Score = 0;
+            matchState.history = [];
+            matchState.timeline = [];
+            matchState.halfSwitched = false;
+            timeoutUsed = { t1: false, t2: false, medicalT1: false, medicalT2: false };
+            matchState.over = false;
+
             $('endGameBtn').classList.add('hidden');
             try { await updateRefereeStatus('执裁中', currentMatch.court); } catch(e){}
-            $('recoveryBadge').classList.add('hidden'); 
-            renderGame(); 
-            syncLiveScore(); 
-            showStep(3); 
+            $('recoveryBadge').classList.add('hidden');
+            renderGame();
+            syncLiveScore();
+            showStep(3);
             backupState();
         }
 
@@ -896,18 +906,18 @@
             let leftBuff = gameState.initServTeam === leftTeamNum ? `<span class="bg-amber-600 text-white px-1.5 py-0.5 rounded shadow-sm ml-2 text-[9px] font-black uppercase">首发</span>` : `<span class="bg-cyan-600 text-white px-1.5 py-0.5 rounded shadow-sm ml-2 text-[9px] font-black uppercase">首接</span>`;
             let rightBuff = gameState.initServTeam === rightTeamNum ? `<span class="bg-amber-600 text-white px-1.5 py-0.5 rounded shadow-sm ml-2 text-[9px] font-black uppercase">首发</span>` : `<span class="bg-cyan-600 text-white px-1.5 py-0.5 rounded shadow-sm ml-2 text-[9px] font-black uppercase">首接</span>`;
             $('leftTeamName').innerHTML = `${leftName} ${leftBuff}`; $('rightTeamName').innerHTML = `${rightName} ${rightBuff}`;
-            
+
             let leftScore = gameState.viewBa ? matchState.t2Score : matchState.t1Score; let rightScore = gameState.viewBa ? matchState.t1Score : matchState.t2Score;
             $('leftScore').innerText = leftScore; $('rightScore').innerText = rightScore;
-            
+
             let formatStr = currentMatch.format === 3 ? '三局两胜' : '单局制';
             $('matchScoreBar').innerHTML = `${currentMatch.t1Name} <span class="mx-3 opacity-50 bg-slate-900 px-2 rounded-lg border border-slate-700">${matchState.t1Wins} : ${matchState.t2Wins}</span> ${currentMatch.t2Name}`;
             $('matchIdBar').innerHTML = `NO: ${currentMatch.id} | 场地: ${currentMatch.court} | ${formatStr}`;
             $('gameNum').innerHTML = `G${matchState.currentGame}`;
-            
+
             $('tlName1').innerText = leftName; $('tlName2').innerText = rightName;
             $('pointCountText').innerText = `G${matchState.currentGame} / 共 ${matchState.timeline.length} 球`;
-            
+
             $('timelineT1').innerHTML = ''; $('timelineT2').innerHTML = '';
             matchState.timeline.forEach(team => {
                 let d1 = document.createElement('div'); d1.style.flex = '1'; d1.style.borderRight = '1px solid #0f172a';
@@ -928,11 +938,11 @@
             if(medR) { medR.className = mT2Used ? 'bg-slate-900 line-through text-slate-600 border border-slate-800 py-3.5 rounded-xl text-xs font-bold shadow-sm' : 'bg-red-950/50 py-3.5 rounded-xl text-xs font-bold text-red-400 border border-red-500/40 btn-press shadow-md'; medR.disabled = mT2Used; medR.innerHTML = mT2Used ? '🚫 伤停耗尽' : '🏥 右队医疗伤停'; }
 
             ['slotTL','slotBL','slotTR','slotBR'].forEach(id => { $(id).innerHTML = ''; $(id).classList.remove('slot-active'); });
-            
-            const bld = (name, teamNum, isServTarget, sText) => { 
+
+            const bld = (name, teamNum, isServTarget, sText) => {
                 let isInitRight = (teamNum===1 && name===gameState.initRightP1) || (teamNum===2 && name===gameState.initRightP2);
                 let pBuff = (isInitRight && currentMatch.type === 'doubles') ? `<div class="text-[14px] bg-red-950 text-red-400 px-2.5 py-0.5 rounded mt-1 shadow-inner font-black tracking-widest border border-red-500/50">[首发位]</div>` : '';
-                return `<div class='flex flex-col items-center justify-center w-full'><div class='text-2xl font-black w-full overflow-hidden text-center ${isServTarget?'text-yellow-400 scale-125 drop-shadow-md':'text-slate-400 opacity-60'}'>${name}</div>${pBuff}${isServTarget ? `<div class='text-sm bg-gradient-to-r from-yellow-400 to-amber-500 text-slate-900 px-4 py-1.5 rounded-full font-black mt-2 shadow-lg animate-pulse border-2 border-white/20'>${sText}</div>` : ''}</div>`; 
+                return `<div class='flex flex-col items-center justify-center w-full'><div class='text-2xl font-black w-full overflow-hidden text-center ${isServTarget?'text-yellow-400 scale-125 drop-shadow-md':'text-slate-400 opacity-60'}'>${name}</div>${pBuff}${isServTarget ? `<div class='text-sm bg-gradient-to-r from-yellow-400 to-amber-500 text-slate-900 px-4 py-1.5 rounded-full font-black mt-2 shadow-lg animate-pulse border-2 border-white/20'>${sText}</div>` : ''}</div>`;
             };
 
             const isServeBox = (team, expectedSide) => {
@@ -990,23 +1000,23 @@
         };
 
         window.triggerManualCancel = () => { if(activeTimer) { stopTimerManually(true); showToast('✅ 已强行解除倒计时'); } else showToast('⏳ 当前无倒计时'); };
-        
-        window.requestTimeout = (isLeftBtn) => { 
+
+        window.requestTimeout = (isLeftBtn) => {
             let isT1Target = gameState.viewBa ? !isLeftBtn : isLeftBtn;
             if(isT1Target) {
-                if(timeoutUsed.t1) return showToast('左队额度已用尽', true); 
+                if(timeoutUsed.t1) return showToast('左队额度已用尽', true);
                 if(confirm('确定左队请求暂停吗？（每局仅限一次）')) { timeoutUsed.t1 = true; renderGame(); backupState(); startTimer(60, '⏸️ 左队暂停：球拍请放在场内'); }
             } else {
-                if(timeoutUsed.t2) return showToast('右队额度已用尽', true); 
+                if(timeoutUsed.t2) return showToast('右队额度已用尽', true);
                 if(confirm('确定右队请求暂停吗？（每局仅限一次）')) { timeoutUsed.t2 = true; renderGame(); backupState(); startTimer(60, '⏸️ 右队暂停：球拍请放在场内'); }
             }
         };
 
-        window.requestMedical = (isLeftBtn) => { 
-            if(matchState.over) return; 
+        window.requestMedical = (isLeftBtn) => {
+            if(matchState.over) return;
             let isT1Target = gameState.viewBa ? !isLeftBtn : isLeftBtn;
             let teamName = isT1Target ? currentMatch.t1Name : currentMatch.t2Name;
-            
+
             if(isT1Target) {
                 if(timeoutUsed.medicalT1) return showToast('左队医疗额度已用尽', true);
                 if(confirm(`⚠️ 确定为【${teamName}】启动医疗通道吗？\n每场比赛仅限 1 次 15 分钟伤停。`)) { timeoutUsed.medicalT1 = true; backupState(); startTimer(900, `🚨 ${teamName} 医疗伤停`); }
@@ -1015,7 +1025,7 @@
                 if(confirm(`⚠️ 确定为【${teamName}】启动医疗通道吗？\n每场比赛仅限 1 次 15 分钟伤停。`)) { timeoutUsed.medicalT2 = true; backupState(); startTimer(900, `🚨 ${teamName} 医疗伤停`); }
             }
         };
-        
+
         window.award = (isLeftClick) => {
             if (matchState.over || activeTimer) return;
             const targetScoreDOM = $(isLeftClick ? 'leftScore' : 'rightScore');
@@ -1027,7 +1037,7 @@
             matchState.timeline.push(winTeam);
 
             const isServerWon = (winTeam === gameState.servTeam);
-            
+
             if (currentMatch.meth === 'sideout') {
                 if (isServerWon) {
                     if (winTeam === 1) matchState.t1Score++; else matchState.t2Score++;
@@ -1051,7 +1061,7 @@
                             gameState.servTeam = winTeam;
                             gameState.servNum = 1;
                             let teamStr = winTeam === 1 ? 't1' : 't2';
-                            gameState.servingPlayer = gameState[teamStr].r; 
+                            gameState.servingPlayer = gameState[teamStr].r;
                         }
                     }
                 }
@@ -1075,7 +1085,7 @@
 
             let maxScore = Math.max(matchState.t1Score, matchState.t2Score);
             let switchPoint = Math.ceil(currentMatch.target / 2);
-            
+
             if (maxScore === switchPoint && !matchState.halfSwitched) {
                 setTimeout(() => {
                     alert(`🔥 场地交换提示：\n\n一方已达到 ${switchPoint} 分！\n请指挥双方交换场地并休整 60 秒。\n\n⚠️ 【重要提醒】：交换场地时，请提醒选手将球拍留在当前场地内！`);
@@ -1093,8 +1103,8 @@
 
         window.undoLastPoint = () => {
             if (matchState.history.length > 0) {
-                let last = matchState.history.pop(); matchState.timeline.pop(); 
-                matchState.t1Score = last.t1Score; matchState.t2Score = last.t2Score; gameState = last.gameState; timeoutUsed = last.timeoutUsed; matchState.halfSwitched = last.halfSwitched; 
+                let last = matchState.history.pop(); matchState.timeline.pop();
+                matchState.t1Score = last.t1Score; matchState.t2Score = last.t2Score; gameState = last.gameState; timeoutUsed = last.timeoutUsed; matchState.halfSwitched = last.halfSwitched;
                 matchState.over = false; $('endGameBtn').classList.add('hidden');
                 renderGame(); syncLiveScore(); backupState(); showToast('↩️ 已回档');
             } else showToast('⚠️ 无历史可撤回', true);
@@ -1102,34 +1112,34 @@
 
         window.endCurrentGame = () => {
             alert('⚠️ 裁判提醒：\n比赛已完结，请务必【回收比赛用球及手环】！');
-            
+
             if(matchState.t1Score > matchState.t2Score) matchState.t1Wins++; else matchState.t2Wins++;
             matchState.results = matchState.results || [];
             matchState.results.push(`G${matchState.currentGame}: ${matchState.t1Score} - ${matchState.t2Score}`);
-            
-            matchState.over = true; clearBackup(); 
-            
+
+            matchState.over = true; clearBackup();
+
             if(currentMatch.format === 1 || matchState.t1Wins === 2 || matchState.t2Wins === 2) {
                 let winner = matchState.t1Wins > matchState.t2Wins ? currentMatch.t1Name : currentMatch.t2Name;
                 let details = matchState.results.join(' | ');
                 let finalScoreDisplay = currentMatch.format === 1 ? `${matchState.t1Score} - ${matchState.t2Score}` : `${matchState.t1Wins} - ${matchState.t2Wins}`;
-                
+
                 let report = `【Pickle球 认证结算单】\n编号: ${currentMatch.id} | 场地: ${currentMatch.court}\n------------------------\n⚔️ ${currentMatch.t1Name} [${matchState.t1Wins}]\n⚔️ ${currentMatch.t2Name} [${matchState.t2Wins}]\n\n比分明细: ${details}\n\n🏆 决胜方: ${winner}\n👨‍⚖️ 执裁人: [${currentRefLevel}] ${currentMatch.ref}\n时间戳: ${new Date().toLocaleString()}`;
-                $('reportText').innerText = report; $('finalScore').innerText = finalScoreDisplay; 
-                
+                $('reportText').innerText = report; $('finalScore').innerText = finalScoreDisplay;
+
                 showStep(4);
                 setTimeout(() => { if(window.initSignatureBoard) window.initSignatureBoard(); }, 200);
-            } else { 
+            } else {
                 let initServNum = (currentMatch.type === 'doubles' && currentMatch.meth === 'sideout') ? 2 : 1;
-                matchState.currentGame++; gameState.servNum = initServNum; matchState.halfSwitched = false; matchState.timeline = []; timeoutUsed = {t1:false, t2:false, medicalT1:false, medicalT2:false}; 
-                showStep(2); 
+                matchState.currentGame++; gameState.servNum = initServNum; matchState.halfSwitched = false; matchState.timeline = []; timeoutUsed = {t1:false, t2:false, medicalT1:false, medicalT2:false};
+                showStep(2);
             }
         };
 
-        window.reEditScore = async () => { 
+        window.reEditScore = async () => {
             if (matchState.t1Score > matchState.t2Score) matchState.t1Wins = Math.max(0, matchState.t1Wins - 1); else matchState.t2Wins = Math.max(0, matchState.t2Wins - 1);
             if (matchState.results && matchState.results.length > 0) matchState.results.pop();
-            showStep(3); matchState.over = true; $('endGameBtn').classList.remove('hidden'); 
+            showStep(3); matchState.over = true; $('endGameBtn').classList.remove('hidden');
             try { await updateRefereeStatus('执裁中', currentMatch.court); } catch(e){}
             renderGame(); syncLiveScore();
         };
@@ -1137,42 +1147,42 @@
         window.submitFinalReport = async () => {
             try {
                 const btn = $('submitReport');
-                const winner = matchState.t1Wins > matchState.t2Wins ? currentMatch.t1Name : currentMatch.t2Name; 
+                const winner = matchState.t1Wins > matchState.t2Wins ? currentMatch.t1Name : currentMatch.t2Name;
                 const details = matchState.results.join(' | ');
                 const dbScoreData = currentMatch.format === 1 ? `${matchState.t1Score}-${matchState.t2Score}` : `${matchState.t1Wins}-${matchState.t2Wins}`;
-                
+
                 if(!hasSigned) return showToast('⚠️ 请先签署姓名确认', true);
                 if(!refereeSigCanvas) { showToast('画板异常，请重新签名', true); return; }
-                
+
                 btn.disabled = true; btn.innerHTML = '正在合成高清战报...';
-                
-                const signatureData = refereeSigCanvas.toDataURL('image/jpeg', 0.8); 
+
+                const signatureData = refereeSigCanvas.toDataURL('image/jpeg', 0.8);
                 const signedReportBase64 = await generateReportWithSignature($('reportText').innerText, dbScoreData, signatureData);
-                
+
                 $('canvasContainer').innerHTML = `<img src="${signedReportBase64}" class="w-full rounded shadow-lg border border-emerald-500">`;
                 $('clearRefereeSigBtn').outerHTML = `<div class="text-xs text-amber-400 mt-2 font-black animate-pulse bg-amber-900/30 py-2 rounded">👆 长按上方生成的图片可保存或发往赛事群</div>`;
-                
-                if (sysMode === 'local') { 
-                    showToast('单机模式：无需上传', false); btn.innerText = '✅ 本地裁决结束'; clearBackup(); return; 
+
+                if (sysMode === 'local') {
+                    showToast('单机模式：无需上传', false); btn.innerText = '✅ 本地裁决结束'; clearBackup(); return;
                 }
-                
-                window.finalPayload = { 
-                    action: 'save_score', id: currentMatch.id, t1: currentMatch.t1Name, t2: currentMatch.t2Name, 
-                    score: dbScoreData, details: details, winner: winner, court: currentMatch.court, 
+
+                window.finalPayload = {
+                    action: 'save_score', id: currentMatch.id, t1: currentMatch.t1Name, t2: currentMatch.t2Name,
+                    score: dbScoreData, details: details, winner: winner, court: currentMatch.court,
                     referee_id: currentRefereeId, referee: `[${currentRefLevel}] ${currentMatch.ref}`, signature: signatureData,
                     is_team: currentMatch.is_team || false
                 };
-                
+
                 btn.innerHTML = '云端数据同步中...';
                 await updateRefereeStatus('空闲', currentMatch.court);
                 const res = await apiCall('save_score', window.finalPayload);
-                
-                if(res.status === 'success') { 
-                    showToast('☁️ 成绩与签名凭证已入库'); btn.innerText = '✅ 云端确收完结'; clearBackup(); 
+
+                if(res.status === 'success') {
+                    showToast('☁️ 成绩与签名凭证已入库'); btn.innerText = '✅ 云端确收完结'; clearBackup();
                 } else throw new Error(res.message || "服务器拒绝了请求");
-            } catch(e) { 
-                showToast('传输失败: ' + e.message, true); 
-                $('submitReport').disabled = false; $('submitReport').innerText = '☁️ 通信失败，重新提交'; 
+            } catch(e) {
+                showToast('传输失败: ' + e.message, true);
+                $('submitReport').disabled = false; $('submitReport').innerText = '☁️ 通信失败，重新提交';
             }
         };
 
