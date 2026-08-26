@@ -226,6 +226,23 @@
         };
 
         // ========== 加载 AI 欢迎语（智能小P） ==========
+        // [Checkin FIXUP] 日期和时段问候由确定性函数按 Asia/Shanghai 计算；
+        // AI 正文不包含具体日期或早上/下午/晚上等易过期内容。
+        function getTimeInShanghai() {
+            // 用 Intl.DateTimeFormat 获取 Asia/Shanghai 时间
+            return new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Shanghai' }));
+        }
+
+        function getPeriodGreeting(shanghaiHour) {
+            // 显式定义时段规则：
+            // 05:00-11:59 -> 早上好
+            // 12:00-17:59 -> 下午好
+            // 18:00-04:59 -> 晚上好
+            if (shanghaiHour >= 5 && shanghaiHour < 12) return '早上好';
+            if (shanghaiHour >= 12 && shanghaiHour < 18) return '下午好';
+            return '晚上好';
+        }
+
         async function loadGreeting() {
             const el = document.getElementById('greetingArea');
             if (!eventCode) {
@@ -235,28 +252,38 @@
             try {
                 const res = await fetch(`${API}?action=ai_generate_greeting&event_code=${eventCode}&_t=${Date.now()}`);
                 const data = await res.json();
-                if (data.status === 'success' && data.greeting) {
-                    el.innerHTML = data.greeting;
+                // [Checkin FIXUP] 接收 greeting_body + notice + timezone
+                const shanghaiNow = getTimeInShanghai();
+                const dateStr = `${shanghaiNow.getMonth() + 1}月${shanghaiNow.getDate()}日`;
+                const periodGreeting = getPeriodGreeting(shanghaiNow.getHours());
+
+                let dynamicPart = '';
+                if (data.greeting_body) {
+                    // AI 返回不含日期和时段的欢迎语正文
+                    dynamicPart = data.greeting_body;
+                } else if (data.notice) {
+                    // 有公告但无 AI 正文
+                    dynamicPart = `小P说：${data.notice}`;
                 } else {
-                    // 降级：本地生成
-                    const now = new Date();
-                    const dayOfWeek = ['星期日','星期一','星期二','星期三','星期四','星期五','星期六'][now.getDay()];
-                    const month = now.getMonth() + 1;
-                    const date = now.getDate();
-                    const hour = now.getHours();
-                    let timeGreeting = '下午好';
-                    if (hour < 6) timeGreeting = '夜深了';
-                    else if (hour < 12) timeGreeting = '早上好';
-                    else if (hour < 18) timeGreeting = '下午好';
-                    else timeGreeting = '晚上好';
-                    el.innerHTML = `✨ 小P欢迎你！${timeGreeting}，今天是 ${month}月${date}日 ${dayOfWeek}，祝你在赛场上尽情挥洒，取得好成绩！🎾`;
+                    // 无任何内容时的保底文案（含动态日期/时段）
+                    dynamicPart = `小P说：${periodGreeting}！${dateStr}赛场见真章，加油！🏓`;
                 }
+                el.innerHTML = `${dynamicPart}`;
             } catch (e) {
-                // 网络错误降级
-                el.innerHTML = '✨ 欢迎来到赛场！请完成免责签到，祝您比赛愉快！';
+                // 网络错误降级：仍显示日期+时段
+                const shanghaiNow = getTimeInShanghai();
+                const dateStr = `${shanghaiNow.getMonth() + 1}月${shanghaiNow.getDate()}日`;
+                el.innerHTML = `✨ ${getPeriodGreeting(shanghaiNow.getHours())}！${dateStr} 欢迎来到赛场，请完成免责签到！`;
                 console.warn('AI 问候加载失败', e);
             }
         }
+
+        // [Checkin FIXUP] visibilitychange 时重新计算动态问候——用户切回页面时更新日期/时段
+        document.addEventListener('visibilitychange', () => {
+            if (!document.hidden) {
+                loadGreeting();
+            }
+        });
 
         // ========== 加载赛事统一风险告知书（只读） ==========
         async function loadWaiverText() {

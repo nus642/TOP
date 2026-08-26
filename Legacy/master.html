@@ -1713,7 +1713,8 @@ window.generateTeamCodesFromGroups = async () => {
                 let cHtml = '';
                 for (let c in data.courts) {
                     let info = data.courts[c];
-                    let isLive = info.status === '比赛中';
+                    // [P1-2 FIXUP] 扩展 isLive 定义：包括"比赛中"和"待开赛"
+                    let isLive = info.status === '比赛中' || info.status === '待开赛';
                     let statusClass = isLive ? 'badge live' : 'badge';
                     let statusText = info.status || '空闲';
                     let matchIdChip = (isLive && info.match_id) ? ` <span class="meta">🆔 ${info.match_id}</span>` : '';
@@ -1918,13 +1919,16 @@ let teamCodeDisplay = displayCode ? `<span onclick="editTeamCode('${room}', '${t
         };
 
         window.editCourt = async (taskId) => {
-            const newCourt = prompt(`请输入【${taskId}】的新场地号：`, '');
+            // [P2 FIXUP] 换场独立确认提示语：不得复用暂停/医疗暂停/球拍留场等语义。
+            const oldTask = Object.values(globalDashboardData?.tasks || {}).find(t => normalizeId(t.id) === normalizeId(taskId));
+            const oldCourt = oldTask ? String(oldTask.court ?? '未分配') : '未知';
+            const newCourt = prompt(`确认将本场比赛从 #${oldCourt} 号场调整至新场地？\n请输入新场地号（如 3、4...）：`, '');
             if (newCourt === null) return;
             const courtNum = newCourt.trim();
             if (!courtNum) return showToast('场地号不能为空', true);
             try {
                 const res = await apiPost('update_task_court', { match_id: taskId, court: courtNum });
-                if (res.status === 'success') { showToast(`✅ 已成功将 ${taskId} 改到 ${courtNum} 号场`); loadDashboard(); } else { showToast('修改失败：' + (res.message || ''), true); }
+                if (res.status === 'success') { showToast(`✅ 已成功将 ${taskId} 改到 ${courtNum} 号场；旧场地立即恢复空闲`); loadDashboard(); } else { showToast('修改失败：' + (res.message || ''), true); }
             } catch (e) {
                 showToast('网络错误', true);
             }

@@ -161,17 +161,15 @@ switch ($action) {
     // 从环境变量读取 DeepSeek API Key
     $apiKey = getenv('DEEPSEEK_API_KEY') ?: 'sk-你的备用Key（仅测试用）';
     if (empty($apiKey) || $apiKey === 'sk-你的备用Key（仅测试用）') {
-        // 若未配置，返回本地生成内容
-        $hour = date('H');
-        $timeGreeting = ($hour < 6) ? '夜深了' : (($hour < 12) ? '早上好' : (($hour < 18) ? '下午好' : '晚上好'));
-        $greeting = "小P说：{$timeGreeting}！今天是 " . date('Y年n月j日 l') . "，阳光正好，赛场见真章！加油，选手们！🏓";
-        echo json_encode(['status' => 'success', 'greeting' => $greeting, 'has_notice' => $hasNotice]);
+        // [Checkin FIXUP] 若无 AI Key，仅返回公告聚合文本；日期和时段由前端 JS 按 Asia/Shanghai 计算。
+        echo json_encode(['status' => 'success', 'greeting_body' => '', 'notice' => $noticeText, 'timezone' => 'Asia/Shanghai']);
         break;
     }
     
+    // [Checkin FIXUP] AI prompt 不包含具体日期和时段问候——避免跨日过期。
     $prompt = $hasNotice 
-        ? "以下是赛事公告内容：\"$noticeText\"。请根据这些公告内容，生成一段热情洋溢的赛场欢迎语或提示语，语气亲切，以'小P说'开头，不超过60字。"
-        : "今天是 " . date('Y年n月j日 l') . "。请生成一段热情洋溢的赛场欢迎语，包含对选手的鼓励，以'小P说'开头，不超过60字。";
+        ? "以下是赛事公告内容：\"$noticeText\"。请根据这些公告内容，生成一段热情洋溢的赛场欢迎语或提示语，语气亲切，以'小P说'开头，不超过60字。不要包含具体日期或早上/下午/晚上等易过时的时间词。"
+        : "请生成一段热情洋溢的赛场欢迎语，包含对选手的鼓励，以'小P说'开头，不超过60字。不要包含具体日期或早上/下午/晚上等易过时的时间词。";
     
     $ch = curl_init('https://api.deepseek.com/v1/chat/completions');
     curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
@@ -195,19 +193,17 @@ switch ($action) {
     
     if ($httpCode === 200) {
         $result = json_decode($response, true);
-        $greeting = $result['choices'][0]['message']['content'] ?? '';
+        $greetingBody = $result['choices'][0]['message']['content'] ?? '';
     } else {
-        $greeting = '';
+        $greetingBody = '';
     }
     
-    if (empty($greeting)) {
-        // 降级
-        $hour = date('H');
-        $timeGreeting = ($hour < 6) ? '夜深了' : (($hour < 12) ? '早上好' : (($hour < 18) ? '下午好' : '晚上好'));
-        $greeting = "小P说：{$timeGreeting}！今天是 " . date('Y年n月j日 l') . "，阳光正好，赛场见真章！加油，选手们！🏓";
+    // [Checkin FIXUP] AI 失败时返回空正文而非带日期的降级文本。
+    if (empty($greetingBody)) {
+        $greetingBody = '';
     }
     
-    echo json_encode(['status' => 'success', 'greeting' => $greeting, 'has_notice' => $hasNotice]);
+    echo json_encode(['status' => 'success', 'greeting_body' => $greetingBody, 'notice' => $noticeText, 'timezone' => 'Asia/Shanghai']);
     break;
 	
 	case 'update_task_date':
@@ -391,6 +387,7 @@ switch ($action) {
         // P1-2：以 task id/court 为唯一关联，将活动比赛投影到对应场地卡片（不建立第二套状态）。
         // 比分来自 tasks[].live_score（referee sync_live_score 实时写入）；
         // 完赛后 save_score 删除 task，投影自动消失，场地恢复空闲不残留。
+        // [P1-2 FIXUP] 扩展 status='待开赛' 覆盖：accept_task 写入 live_scores 后 Master 可提前显示真实队名。
         // 镜像测试：Tools/legacy-live-record-visibility/court-projection-logic.js
         foreach ($res['tasks'] as $t) {
             $tc = trim($t['court'] ?? '');
@@ -399,6 +396,14 @@ switch ($action) {
                 $res['courts'][$tc]['match_id'] = $t['id'] ?? '';
                 $res['courts'][$tc]['match_name'] = trim(($t['t1'] ?? '') . ' vs ' . ($t['t2'] ?? ''));
                 $res['courts'][$tc]['score'] = $t['live_score'] ?? '';
+            }
+            // [P1-2 FIXUP] 同理由 live_scores 中的待开赛状态覆盖：如果此 court 已被 accept_task 写入，且尚未被 task 投影占据。
+            if (isset($live[$tc]) && ($live[$tc]['status'] ?? '') === '待开赛' && isset($res['courts'][$tc]) && $res['courts'][$tc]['match_id'] === '') {
+                $res['courts'][$tc]['status'] = $live[$tc]['status'] ?? '待开赛';
+                $res['courts'][$tc]['match_id'] = $live[$tc]['match_id'] ?? '';
+                $res['courts'][$tc]['match_name'] = $live[$tc]['match_name'] ?? '';
+                $res['courts'][$tc]['score'] = $live[$tc]['score'] ?? '0-0';
+                $res['courts'][$tc]['referee'] = $live[$tc]['referee'] ?? '';
             }
         }
         echo json_encode($res); break;
@@ -521,6 +526,27 @@ switch ($action) {
             if (isset($info['match_id']) && normalizeId($info['match_id']) === $match_id) { $old_court = $court; break; }
         }
         if ($old_court && $old_court !== $new_court) { $live[$new_court] = $live[$old_court]; unset($live[$old_court]); kv_set($event_code, 'live_scores', $live); }
+        echo json_encode(['status' => 'success']);
+        break;
+    case 'accept_task':
+        // [P1-2 FIXUP] 裁判接受任务即写 live_scores（status=待开赛）：Master 场地卡可提前显示真实队名、task id、裁判。
+        // 正式开赛后 sync_live_score 覆盖为 status=比赛中 + 实时比分；完赛 save_score 删 task + 清 live_scores。
+        $match_id = normalizeId($req['match_id'] ?? '');
+        $court = trim($req['court'] ?? '');
+        $t1 = trim($req['t1'] ?? '');
+        $t2 = trim($req['t2'] ?? '');
+        $ref = trim($req['ref'] ?? '');
+        if (!$match_id || !$court) { echo json_encode(['status' => 'error', 'message' => '缺少比赛ID或场地']); break; }
+        $live = kv_get($event_code, 'live_scores', []);
+        $live[$court] = [
+            'match_id' => $match_id,
+            'status' => '待开赛',
+            'match_name' => ($t1 ? $t1 : '') . ' vs ' . ($t2 ? $t2 : ''),
+            'score' => '0-0',
+            'referee' => $ref,
+            'court' => $court,
+        ];
+        kv_set($event_code, 'live_scores', $live);
         echo json_encode(['status' => 'success']);
         break;
     case 'clear_all_tasks': kv_set($event_code, 'tasks', []); echo json_encode(['status' => 'success']); break;
