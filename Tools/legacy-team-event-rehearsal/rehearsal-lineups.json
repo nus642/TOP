@@ -1,0 +1,18 @@
+{
+  "event_code": "TEAM-REHEARSAL-20260825",
+  "room_code": "001",
+  "expected_tasks": ["001-01", "001-02", "001-03"],
+  "comment": "标准三盘团体赛排阵。依据：team_lineup.html L397 默认 3 盘双打；L432-433 同一排阵内禁止同一球员重复上场；L520-530 提交前每盘必须排满；master.html L2283-2287 核碰按双方盘数生成任务。双方必须各 3 盘且盘数一致，禁止依赖较少方截断。",
+  "lineups": {
+    "先锋预备队": [
+      { "type": "doubles", "format": 1, "players": ["甲一", "甲二"] },
+      { "type": "doubles", "format": 1, "players": ["甲三", "甲四"] },
+      { "type": "doubles", "format": 1, "players": ["甲五", "甲六"] }
+    ],
+    "铁壁预备队": [
+      { "type": "doubles", "format": 1, "players": ["乙一", "乙二"] },
+      { "type": "doubles", "format": 1, "players": ["乙三", "乙四"] },
+      { "type": "doubles", "format": 1, "players": ["乙五", "乙六"] }
+    ]
+  }
+}
