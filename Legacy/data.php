@@ -388,6 +388,19 @@ switch ($action) {
                 if (isset($live[$r['current_court']])) { $res['courts'][$r['current_court']]['score'] = $live[$r['current_court']]['score']; $res['courts'][$r['current_court']]['match_name'] = $live[$r['current_court']]['match_name']; $res['courts'][$r['current_court']]['match_id'] = $live[$r['current_court']]['match_id']; }
             }
         }
+        // P1-2：以 task id/court 为唯一关联，将活动比赛投影到对应场地卡片（不建立第二套状态）。
+        // 比分来自 tasks[].live_score（referee sync_live_score 实时写入）；
+        // 完赛后 save_score 删除 task，投影自动消失，场地恢复空闲不残留。
+        // 镜像测试：Tools/legacy-live-record-visibility/court-projection-logic.js
+        foreach ($res['tasks'] as $t) {
+            $tc = trim($t['court'] ?? '');
+            if (($t['status'] ?? '') === '比赛中' && $tc !== '' && isset($res['courts'][$tc]) && $res['courts'][$tc]['match_id'] === '') {
+                $res['courts'][$tc]['status'] = '比赛中';
+                $res['courts'][$tc]['match_id'] = $t['id'] ?? '';
+                $res['courts'][$tc]['match_name'] = trim(($t['t1'] ?? '') . ' vs ' . ($t['t2'] ?? ''));
+                $res['courts'][$tc]['score'] = $t['live_score'] ?? '';
+            }
+        }
         echo json_encode($res); break;
         
     case 'change_event_mode':

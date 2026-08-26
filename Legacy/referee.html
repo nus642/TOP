@@ -698,8 +698,10 @@
                 const data = await apiGet('get_personal_task', { match_id: matchId }); 
                 if (data.status === 'success' && data.data) {
                     window.pendingTask = data.data; let fmtDesc = data.data.format == 3 ? '三局两胜' : '单局制';
-                    $('taskContent').innerHTML = `<span class="text-white font-bold text-base">${data.data.t1} <span class="text-emerald-500 px-1">vs</span> ${data.data.t2}</span><br><span class="text-slate-400 mt-2 block border-t border-slate-600/50 pt-2 text-xs">目标分: ${data.data.target_score} | 封顶分: ${data.data.cap_score} | 赛制: ${fmtDesc}</span>`;
-                    $('taskArea').classList.remove('hidden'); if(data.data.court) $('courtNo').value = data.data.court; showToast(`📡 已获取网络任务`);
+                    // [P1-1] 场地来自主控对 task 的分配，提取时自动带出并明示；未分配则警示（展示前剔除尖括号防注入）
+                    let courtDesc = data.data.court ? String(data.data.court).replace(/[<>&"']/g, '') : '未分配（请主控先改场）';
+                    $('taskContent').innerHTML = `<span class="text-white font-bold text-base">${data.data.t1} <span class="text-emerald-500 px-1">vs</span> ${data.data.t2}</span><br><span class="text-slate-400 mt-2 block border-t border-slate-600/50 pt-2 text-xs">目标分: ${data.data.target_score} | 封顶分: ${data.data.cap_score} | 赛制: ${fmtDesc} | 场地: #${courtDesc}</span>`;
+                    $('taskArea').classList.remove('hidden'); if(data.data.court) $('courtNo').value = data.data.court; showToast(data.data.court ? `📡 已获取网络任务（场地 #${courtDesc} 由来自主控分配）` : '📡 已获取网络任务（⚠️ 主控未分配场地，将无法开赛）', !data.data.court);
                 } else { $('taskArea').classList.add('hidden'); showToast(`❌ 云端未找到 [${rawId}] 的信息`, true); }
             } catch(e) { showToast('通信断层', true); }
             btn.innerText = "📡 提取";
@@ -709,6 +711,7 @@
             if (!window.pendingTask) return;
             const t = window.pendingTask;
             $('matchIdInput2').value = t.id || ''; $('targetScore').value = t.target_score !== undefined ? t.target_score : 21; $('capScore').value = t.cap_score !== undefined ? t.cap_score : 21;
+            if (t.court) $('courtNo').value = t.court; // [P1-1] 场地继承主控分配，不依靠裁判手工填写
             if(t.format) $('gameFormat').value = t.format; if(t.meth) $('scoreRule').value = t.meth;
             $('t1Name').value = t.t1 || ''; $('t2Name').value = t.t2 || ''; $('t1p1').value = t.t1p1 || ''; $('t1p2').value = t.t1p2 || ''; $('t2p1').value = t.t2p1 || ''; $('t2p2').value = t.t2p2 || '';
             if (t.t1p2 || t.t2p2) { $('matchTypeSel').value = 'doubles'; } else { $('matchTypeSel').value = 'singles'; $('t1p2').value = ''; $('t2p2').value = ''; }
@@ -750,6 +753,16 @@
                     }
                 } catch(e) {}
                 btn.innerText = oldText; btn.disabled = false;
+            }
+
+            // [P1-1] 场地必须继承主控对 task 的分配，裁判不得凭记忆手工填写；
+            // task 无场地时阻断开赛。镜像测试：Tools/legacy-live-record-visibility/court-handoff-logic.js
+            if (sysMode !== 'local' && window.pendingTask) {
+                if (window.pendingTask.court) $('courtNo').value = window.pendingTask.court;
+                if (!$('courtNo').value.trim()) {
+                    alert('🚨 无法开赛：该任务尚未分配场地。\n请先由主控分配场地（master 待办队列 → 改场），然后重新提取任务。');
+                    return;
+                }
             }
 
             localStorage.setItem('pickle_def_court', $('courtNo').value); localStorage.setItem('pickle_def_target', $('targetScore').value); localStorage.setItem('pickle_def_cap', $('capScore').value); localStorage.setItem('pickle_def_format', $('gameFormat').value); localStorage.setItem('pickle_def_meth', $('scoreRule').value);

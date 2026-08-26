@@ -213,6 +213,26 @@
         </div>
     </div>
 
+    <!-- P1-3 赛果单详情弹窗（签名安全白名单见 SAFE_SIGNATURE_REGEX） -->
+    <div id="recordDetailModal" class="hidden-panel fixed inset-0 bg-black/80 z-[99999] flex items-center justify-center p-4">
+        <div class="bg-slate-800 p-6 rounded-xl w-full max-w-lg border border-emerald-500/50 shadow-2xl max-h-[90vh] overflow-y-auto custom-scrollbar">
+            <h3 class="text-lg font-bold text-emerald-400 mb-3 flex items-center gap-2"><span>📜</span> 赛果单详情</h3>
+            <div class="space-y-1.5 text-xs mb-3">
+                <div class="flex justify-between border-b border-slate-700/60 pb-1"><span class="text-slate-400">编号</span><span id="rdId" class="font-mono font-bold text-slate-200"></span></div>
+                <div class="flex justify-between border-b border-slate-700/60 pb-1"><span class="text-slate-400">场地</span><span id="rdCourt" class="font-bold text-slate-200"></span></div>
+                <div class="flex justify-between border-b border-slate-700/60 pb-1"><span class="text-slate-400">队伍</span><span id="rdTeams" class="font-bold text-slate-200 text-right"></span></div>
+                <div class="flex justify-between border-b border-slate-700/60 pb-1"><span class="text-slate-400">比分</span><span id="rdScore" class="font-black text-emerald-400"></span></div>
+                <div class="flex justify-between border-b border-slate-700/60 pb-1"><span class="text-slate-400">比分明细</span><span id="rdDetails" class="text-slate-300 text-right"></span></div>
+                <div class="flex justify-between border-b border-slate-700/60 pb-1"><span class="text-slate-400">胜方</span><span id="rdWinner" class="font-bold text-amber-300 text-right"></span></div>
+                <div class="flex justify-between border-b border-slate-700/60 pb-1"><span class="text-slate-400">裁判</span><span id="rdReferee" class="text-slate-200 text-right"></span></div>
+                <div class="flex justify-between border-b border-slate-700/60 pb-1"><span class="text-slate-400">时间</span><span id="rdTime" class="text-slate-300"></span></div>
+            </div>
+            <div class="text-[10px] text-slate-400 font-bold mb-1">✍️ 赛果确认签名</div>
+            <div id="rdSigArea" class="bg-white rounded-lg p-2 min-h-[80px] flex items-center justify-center mb-4"></div>
+            <button onclick="document.getElementById('recordDetailModal').classList.add('hidden-panel')" class="btn bg-slate-600 w-full">关闭</button>
+        </div>
+    </div>
+
     <!-- 主控面板 -->
     <div id="mainPanel" class="hidden-panel flex-grow w-full flex flex-col pb-10">
 
@@ -1689,14 +1709,15 @@ window.generateTeamCodesFromGroups = async () => {
                 if (!data || data.status !== 'success') return;
                 globalDashboardData = data;
 
-                // 场地卡片
+                // 场地卡片（P1-2：task 投影由后端 get_full_dashboard 完成，此处仅渲染，不建立第二套状态）
                 let cHtml = '';
                 for (let c in data.courts) {
                     let info = data.courts[c];
                     let isLive = info.status === '比赛中';
                     let statusClass = isLive ? 'badge live' : 'badge';
                     let statusText = info.status || '空闲';
-                    let matchDisplay = isLive ? `<span class="match-text text-[0.65rem] sm:text-xs text-slate-300 truncate">${info.match_name || '自由赛'}</span>` : `<span class="empty">空闲中</span>`;
+                    let matchIdChip = (isLive && info.match_id) ? ` <span class="meta">🆔 ${info.match_id}</span>` : '';
+                    let matchDisplay = isLive ? `<span class="match-text text-[0.65rem] sm:text-xs text-slate-300 truncate">${info.match_name || '自由赛'}${matchIdChip}</span>` : `<span class="empty">空闲中</span>`;
                     let scoreRef = isLive ? `<div class="row mt-1"><span class="score">${info.score || '0-0'}</span><span class="referee-name">👨‍⚖️ ${info.referee || '待分配'}</span></div>` : '';
                     cHtml += `<div class="unified-card"><div class="row"><span class="label"># ${c}</span><span class="${statusClass}">${statusText}</span></div>${matchDisplay}${scoreRef}</div>`;
                 }
@@ -1736,11 +1757,12 @@ window.generateTeamCodesFromGroups = async () => {
                     </div>`;
                 }).join('') || '<div class="text-xs text-slate-500 text-center py-2">无该模式队列</div>';
 
-                // 完赛记录
+                // 完赛记录（P1-3：卡片可点击，showRecordDetail 展示完整赛果单）
                 let recordsArr = data.records.slice(0, 20);
                 recordsArr = recordsArr.filter(r => sysMode === 'team' ? r.is_team === true : r.is_team !== true);
-                $('recordsList').innerHTML = recordsArr.map(r => {
-                    return `<div class="bg-slate-900/40 p-2.5 rounded border border-slate-700/50 text-xs mb-2"><div class="flex justify-between items-center mb-1"><span class="font-black text-slate-300">${r.id} <span class="text-slate-500 ml-1">#${r.court}场</span></span><span class="text-emerald-400 font-black">${r.score}</span></div><div class="text-slate-400 flex justify-between items-center"><span class="truncate pr-2">${r.t1} vs ${r.t2}</span></div></div>`;
+                window.lastRecordsArr = recordsArr;
+                $('recordsList').innerHTML = recordsArr.map((r, idx) => {
+                    return `<div onclick="showRecordDetail(${idx})" class="bg-slate-900/40 p-2.5 rounded border border-slate-700/50 text-xs mb-2 cursor-pointer hover:border-emerald-500/50 transition-colors"><div class="flex justify-between items-center mb-1"><span class="font-black text-slate-300">${r.id} <span class="text-slate-500 ml-1">#${r.court}场</span></span><span class="text-emerald-400 font-black">${r.score}</span></div><div class="text-slate-400 flex justify-between items-center"><span class="truncate pr-2">${r.t1} vs ${r.t2}</span><span class="text-[9px] text-slate-600 shrink-0">点击查看 ▸</span></div></div>`;
                 }).join('') || '<div class="text-xs text-slate-500 text-center py-2">尚无完赛成绩</div>';
 
                 // 团队雷达统计
@@ -2308,6 +2330,37 @@ let teamCodeDisplay = displayCode ? `<span onclick="editTeamCode('${room}', '${t
             }
             $('pushTeamMatchesBtn').innerText = '⚡ 扫描核碰双方盲排，并下发至裁判队列';
             $('pushTeamMatchesBtn').disabled = false;
+        };
+
+        // ======================== P1-3 赛果单详情 ========================
+        // 签名安全白名单：仅接受画布导出的 data:image base64，拒绝任意 HTML/伪协议注入。
+        // 镜像测试模块：Tools/legacy-live-record-visibility/record-detail-logic.js
+        const SAFE_SIGNATURE_REGEX = /^data:image\/(?:png|jpe?g|gif|webp);base64,[A-Za-z0-9+\/=]+$/;
+        window.showRecordDetail = (idx) => {
+            const list = window.lastRecordsArr || [];
+            const r = list[idx];
+            if (!r) return;
+            const fill = (id, val) => { const el = $(id); if (el) el.textContent = (val === undefined || val === null || val === '') ? '—' : String(val); };
+            fill('rdId', r.id); fill('rdCourt', r.court ? `#${r.court} 场` : ''); fill('rdTeams', `${r.t1} vs ${r.t2}`);
+            fill('rdScore', r.score); fill('rdDetails', r.details); fill('rdWinner', r.winner);
+            fill('rdReferee', r.referee); fill('rdTime', r.time);
+            const area = $('rdSigArea');
+            if (area) {
+                area.innerHTML = '';
+                if (r.signature && SAFE_SIGNATURE_REGEX.test(r.signature)) {
+                    const img = document.createElement('img');
+                    img.src = r.signature;
+                    img.alt = '赛果确认签名';
+                    img.className = 'max-h-40 rounded';
+                    area.appendChild(img);
+                } else {
+                    const ph = document.createElement('span');
+                    ph.textContent = '（无签名图）';
+                    ph.className = 'text-slate-400 text-xs';
+                    area.appendChild(ph);
+                }
+            }
+            document.getElementById('recordDetailModal').classList.remove('hidden-panel');
         };
 
         // ======================== 手动录分 ========================
