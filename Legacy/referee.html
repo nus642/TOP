@@ -625,7 +625,8 @@
 
                     loadPlayers();
                     if (!checkAndRestoreBackup()) {
-                        updateRefereeStatus('空闲', $('courtNo').value);
+                        // [PR#155 REVIEW FIX] 登录时使用 court=null，不携带默认场地值，避免任何残留的投影清理风险
+                        updateRefereeStatus('空闲', null);
                         showStep(1);
                     }
                     loadTaskList();
@@ -664,7 +665,8 @@
                 displayScore += ` [发球: ${gameState.servingPlayer} 第${gameState.servNum}发]`;
             }
             let playersText = `${currentMatch.t1p1} ${currentMatch.t1p2 ? '& '+currentMatch.t1p2 : ''} vs ${currentMatch.t2p1} ${currentMatch.t2p2 ? '& '+currentMatch.t2p2 : ''}`.replace(/  /g, ' ');
-            apiCall('sync_live_score', { court: currentMatch.court, score_text: displayScore, status: '比赛中', match_name: `${currentMatch.t1Name} vs ${currentMatch.t2Name}`, match_id: currentMatch.id, players: playersText, t1: currentMatch.t1Name, t2: currentMatch.t2Name });
+            // [PR#155 REVIEW FIX] 传递 referee_id 供服务端归属校验
+            apiCall('sync_live_score', { court: currentMatch.court, score_text: displayScore, status: '比赛中', match_name: `${currentMatch.t1Name} vs ${currentMatch.t2Name}`, match_id: currentMatch.id, players: playersText, t1: currentMatch.t1Name, t2: currentMatch.t2Name, referee_id: currentRefereeId });
         }
 
         async function updateRefereeStatus(status, court=null) {
@@ -710,28 +712,38 @@
                     if (data.data.court) $('courtNo').value = data.data.court;
                     else $('courtNo').value = '';
                     showToast(data.data.court ? `📡 已获取网络任务（场地 #${courtDesc} 由来自主控分配）` : '📡 已获取网络任务（⚠️ 主控未分配场地，将无法开赛）', !data.data.court);
+                    $('taskArea').classList.remove('hidden');
                 } else { $('taskArea').classList.add('hidden'); showToast(`❌ 云端未找到 [${rawId}] 的信息`, true); }
             } catch(e) { showToast('通信断层', true); }
             btn.innerText = "📡 提取";
         };
 
-        window.handleTaskAccept = () => {
+        // [PR#155 REVIEW FIX] handleTaskAccept 改为真正的 async 权威流程：
+        // 先 await accept_task，只有 status=success 时才载入参数并隐藏任务区。
+        // 失败时保持任务选择界面、不填充工作台、显示服务端错误。
+        window.handleTaskAccept = async () => {
             if (!window.pendingTask) return;
             const t = window.pendingTask;
-            $('matchIdInput2').value = t.id || ''; $('targetScore').value = t.target_score !== undefined ? t.target_score : 21; $('capScore').value = t.cap_score !== undefined ? t.cap_score : 21;
-            if (t.court) $('courtNo').value = t.court; // [P1-1] 场地继承主控分配，不依靠裁判手工填写
-            if(t.format) $('gameFormat').value = t.format; if(t.meth) $('scoreRule').value = t.meth;
-            $('t1Name').value = t.t1 || ''; $('t2Name').value = t.t2 || ''; $('t1p1').value = t.t1p1 || ''; $('t1p2').value = t.t1p2 || ''; $('t2p1').value = t.t2p1 || ''; $('t2p2').value = t.t2p2 || '';
-            if (t.t1p2 || t.t2p2) { $('matchTypeSel').value = 'doubles'; } else { $('matchTypeSel').value = 'singles'; $('t1p2').value = ''; $('t2p2').value = ''; }
-            window.syncInputs(); showToast('✅ 参数已成功写入终端内存'); $('taskArea').classList.add('hidden');
-            // [P1-2 FIXUP] 接受任务即写入 live_scores——Master 场地卡在开赛前显示"待开赛"
-            // 真实队名、task id、裁判；正式开赛后 sync_live_score 覆盖为"比赛中"。
-            // [SECOND HARDENING] 传递 referee_id 供服务端幂等/归属冲突检测。
-            (async () => {
-                try {
-                    await apiCall('accept_task', { match_id: t.id, court: t.court, t1: t.t1, t2: t.t2, ref: `[${currentRefLevel}] ${currentRefereeName}`, referee_id: currentRefereeId });
-                } catch(e) {}
-            })();
+            const btn = $('acceptTaskBtn');
+            btn.disabled = true; btn.innerText = '领取中...';
+            try {
+                const res = await apiCall('accept_task', { match_id: t.id, court: t.court, t1: t.t1, t2: t.t2, ref: `[${currentRefLevel}] ${currentRefereeName}`, referee_id: currentRefereeId });
+                if (!res || res.status !== 'success') {
+                    showToast('❌ ' + (res?.message || '领取失败'), true);
+                    btn.disabled = false; btn.innerText = '将参数载入工作台';
+                    return;
+                }
+                // 服务端确认成功——载入参数
+                $('matchIdInput2').value = t.id || ''; $('targetScore').value = t.target_score !== undefined ? t.target_score : 21; $('capScore').value = t.cap_score !== undefined ? t.cap_score : 21;
+                if (t.court) $('courtNo').value = t.court;
+                if(t.format) $('gameFormat').value = t.format; if(t.meth) $('scoreRule').value = t.meth;
+                $('t1Name').value = t.t1 || ''; $('t2Name').value = t.t2 || ''; $('t1p1').value = t.t1p1 || ''; $('t1p2').value = t.t1p2 || ''; $('t2p1').value = t.t2p1 || ''; $('t2p2').value = t.t2p2 || '';
+                if (t.t1p2 || t.t2p2) { $('matchTypeSel').value = 'doubles'; } else { $('matchTypeSel').value = 'singles'; $('t1p2').value = ''; $('t2p2').value = ''; }
+                window.syncInputs(); showToast('✅ 参数已成功写入终端内存'); $('taskArea').classList.add('hidden');
+            } catch(e) {
+                showToast('❌ 网络异常，请重试', true);
+                btn.disabled = false; btn.innerText = '将参数载入工作台';
+            }
         };
 
         window.syncInputs = () => { const isD = $('matchTypeSel').value === 'doubles'; document.querySelectorAll('.p2-only').forEach(el => { if(isD) el.classList.remove('hidden'); else el.classList.add('hidden'); }); };
@@ -931,10 +943,28 @@
             matchState.over = false;
 
             $('endGameBtn').classList.add('hidden');
-            try { await updateRefereeStatus('执裁中', currentMatch.court); } catch(e){}
+
+            // [PR#155 REVIEW FIX] 联网模式必须调用原子 start_task，只有服务端确认成功后才进入 step 3。
+            // 不再使用两个独立写入（updateRefereeStatus + syncLiveScore），避免部分写入风险。
+            if (sysMode !== 'local') {
+                const startRes = await apiCall('start_task', {
+                    match_id: currentMatch.id, referee_id: currentRefereeId,
+                    score_text: 'G1 0-0', match_name: `${currentMatch.t1Name} vs ${currentMatch.t2Name}`
+                });
+                if (!startRes || startRes.status !== 'success') {
+                    showToast('❌ 开赛失败: ' + (startRes?.message || '服务端拒绝'), true);
+                    const startBtn = document.querySelector('[onclick*="confirmAndStart"]');
+                    if (startBtn) { startBtn.disabled = false; }
+                    return;
+                }
+            } else {
+                // 本地模式保留原有行为
+                try { await updateRefereeStatus('执裁中', currentMatch.court); } catch(e){}
+            }
+
             $('recoveryBadge').classList.add('hidden');
             renderGame();
-            syncLiveScore();
+            if (sysMode === 'local') syncLiveScore();
             showStep(3);
             backupState();
         }
@@ -1213,7 +1243,8 @@
                 };
 
                 btn.innerHTML = '云端数据同步中...';
-                await updateRefereeStatus('空闲', currentMatch.court);
+                // [PR#155 REVIEW FIX] 不再提前调用 updateRefereeStatus('空闲')。
+                // save_score 服务端事务内原子完成 referee 重置，避免 save_score 失败时裁判空闲但比赛未完结。
                 const res = await apiCall('save_score', window.finalPayload);
 
                 if(res.status === 'success') {

@@ -204,11 +204,12 @@ describe('accept_task 服务端权威边界（真实 HTTP）', () => {
 describe('release_task_acceptance 待开赛释放（真实 HTTP）', () => {
   it('H10: 比赛中释放 → 拒绝，状态不变', async () => {
     assert.ok(available, '服务不可达');
-    // 用 HT-003（court=2）接受并开赛（即使比分 0-0 也已进入比赛中）
+    // 用 HT-003（court=2）接受并用 start_task 原子开赛
     await post('accept_task', { match_id: 'HT-003', referee_id: REF_B });
-    await post('sync_live_score', { match_id: 'HT-003', court: '2', score_text: '0-0', status: '比赛中', match_name: '红队HT-003 vs 蓝队HT-003' });
+    const startRes = await post('start_task', { match_id: 'HT-003', referee_id: REF_B, score_text: 'G1 0-0', match_name: '红队HT-003 vs 蓝队HT-003' });
+    assert.equal(startRes.status, 'success', `start_task 失败: ${JSON.stringify(startRes)}`);
     const dash = await get('get_full_dashboard');
-    assert.equal(dash.courts['2'].status, '比赛中', '前置：场地 2 应为比赛中（0-0 也算已开赛）');
+    assert.equal(dash.courts['2'].status, '比赛中', '前置：场地 2 应为比赛中（start_task 原子开赛）');
     const r = await post('release_task_acceptance', { referee_id: REF_B, match_id: 'HT-003' });
     assert.equal(r.status, 'error');
     assert.match(r.message || '', /比赛已开始|禁止/);
@@ -296,16 +297,16 @@ describe('update_task_court 更换比赛场地（真实 HTTP）', () => {
 
   it('H17: 比赛中迁移保留比分/状态，旧场地释放，归属不变', async () => {
     assert.ok(available, '服务不可达');
-    // HT-003 在 court=2 比赛中（H10 已开），推进比分到 7-5；迁到场地 4（空闲）
-    await post('sync_live_score', { match_id: 'HT-003', court: '2', score_text: '7-5', status: '比赛中', match_name: '红队HT-003 vs 蓝队HT-003' });
+    // HT-003 在 court=2 比赛中（H10 已 start_task），推进比分到 7-5；迁到场地 4（空闲）
+    await post('sync_live_score', { match_id: 'HT-003', court: '2', score_text: 'G1 7-5', status: '比赛中', match_name: '红队HT-003 vs 蓝队HT-003', referee_id: REF_B });
     const r = await post('update_task_court', { match_id: 'HT-003', court: '4' });
     assert.equal(r.status, 'success');
     const dash = await get('get_full_dashboard');
     assert.equal(dash.courts['4'].match_id, 'HT-003');
     assert.equal(dash.courts['4'].status, '比赛中');
-    assert.equal(dash.courts['4'].score, '7-5', '新场地必须保留当前比分，不得重置 0-0');
+    assert.equal(dash.courts['4'].score, 'G1 7-5', '新场地必须保留当前比分，不得重置 0-0');
     const tasks = await get('get_personal_tasks');
-    assert.equal(tasks.tasks['HT-003'].live_score, '7-5', 'task.live_score 权威比分必须保留');
+    assert.equal(tasks.tasks['HT-003'].live_score, 'G1 7-5', 'task.live_score 权威比分必须保留');
     assert.ok(dash.courts['2'].match_id === '' || dash.courts['2'].status === '空闲', '旧场地 2 应恢复空闲');
     // 归属不变：迁移后释放仍被"比赛中"规则拒绝（而非"无权"）
     const rel = await post('release_task_acceptance', { referee_id: REF_B, match_id: 'HT-003' });
@@ -313,15 +314,19 @@ describe('update_task_court 更换比赛场地（真实 HTTP）', () => {
     assert.match(rel.message || '', /比赛已开始/);
   });
 
-  it('H18: 旧 live 投影缺失但 task.live_score 存在 → 比分从权威数据恢复', async () => {
+  it('H18: start_task 后换场 → 比分从权威数据保留', async () => {
     assert.ok(available, '服务不可达');
-    // HT-001 在 H14 后无 live 投影；直接同步比分制造权威 live_score 后迁移
-    await post('sync_live_score', { match_id: 'HT-001', court: '1', score_text: '9-3', status: '比赛中', match_name: '红队HT-001 vs 蓝队HT-001' });
+    // H14 后 HT-001 无投影；task.court=1 但 court 1 已被 HT-004 占用（H15），先改到空闲场地 3
+    await post('update_task_court', { match_id: 'HT-001', court: '3' });
+    await post('accept_task', { match_id: 'HT-001', referee_id: REF_A });
+    const startRes = await post('start_task', { match_id: 'HT-001', referee_id: REF_A, score_text: 'G1 9-3', match_name: '红队HT-001 vs 蓝队HT-001' });
+    assert.equal(startRes.status, 'success', `start_task 失败: ${JSON.stringify(startRes)}`);
+    // 换场到 court 2
     const r = await post('update_task_court', { match_id: 'HT-001', court: '2' });
     assert.equal(r.status, 'success');
     const dash = await get('get_full_dashboard');
     assert.equal(dash.courts['2'].match_id, 'HT-001');
-    assert.equal(dash.courts['2'].score, '9-3', '比分必须从 task.live_score 权威恢复，不得默认 0-0');
+    assert.equal(dash.courts['2'].score, 'G1 9-3', '比分必须从权威数据保留，不得默认 0-0');
     assert.equal(dash.courts['2'].status, '比赛中');
   });
 
