@@ -1228,10 +1228,16 @@
                 const signatureData = refereeSigCanvas.toDataURL('image/jpeg', 0.8);
                 const signedReportBase64 = await generateReportWithSignature($('reportText').innerText, dbScoreData, signatureData);
 
-                $('canvasContainer').innerHTML = `<img src="${signedReportBase64}" class="w-full rounded shadow-lg border border-emerald-500">`;
-                $('clearRefereeSigBtn').outerHTML = `<div class="text-xs text-amber-400 mt-2 font-black animate-pulse bg-amber-900/30 py-2 rounded">👆 长按上方生成的图片可保存或发往赛事群</div>`;
+                // [PR#155 R2 FIX] 预览战报图片；但不可逆 DOM 替换（销毁“清空画板”按钮）不得在云端确收前执行：
+                // 否则 save_score 失败后重试时 $('clearRefereeSigBtn') 为 null 抛异常，save_score 永远无法二次发出。
+                if ($('canvasContainer')) {
+                    $('canvasContainer').innerHTML = `<img src="${signedReportBase64}" class="w-full rounded shadow-lg border border-emerald-500">`;
+                }
 
                 if (sysMode === 'local') {
+                    if ($('clearRefereeSigBtn')) {
+                        $('clearRefereeSigBtn').outerHTML = `<div class="text-xs text-amber-400 mt-2 font-black animate-pulse bg-amber-900/30 py-2 rounded">👆 长按上方生成的图片可保存或发往赛事群</div>`;
+                    }
                     showToast('单机模式：无需上传', false); btn.innerText = '✅ 本地裁决结束'; clearBackup(); return;
                 }
 
@@ -1248,7 +1254,11 @@
                 const res = await apiCall('save_score', window.finalPayload);
 
                 if(res.status === 'success') {
-                    showToast('☁️ 成绩与签名凭证已入库'); btn.innerText = '✅ 云端确收完结'; clearBackup();
+                    // [PR#155 R2 FIX] 不可逆 DOM 变更（销毁清空画板按钮）只在云端确收后执行。
+                    if ($('clearRefereeSigBtn')) {
+                        $('clearRefereeSigBtn').outerHTML = `<div class="text-xs text-amber-400 mt-2 font-black animate-pulse bg-amber-900/30 py-2 rounded">👆 长按上方生成的图片可保存或发往赛事群</div>`;
+                    }
+                    showToast('☁️ 成绩与签名凭证已入库'); btn.innerText = '✅ 云端确收完结'; btn.disabled = true; clearBackup();
                 } else throw new Error(res.message || "服务器拒绝了请求");
             } catch(e) {
                 showToast('传输失败: ' + e.message, true);
