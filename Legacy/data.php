@@ -945,6 +945,8 @@ switch ($action) {
         $req_court = isset($req['court']) ? trim((string)$req['court']) : '';
         if (!$match_id) { echo json_encode(['status' => 'error', 'message' => '缺少比赛ID']); break; }
         if (!$referee_id) { echo json_encode(['status' => 'error', 'message' => '缺少裁判ID']); break; }
+        // [PR#155 R7] req.court 必须非空（首次提交和幂等重试均适用）
+        if ($req_court === '') { echo json_encode(['status' => 'error', 'message' => '缺少场地信息']); break; }
         try {
             $pdo->beginTransaction();
             $lockStmt = $pdo->prepare("SELECT data_value FROM nhpa_store WHERE event_code = ? AND data_key = 'config' FOR UPDATE");
@@ -964,9 +966,9 @@ switch ($action) {
                 $reqWinner = trim($req['winner'] ?? '');
                 $reqDetails = $req['details'] ?? '';
                 $reqSignature = $req['signature'] ?? '';
-                $reqCourtVal = isset($req['court']) ? trim((string)$req['court']) : '';
+                // [PR#155 R7] 严格比较，不使用自匹配回退
                 if (normalizeId($existingRecord['referee'] ?? '') === $referee_id
-                    && (string)($existingRecord['court'] ?? '') === (string)($reqCourtVal !== '' ? $reqCourtVal : ($existingRecord['court'] ?? ''))
+                    && (string)($existingRecord['court'] ?? '') === (string)$req_court
                     && ($existingRecord['score'] ?? '') === $reqScore
                     && ($existingRecord['winner'] ?? '') === $reqWinner
                     && ($existingRecord['details'] ?? '') === $reqDetails

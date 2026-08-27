@@ -1041,6 +1041,188 @@ describe('R6-save_score：响应丢失幂等恢复', () => {
   });
 });
 
+// ======================== R7: save_score 幂等拒绝矩阵 ========================
+describe('R7-save_score：幂等拒绝矩阵', () => {
+  const basePayload = {
+    action: 'save_score',
+    t1: 'A队', t2: 'B队',
+    score: '21-15', winner: 'A队', details: 'G1: 21-15', court: '1',
+    referee: '裁判A', signature: 'sig-r7-matrix', is_team: true
+  };
+
+  async function setupAndSave(code) {
+    await assignCourt('001-01', '1');
+    await accept('裁判A', '001-01');
+    await start('裁判A', '001-01');
+    return post({ ...basePayload, event_code: code, id: '001-01', referee_id: '裁判A' });
+  }
+
+  it('R7-1: signature 改变 → error', async () => {
+    const savedEvent = EVENT;
+    const code = await newEvent('R7M1', ['001-01'], ['1']);
+    await setupAndSave(code);
+    const dash = await dashboard();
+    const origRecord = JSON.stringify(dash.records[0]);
+    const refs = await get('get_referees');
+    const refA = refs.data.find(r => r.name === '裁判A');
+    const origMatchCount = refA.match_count;
+    // signature 改变
+    const res = await post({ ...basePayload, event_code: code, id: '001-01', referee_id: '裁判A', signature: 'sig-DIFFERENT' });
+    assert.equal(res.status, 'error', 'signature 改变必须 error');
+    // 断言
+    const dashAfter = await dashboard();
+    assert.equal((dashAfter.records || []).length, 1, 'records 必须仍为 1');
+    assert.equal(JSON.stringify(dashAfter.records[0]), origRecord, '原 record JSON 全等');
+    const refsAfter = await get('get_referees');
+    const refAAfter = refsAfter.data.find(r => r.name === '裁判A');
+    assert.equal(refAAfter.match_count, origMatchCount, 'match_count 必须不变');
+    EVENT = savedEvent;
+  });
+
+  it('R7-2: score 改变 → error', async () => {
+    const savedEvent = EVENT;
+    const code = await newEvent('R7M2', ['001-01'], ['1']);
+    await setupAndSave(code);
+    const dash = await dashboard();
+    const origRecord = JSON.stringify(dash.records[0]);
+    const refs = await get('get_referees');
+    const origMatchCount = refs.data.find(r => r.name === '裁判A').match_count;
+    // score 改变
+    const res = await post({ ...basePayload, event_code: code, id: '001-01', referee_id: '裁判A', score: '21-10' });
+    assert.equal(res.status, 'error', 'score 改变必须 error');
+    // 断言
+    const dashAfter = await dashboard();
+    assert.equal((dashAfter.records || []).length, 1, 'records 必须仍为 1');
+    assert.equal(JSON.stringify(dashAfter.records[0]), origRecord, '原 record JSON 全等');
+    const refsAfter = await get('get_referees');
+    assert.equal(refsAfter.data.find(r => r.name === '裁判A').match_count, origMatchCount, 'match_count 必须不变');
+    EVENT = savedEvent;
+  });
+
+  it('R7-3: winner 改变 → error', async () => {
+    const savedEvent = EVENT;
+    const code = await newEvent('R7M3', ['001-01'], ['1']);
+    await setupAndSave(code);
+    const dash = await dashboard();
+    const origRecord = JSON.stringify(dash.records[0]);
+    const refs = await get('get_referees');
+    const origMatchCount = refs.data.find(r => r.name === '裁判A').match_count;
+    // winner 改变
+    const res = await post({ ...basePayload, event_code: code, id: '001-01', referee_id: '裁判A', winner: 'B队' });
+    assert.equal(res.status, 'error', 'winner 改变必须 error');
+    // 断言
+    const dashAfter = await dashboard();
+    assert.equal((dashAfter.records || []).length, 1, 'records 必须仍为 1');
+    assert.equal(JSON.stringify(dashAfter.records[0]), origRecord, '原 record JSON 全等');
+    const refsAfter = await get('get_referees');
+    assert.equal(refsAfter.data.find(r => r.name === '裁判A').match_count, origMatchCount, 'match_count 必须不变');
+    EVENT = savedEvent;
+  });
+
+  it('R7-4: referee_id 改变 → error', async () => {
+    const savedEvent = EVENT;
+    const code = await newEvent('R7M4', ['001-01'], ['1']);
+    await setupAndSave(code);
+    const dash = await dashboard();
+    const origRecord = JSON.stringify(dash.records[0]);
+    const refs = await get('get_referees');
+    const origMatchCount = refs.data.find(r => r.name === '裁判A').match_count;
+    // referee_id 改变
+    const res = await post({ ...basePayload, event_code: code, id: '001-01', referee_id: '裁判B' });
+    assert.equal(res.status, 'error', 'referee_id 改变必须 error');
+    // 断言
+    const dashAfter = await dashboard();
+    assert.equal((dashAfter.records || []).length, 1, 'records 必须仍为 1');
+    assert.equal(JSON.stringify(dashAfter.records[0]), origRecord, '原 record JSON 全等');
+    const refsAfter = await get('get_referees');
+    assert.equal(refsAfter.data.find(r => r.name === '裁判A').match_count, origMatchCount, 'match_count 必须不变');
+    EVENT = savedEvent;
+  });
+
+  it('R7-5: court 改变 → error', async () => {
+    const savedEvent = EVENT;
+    const code = await newEvent('R7M5', ['001-01'], ['1']);
+    await setupAndSave(code);
+    const dash = await dashboard();
+    const origRecord = JSON.stringify(dash.records[0]);
+    const refs = await get('get_referees');
+    const origMatchCount = refs.data.find(r => r.name === '裁判A').match_count;
+    // court 改变
+    const res = await post({ ...basePayload, event_code: code, id: '001-01', referee_id: '裁判A', court: '2' });
+    assert.equal(res.status, 'error', 'court 改变必须 error');
+    // 断言
+    const dashAfter = await dashboard();
+    assert.equal((dashAfter.records || []).length, 1, 'records 必须仍为 1');
+    assert.equal(JSON.stringify(dashAfter.records[0]), origRecord, '原 record JSON 全等');
+    const refsAfter = await get('get_referees');
+    assert.equal(refsAfter.data.find(r => r.name === '裁判A').match_count, origMatchCount, 'match_count 必须不变');
+    EVENT = savedEvent;
+  });
+
+  it('R7-6: court 缺失 → error', async () => {
+    const savedEvent = EVENT;
+    const code = await newEvent('R7M6', ['001-01'], ['1']);
+    await setupAndSave(code);
+    const dash = await dashboard();
+    const origRecord = JSON.stringify(dash.records[0]);
+    const refs = await get('get_referees');
+    const origMatchCount = refs.data.find(r => r.name === '裁判A').match_count;
+    // court 缺失
+    const payload = { ...basePayload, event_code: code, id: '001-01', referee_id: '裁判A' };
+    delete payload.court;
+    const res = await post(payload);
+    assert.equal(res.status, 'error', 'court 缺失必须 error');
+    // 断言
+    const dashAfter = await dashboard();
+    assert.equal((dashAfter.records || []).length, 1, 'records 必须仍为 1');
+    assert.equal(JSON.stringify(dashAfter.records[0]), origRecord, '原 record JSON 全等');
+    const refsAfter = await get('get_referees');
+    assert.equal(refsAfter.data.find(r => r.name === '裁判A').match_count, origMatchCount, 'match_count 必须不变');
+    EVENT = savedEvent;
+  });
+
+  it('R7-7: details 改变 → error', async () => {
+    const savedEvent = EVENT;
+    const code = await newEvent('R7M7', ['001-01'], ['1']);
+    await setupAndSave(code);
+    const dash = await dashboard();
+    const origRecord = JSON.stringify(dash.records[0]);
+    const refs = await get('get_referees');
+    const origMatchCount = refs.data.find(r => r.name === '裁判A').match_count;
+    // details 改变
+    const res = await post({ ...basePayload, event_code: code, id: '001-01', referee_id: '裁判A', details: 'G1: 21-10' });
+    assert.equal(res.status, 'error', 'details 改变必须 error');
+    // 断言
+    const dashAfter = await dashboard();
+    assert.equal((dashAfter.records || []).length, 1, 'records 必须仍为 1');
+    assert.equal(JSON.stringify(dashAfter.records[0]), origRecord, '原 record JSON 全等');
+    const refsAfter = await get('get_referees');
+    assert.equal(refsAfter.data.find(r => r.name === '裁判A').match_count, origMatchCount, 'match_count 必须不变');
+    EVENT = savedEvent;
+  });
+
+  it('R7-8: 完全相同 payload → success + idempotent=true', async () => {
+    const savedEvent = EVENT;
+    const code = await newEvent('R7M8', ['001-01'], ['1']);
+    await setupAndSave(code);
+    const dash = await dashboard();
+    const origRecord = JSON.stringify(dash.records[0]);
+    const refs = await get('get_referees');
+    const origMatchCount = refs.data.find(r => r.name === '裁判A').match_count;
+    // 完全相同 payload
+    const res = await post({ ...basePayload, event_code: code, id: '001-01', referee_id: '裁判A' });
+    assert.equal(res.status, 'success', '完全相同 payload 必须 success');
+    assert.equal(res.idempotent, true, '必须 idempotent=true');
+    // 断言
+    const dashAfter = await dashboard();
+    assert.equal((dashAfter.records || []).length, 1, 'records 必须仍为 1');
+    assert.equal(JSON.stringify(dashAfter.records[0]), origRecord, '原 record JSON 全等');
+    const refsAfter = await get('get_referees');
+    assert.equal(refsAfter.data.find(r => r.name === '裁判A').match_count, origMatchCount, 'match_count 必须不变');
+    EVENT = savedEvent;
+  });
+});
+
 // ======================== 清理 ========================
 after(async () => {
   for (const code of createdEvents) {
