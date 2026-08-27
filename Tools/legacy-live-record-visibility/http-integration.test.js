@@ -18,6 +18,7 @@ const SUPER_PWD = 'Wuxian666'; // data.php 内置超管口令（仅本地隔离�
 
 const REF_A = '测试裁判甲';
 const REF_B = '测试裁判乙';
+const REF_C = '测试裁判丙';
 
 let available = false;
 
@@ -94,6 +95,7 @@ describe('真实 HTTP 集成：隔离赛事生命周期', () => {
       referees: [
         { name: REF_A, status: '空闲', current_court: '', match_count: 0, comment: '', last_login: '' },
         { name: REF_B, status: '空闲', current_court: '', match_count: 0, comment: '', last_login: '' },
+        { name: REF_C, status: '空闲', current_court: '', match_count: 0, comment: '', last_login: '' },
       ],
     });
     assert.equal(sr.status, 'success');
@@ -204,13 +206,13 @@ describe('accept_task 服务端权威边界（真实 HTTP）', () => {
 describe('release_task_acceptance 待开赛释放（真实 HTTP）', () => {
   it('H10: 比赛中释放 → 拒绝，状态不变', async () => {
     assert.ok(available, '服务不可达');
-    // 用 HT-003（court=2）接受并用 start_task 原子开赛
-    await post('accept_task', { match_id: 'HT-003', referee_id: REF_B });
-    const startRes = await post('start_task', { match_id: 'HT-003', referee_id: REF_B, score_text: 'G1 0-0', match_name: '红队HT-003 vs 蓝队HT-003' });
+    // 用 HT-003（court=2）接受并用 start_task 原子开赛（使用 REF_C 隔离，避免跨投影影响后续 REF_B 测试）
+    await post('accept_task', { match_id: 'HT-003', referee_id: REF_C });
+    const startRes = await post('start_task', { match_id: 'HT-003', referee_id: REF_C, score_text: 'G1 0-0', match_name: '红队HT-003 vs 蓝队HT-003' });
     assert.equal(startRes.status, 'success', `start_task 失败: ${JSON.stringify(startRes)}`);
     const dash = await get('get_full_dashboard');
     assert.equal(dash.courts['2'].status, '比赛中', '前置：场地 2 应为比赛中（start_task 原子开赛）');
-    const r = await post('release_task_acceptance', { referee_id: REF_B, match_id: 'HT-003' });
+    const r = await post('release_task_acceptance', { referee_id: REF_C, match_id: 'HT-003' });
     assert.equal(r.status, 'error');
     assert.match(r.message || '', /比赛已开始|禁止/);
     const dash2 = await get('get_full_dashboard');
@@ -298,7 +300,7 @@ describe('update_task_court 更换比赛场地（真实 HTTP）', () => {
   it('H17: 比赛中迁移保留比分/状态，旧场地释放，归属不变', async () => {
     assert.ok(available, '服务不可达');
     // HT-003 在 court=2 比赛中（H10 已 start_task），推进比分到 7-5；迁到场地 4（空闲）
-    await post('sync_live_score', { match_id: 'HT-003', court: '2', score_text: 'G1 7-5', status: '比赛中', match_name: '红队HT-003 vs 蓝队HT-003', referee_id: REF_B });
+    await post('sync_live_score', { match_id: 'HT-003', court: '2', score_text: 'G1 7-5', status: '比赛中', match_name: '红队HT-003 vs 蓝队HT-003', referee_id: REF_C });
     const r = await post('update_task_court', { match_id: 'HT-003', court: '4' });
     assert.equal(r.status, 'success');
     const dash = await get('get_full_dashboard');
@@ -309,7 +311,7 @@ describe('update_task_court 更换比赛场地（真实 HTTP）', () => {
     assert.equal(tasks.tasks['HT-003'].live_score, 'G1 7-5', 'task.live_score 权威比分必须保留');
     assert.ok(dash.courts['2'].match_id === '' || dash.courts['2'].status === '空闲', '旧场地 2 应恢复空闲');
     // 归属不变：迁移后释放仍被"比赛中"规则拒绝（而非"无权"）
-    const rel = await post('release_task_acceptance', { referee_id: REF_B, match_id: 'HT-003' });
+    const rel = await post('release_task_acceptance', { referee_id: REF_C, match_id: 'HT-003' });
     assert.equal(rel.status, 'error');
     assert.match(rel.message || '', /比赛已开始/);
   });
@@ -317,6 +319,8 @@ describe('update_task_court 更换比赛场地（真实 HTTP）', () => {
   it('H18: start_task 后换场 → 比分从权威数据保留', async () => {
     assert.ok(available, '服务不可达');
     // H14 后 HT-001 无投影；task.court=1 但 court 1 已被 HT-004 占用（H15），先改到空闲场地 3
+    // H17 前：REF_A 仍持有 HT-004 投影（H15），需先释放才能领取 HT-001
+    await post('release_task_acceptance', { referee_id: REF_A, match_id: 'HT-004' });
     await post('update_task_court', { match_id: 'HT-001', court: '3' });
     await post('accept_task', { match_id: 'HT-001', referee_id: REF_A });
     const startRes = await post('start_task', { match_id: 'HT-001', referee_id: REF_A, score_text: 'G1 9-3', match_name: '红队HT-001 vs 蓝队HT-001' });

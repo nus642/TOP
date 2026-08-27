@@ -950,11 +950,14 @@ switch ($action) {
             if ($refIdx === null) { $pdo->rollBack(); echo json_encode(['status' => 'error', 'message' => '裁判不存在']); break; }
             if (($refs[$refIdx]['status'] ?? '') !== '执裁中') { $pdo->rollBack(); echo json_encode(['status' => 'error', 'message' => '裁判当前非执裁状态']); break; }
             if ((string)($refs[$refIdx]['current_court'] ?? '') !== (string)$taskCourt) { $pdo->rollBack(); echo json_encode(['status' => 'error', 'message' => '裁判当前场地与比赛场地不符']); break; }
-            // 7. [PR#155 R3] winner 必须等于服务端 task.t1 或 task.t2；防止客户端伪造胜者
+            // 7. [PR#155 R3+R4] winner 必须严格等于服务端 task.t1 或 task.t2；空值/缺失队伍一律拒绝
             $winner = trim($req['winner'] ?? '');
-            $taskT1 = $task['t1'] ?? '';
-            $taskT2 = $task['t2'] ?? '';
-            if ($winner !== '' && $winner !== $taskT1 && $winner !== $taskT2) {
+            $taskT1 = trim($task['t1'] ?? '');
+            $taskT2 = trim($task['t2'] ?? '');
+            if ($taskT1 === '' || $taskT2 === '') {
+                $pdo->rollBack(); echo json_encode(['status' => 'error', 'message' => '任务队伍信息不完整，无法完赛']); break;
+            }
+            if ($winner !== $taskT1 && $winner !== $taskT2) {
                 $pdo->rollBack(); echo json_encode(['status' => 'error', 'message' => '胜者必须为参赛队伍之一']); break;
             }
             // 所有校验通过——同一事务内原子写入（权威字段取自服务端 task/live/referee）

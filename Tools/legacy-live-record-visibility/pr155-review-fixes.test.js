@@ -149,7 +149,8 @@ describe('start_task：原子开赛', () => {
 
   it('非归属裁判开赛被拒绝', async () => {
     await post({ action: 'update_task_court', event_code: EVENT, match_id: '001-02', court: '2' });
-    await post({ action: 'accept_task', event_code: EVENT, referee_id: '裁判A', match_id: '001-02', court: '2' });
+    // 使用裁判C 领取（裁判A 已在 001-01 执裁中，跨投影校验会拒绝）
+    await post({ action: 'accept_task', event_code: EVENT, referee_id: '裁判C', match_id: '001-02', court: '2' });
     const start = await post({ action: 'start_task', event_code: EVENT, match_id: '001-02', referee_id: '裁判B', score_text: 'G1 0-0' });
     assert.equal(start.status, 'error');
     // 投影不变
@@ -191,9 +192,10 @@ describe('sync_live_score：归属校验', () => {
 
   it('未开赛任务不能通过 sync_live_score 偷偷升级为比赛中', async () => {
     await post({ action: 'update_task_court', event_code: EVENT, match_id: '001-02', court: '2' });
-    await post({ action: 'accept_task', event_code: EVENT, referee_id: '裁判A', match_id: '001-02', court: '2' });
+    // 使用裁判C 领取（裁判A 已在 001-01 执裁中）
+    await post({ action: 'accept_task', event_code: EVENT, referee_id: '裁判C', match_id: '001-02', court: '2' });
     // 不开赛，直接 sync
-    const sync = await post({ action: 'sync_live_score', event_code: EVENT, court: '2', score_text: 'G1 1-0', status: '比赛中', match_name: 'A队 vs B队', match_id: '001-02', referee_id: '裁判A' });
+    const sync = await post({ action: 'sync_live_score', event_code: EVENT, court: '2', score_text: 'G1 1-0', status: '比赛中', match_name: 'A队 vs B队', match_id: '001-02', referee_id: '裁判C' });
     assert.equal(sync.status, 'error', '待开赛投影不得通过 sync 升级为比赛中');
     const d = await dashboard();
     assert.equal(d.courts?.['2']?.status, '待开赛');

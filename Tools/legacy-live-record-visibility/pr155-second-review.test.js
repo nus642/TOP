@@ -575,43 +575,224 @@ describe('R3-第三轮回归测试', () => {
     await release('裁判A', winner);
   });
 
-  // 测试 26-27 需要直接数据库操作来模拟损坏态，暂跳过
-  // 核心功能已由浏览器验收测试 (§7) 和现有测试覆盖
-  it.skip('26. task.status=比赛中但投影缺失 → accept_task 拒绝（需要数据库直接操作设施）', async () => {});
-  it.skip('27. task.status=比赛中但人为存在待开赛投影 → start_task 拒绝（需要数据库直接操作设施）', async () => {});
-
-  // 测试 28-29 的权威字段验证已由测试 23 覆盖
-  it.skip('28. save_score 客户端伪造 id 变体 → record 使用实际 task key（已由测试 23 覆盖）', async () => {});
-  it.skip('29. save_score 客户端伪造 is_team=false → record 使用服务端 true（已由测试 23 覆盖）', async () => {});
-
-  it('30. save_score 客户端伪造 winner 不是 task.t1/task.t2 → 拒绝且四类快照全等', async () => {
-    // 新建赛事避免污染
-    const code = `PR155R3-WINNER-${Date.now().toString(36)}`;
-    const create = await post({ action: 'create_event', super_pwd: 'Wuxian666', custom_code: code, event_name: 'PR155R3 Winner', event_type: 'team', courts: ['1'], referee_password: '2508' });
+  it('26. task.status=比赛中但投影缺失 → accept_task 拒绝且零变化', async () => {
+    // 创建独立赛事，直接通过 set_bulk_tasks 写入 status=比赛中
+    const code = `PR155R4-T26-${Date.now().toString(36)}`;
+    const create = await post({ action: 'create_event', super_pwd: 'Wuxian666', custom_code: code, event_name: 'PR155R4 T26', event_type: 'team', courts: ['1'], referee_password: '2508' });
     assert.equal(create.status, 'success');
     createdEvents.push(code);
-    const savedEvent = EVENT;
-    EVENT = code;
+    const savedEvent = EVENT; EVENT = code;
     await post({ action: 'set_players', event_code: code, players: makePlayers() });
-    const tasks = { '001-01': { id: '001-01', court: '', t1: 'A队', t2: 'B队', status: '未开始', type: 'doubles', format: 1, is_team: true, date: '2026-08-27' } };
-    await post({ action: 'set_bulk_tasks', event_code: code, tasks });
-    await post({ action: 'set_referees', event_code: code, referees: [{ name: '裁判X', level: 'L1', status: '空闲' }] });
-    await post({ action: 'update_task_court', event_code: code, match_id: '001-01', court: '1' });
-    await post({ action: 'accept_task', event_code: code, referee_id: '裁判X', match_id: '001-01' });
-    await post({ action: 'start_task', event_code: code, match_id: '001-01', referee_id: '裁判X', score_text: 'G1 0-0', match_name: 'A队 vs B队' });
-    const before = JSON.stringify(await dashboard());
+    // 直接写入 status=比赛中 + court=1，不调 update_task_court
+    await post({ action: 'set_bulk_tasks', event_code: code, tasks: {
+      '001-01': { id: '001-01', court: '1', t1: 'A队', t2: 'B队', status: '比赛中', live_score: '7-5', type: 'doubles', format: 1, is_team: true, date: '2026-08-27' }
+    }});
+    await post({ action: 'set_referees', event_code: code, referees: [{ name: '裁判A', level: 'L1', status: '空闲' }] });
+    // 确认 live_scores 为空（dashboard courts 可能显示 task 投影，但 live_scores 必须为空）
+    const d0 = await dashboard();
+    assert.ok(d0.tasks['001-01'], 'task 存在');
+    assert.equal(d0.tasks['001-01'].status, '比赛中', 'task 状态为比赛中');
+    // 通过 get 接口直接检查 live_scores
+    const liveCheck = await get('get_full_dashboard');
+    // live_scores 不在 dashboard 直接返回中，但可以通过 courts 状态推断：
+    // 如果 courts[1].referee 为空，说明没有 live_scores 投影
+    assert.equal(liveCheck.courts['1'].referee, '', 'live_scores 无投影（referee 为空）');
+    const before = JSON.stringify(d0);
     const beforeRefs = JSON.stringify(await referees());
-    // 伪造 winner 为不存在的队伍
-    const r = await post({
-      action: 'save_score', event_code: code, id: '001-01', referee_id: '裁判X',
-      t1: 'A队', t2: 'B队', score: '21-15', winner: '不存在的队伍', details: 'G1: 21-15', court: '1',
-      referee: '裁判X', signature: 'sig', is_team: true
-    });
-    assert.equal(r.status, 'error', '伪造 winner 必须被拒绝');
+    const beforeRecords = d0.records.length;
+    // accept_task 必须拒绝（task.status=比赛中）
+    const r = await post({ action: 'accept_task', event_code: code, referee_id: '裁判A', match_id: '001-01' });
+    assert.equal(r.status, 'error', '比赛中任务不得被重新领取');
+    const after = JSON.stringify(await dashboard());
+    const afterRefs = JSON.stringify(await referees());
+    assert.equal(after, before, 'tasks 零变化');
+    assert.equal(afterRefs, beforeRefs, 'referees 零变化');
+    assert.equal((await dashboard()).records.length, beforeRecords, 'records 零变化');
+    EVENT = savedEvent;
+  });
+
+  it('27. task.status=比赛中但存在待开赛投影 → start_task 拒绝且零变化', async () => {
+    // 创建独立赛事
+    const code = `PR155R4-T27-${Date.now().toString(36)}`;
+    const create = await post({ action: 'create_event', super_pwd: 'Wuxian666', custom_code: code, event_name: 'PR155R4 T27', event_type: 'team', courts: ['1'], referee_password: '2508' });
+    assert.equal(create.status, 'success');
+    createdEvents.push(code);
+    const savedEvent = EVENT; EVENT = code;
+    await post({ action: 'set_players', event_code: code, players: makePlayers() });
+    // 1. task 初始 status=未开始，分配场地
+    await post({ action: 'set_bulk_tasks', event_code: code, tasks: {
+      '001-01': { id: '001-01', court: '', t1: 'A队', t2: 'B队', status: '未开始', type: 'doubles', format: 1, is_team: true, date: '2026-08-27' }
+    }});
+    await post({ action: 'set_referees', event_code: code, referees: [{ name: '裁判A', level: 'L1', status: '空闲' }] });
+    await post({ action: 'update_task_court', event_code: code, match_id: '001-01', court: '1' });
+    // 2. accept 生成待开赛投影
+    const acc = await post({ action: 'accept_task', event_code: code, referee_id: '裁判A', match_id: '001-01' });
+    assert.equal(acc.status, 'success');
+    const d1 = await dashboard();
+    assert.equal(d1.courts['1'].status, '待开赛', '投影为待开赛');
+    // 3. 再用 set_bulk_tasks 把 task status 改为比赛中（模拟损坏态）
+    const tasksNow = (await dashboard()).tasks;
+    tasksNow['001-01'] = { id: '001-01', court: '1', t1: 'A队', t2: 'B队', status: '比赛中', live_score: '0-0', type: 'doubles', format: 1, is_team: true, date: '2026-08-27' };
+    await post({ action: 'set_bulk_tasks', event_code: code, tasks: tasksNow });
+    // 确认 task 已改为比赛中
+    const d2 = await dashboard();
+    assert.equal(d2.tasks['001-01'].status, '比赛中', 'task 已改为比赛中');
+    // live_scores 投影仍然存在（dashboard 可能显示 task 投影覆盖，但 live_scores 未被 set_bulk_tasks 清除）
+    const before = JSON.stringify(d2);
+    const beforeRefs = JSON.stringify(await referees());
+    const beforeRecords = d2.records.length;
+    // 4. start_task 必须拒绝（task.status=比赛中）
+    const r = await post({ action: 'start_task', event_code: code, match_id: '001-01', referee_id: '裁判A', score_text: '0-0', match_name: 'A vs B' });
+    assert.equal(r.status, 'error', 'task.status=比赛中 时不得开赛');
     const after = JSON.stringify(await dashboard());
     const afterRefs = JSON.stringify(await referees());
     assert.equal(after, before, 'dashboard 零变化');
     assert.equal(afterRefs, beforeRefs, 'referees 零变化');
+    assert.equal((await dashboard()).records.length, beforeRecords, 'records 零变化');
+    EVENT = savedEvent;
+  });
+
+  it('28. save_score id/is_team 权威性：客户端伪造大小写+空白+is_team=false 不影响 record', async () => {
+    // 创建独立赛事，使用大小写可区分的 key "MiX-01"
+    const code = `PR155R4-T28-${Date.now().toString(36)}`;
+    const create = await post({ action: 'create_event', super_pwd: 'Wuxian666', custom_code: code, event_name: 'PR155R4 T28', event_type: 'team', courts: ['1'], referee_password: '2508' });
+    assert.equal(create.status, 'success');
+    createdEvents.push(code);
+    const savedEvent = EVENT; EVENT = code;
+    await post({ action: 'set_players', event_code: code, players: makePlayers() });
+    await post({ action: 'set_bulk_tasks', event_code: code, tasks: {
+      'MiX-01': { id: 'MiX-01', court: '', t1: 'A队', t2: 'B队', status: '未开始', type: 'doubles', format: 1, is_team: true, date: '2026-08-27' }
+    }});
+    await post({ action: 'set_referees', event_code: code, referees: [{ name: '裁判X', level: 'L1', status: '空闲' }] });
+    await post({ action: 'update_task_court', event_code: code, match_id: 'MiX-01', court: '1' });
+    await post({ action: 'accept_task', event_code: code, referee_id: '裁判X', match_id: 'MiX-01' });
+    const s = await post({ action: 'start_task', event_code: code, match_id: 'MiX-01', referee_id: '裁判X', score_text: 'G1 0-0', match_name: 'A vs B' });
+    assert.equal(s.status, 'success');
+    // save_score 请求 id 使用带空白/不同大小写
+    const r = await post({
+      action: 'save_score', event_code: code, id: ' mix-01 ', referee_id: '裁判X',
+      t1: '伪造队1', t2: '伪造队2', score: '21-15', winner: 'A队', details: 'G1: 21-15', court: '1',
+      referee: '伪造裁判', signature: 'sig', is_team: false
+    });
+    assert.equal(r.status, 'success', `完赛失败: ${JSON.stringify(r)}`);
+    const d = await dashboard();
+    // record.id 必须严格等于实际 task key "MiX-01"
+    const rec = d.records.find(x => x.id === 'MiX-01');
+    assert.ok(rec, 'record 必须使用服务端实际 task key MiX-01');
+    assert.equal(rec.t1, 'A队', 't1 来自服务端');
+    assert.equal(rec.t2, 'B队', 't2 来自服务端');
+    assert.equal(rec.is_team, true, 'is_team 必须取自服务端 task（true），不信任客户端 false');
+    assert.equal(rec.referee, '裁判X', 'referee 来自服务端');
+    assert.equal(rec.court, '1', 'court 来自服务端');
+    EVENT = savedEvent;
+  });
+
+  it('29. winner="" 或缺失 → error 且四类快照全等', async () => {
+    // 创建独立赛事
+    const code = `PR155R4-T29-${Date.now().toString(36)}`;
+    const create = await post({ action: 'create_event', super_pwd: 'Wuxian666', custom_code: code, event_name: 'PR155R4 T29', event_type: 'team', courts: ['1'], referee_password: '2508' });
+    assert.equal(create.status, 'success');
+    createdEvents.push(code);
+    const savedEvent = EVENT; EVENT = code;
+    await post({ action: 'set_players', event_code: code, players: makePlayers() });
+    await post({ action: 'set_bulk_tasks', event_code: code, tasks: {
+      '001-01': { id: '001-01', court: '', t1: 'A队', t2: 'B队', status: '未开始', type: 'doubles', format: 1, is_team: true, date: '2026-08-27' }
+    }});
+    await post({ action: 'set_referees', event_code: code, referees: [{ name: '裁判X', level: 'L1', status: '空闲' }] });
+    await post({ action: 'update_task_court', event_code: code, match_id: '001-01', court: '1' });
+    await post({ action: 'accept_task', event_code: code, referee_id: '裁判X', match_id: '001-01' });
+    await post({ action: 'start_task', event_code: code, match_id: '001-01', referee_id: '裁判X', score_text: 'G1 0-0', match_name: 'A vs B' });
+    // 测试 winner=""
+    const before1 = JSON.stringify(await dashboard());
+    const beforeRefs1 = JSON.stringify(await referees());
+    const r1 = await post({
+      action: 'save_score', event_code: code, id: '001-01', referee_id: '裁判X',
+      t1: 'A队', t2: 'B队', score: '21-15', winner: '', details: 'G1: 21-15', court: '1',
+      referee: '裁判X', signature: 'sig', is_team: true
+    });
+    assert.equal(r1.status, 'error', 'winner="" 必须被拒绝');
+    assert.equal(JSON.stringify(await dashboard()), before1, 'winner="" dashboard 零变化');
+    assert.equal(JSON.stringify(await referees()), beforeRefs1, 'winner="" referees 零变化');
+    // 测试 winner 缺失（不传 winner 字段）
+    const r2 = await post({
+      action: 'save_score', event_code: code, id: '001-01', referee_id: '裁判X',
+      t1: 'A队', t2: 'B队', score: '21-15', details: 'G1: 21-15', court: '1',
+      referee: '裁判X', signature: 'sig', is_team: true
+    });
+    assert.equal(r2.status, 'error', 'winner 缺失必须被拒绝');
+    assert.equal(JSON.stringify(await dashboard()), before1, 'winner 缺失 dashboard 零变化');
+    assert.equal(JSON.stringify(await referees()), beforeRefs1, 'winner 缺失 referees 零变化');
+    EVENT = savedEvent;
+  });
+
+  it('30. winner 完整矩阵：第三方/error、t1/success、t2/success、伪造 t1/t2 不影响', async () => {
+    // 创建独立赛事
+    const code = `PR155R4-T30-${Date.now().toString(36)}`;
+    const create = await post({ action: 'create_event', super_pwd: 'Wuxian666', custom_code: code, event_name: 'PR155R4 T30', event_type: 'team', courts: ['1','2'], referee_password: '2508' });
+    assert.equal(create.status, 'success');
+    createdEvents.push(code);
+    const savedEvent = EVENT; EVENT = code;
+    await post({ action: 'set_players', event_code: code, players: makePlayers() });
+    await post({ action: 'set_bulk_tasks', event_code: code, tasks: {
+      '001-01': { id: '001-01', court: '', t1: 'A队', t2: 'B队', status: '未开始', type: 'doubles', format: 1, is_team: true, date: '2026-08-27' },
+      '001-02': { id: '001-02', court: '', t1: 'A队', t2: 'B队', status: '未开始', type: 'doubles', format: 1, is_team: true, date: '2026-08-27' },
+      '001-03': { id: '001-03', court: '', t1: 'A队', t2: 'B队', status: '未开始', type: 'doubles', format: 1, is_team: true, date: '2026-08-27' }
+    }});
+    await post({ action: 'set_referees', event_code: code, referees: [
+      { name: '裁判X', level: 'L1', status: '空闲' },
+      { name: '裁判Y', level: 'L1', status: '空闲' },
+    ]});
+    // === 子测试 1：winner=第三方队伍 → error ===
+    await post({ action: 'update_task_court', event_code: code, match_id: '001-01', court: '1' });
+    await post({ action: 'accept_task', event_code: code, referee_id: '裁判X', match_id: '001-01' });
+    await post({ action: 'start_task', event_code: code, match_id: '001-01', referee_id: '裁判X', score_text: '0-0', match_name: 'A vs B' });
+    const before1 = JSON.stringify(await dashboard());
+    const beforeRefs1 = JSON.stringify(await referees());
+    const r1 = await post({
+      action: 'save_score', event_code: code, id: '001-01', referee_id: '裁判X',
+      t1: 'A队', t2: 'B队', score: '21-15', winner: '不存在的队伍', details: '', court: '1',
+      referee: '裁判X', signature: 'sig', is_team: true
+    });
+    assert.equal(r1.status, 'error', '第三方 winner 必须被拒绝');
+    assert.equal(JSON.stringify(await dashboard()), before1, '第三方 winner dashboard 零变化');
+    assert.equal(JSON.stringify(await referees()), beforeRefs1, '第三方 winner referees 零变化');
+    // === 子测试 2：winner=task.t1 → success ===
+    const r2 = await post({
+      action: 'save_score', event_code: code, id: '001-01', referee_id: '裁判X',
+      t1: 'A队', t2: 'B队', score: '21-15', winner: 'A队', details: 'G1: 21-15', court: '1',
+      referee: '裁判X', signature: 'sig', is_team: true
+    });
+    assert.equal(r2.status, 'success', 'winner=t1 必须成功');
+    const d2 = await dashboard();
+    assert.ok(!d2.tasks['001-01'], '001-01 task 已删除');
+    assert.equal(d2.records.find(x => x.id === '001-01')?.winner, 'A队', 'record.winner=A队');
+    // === 子测试 3：winner=task.t2 → success ===
+    await post({ action: 'update_task_court', event_code: code, match_id: '001-02', court: '1' });
+    await post({ action: 'accept_task', event_code: code, referee_id: '裁判X', match_id: '001-02' });
+    await post({ action: 'start_task', event_code: code, match_id: '001-02', referee_id: '裁判X', score_text: '0-0', match_name: 'A vs B' });
+    const r3 = await post({
+      action: 'save_score', event_code: code, id: '001-02', referee_id: '裁判X',
+      t1: 'A队', t2: 'B队', score: '15-21', winner: 'B队', details: 'G1: 15-21', court: '1',
+      referee: '裁判X', signature: 'sig', is_team: true
+    });
+    assert.equal(r3.status, 'success', 'winner=t2 必须成功');
+    const d3 = await dashboard();
+    assert.equal(d3.records.find(x => x.id === '001-02')?.winner, 'B队', 'record.winner=B队');
+    // === 子测试 4：客户端伪造 t1/t2 不得改变 winner 校验依据 ===
+    await post({ action: 'update_task_court', event_code: code, match_id: '001-03', court: '1' });
+    await post({ action: 'accept_task', event_code: code, referee_id: '裁判X', match_id: '001-03' });
+    await post({ action: 'start_task', event_code: code, match_id: '001-03', referee_id: '裁判X', score_text: '0-0', match_name: 'A vs B' });
+    // 客户端发送伪造 t1/t2，但 winner 使用服务端真实队伍 A队
+    const r4 = await post({
+      action: 'save_score', event_code: code, id: '001-03', referee_id: '裁判X',
+      t1: '伪造队1', t2: '伪造队2', score: '21-15', winner: 'A队', details: '', court: '1',
+      referee: '裁判X', signature: 'sig', is_team: true
+    });
+    assert.equal(r4.status, 'success', 'winner 校验依据服务端 task.t1/t2，不信任客户端 t1/t2');
+    const d4 = await dashboard();
+    const rec4 = d4.records.find(x => x.id === '001-03');
+    assert.equal(rec4.t1, 'A队', 'record.t1 来自服务端，非客户端伪造');
+    assert.equal(rec4.t2, 'B队', 'record.t2 来自服务端，非客户端伪造');
     EVENT = savedEvent;
   });
 });
