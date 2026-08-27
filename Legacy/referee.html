@@ -1227,14 +1227,15 @@
 
                 const signatureData = refereeSigCanvas.toDataURL('image/jpeg', 0.8);
                 const signedReportBase64 = await generateReportWithSignature($('reportText').innerText, dbScoreData, signatureData);
-
-                // [PR#155 R2 FIX] 预览战报图片；但不可逆 DOM 替换（销毁“清空画板”按钮）不得在云端确收前执行：
-                // 否则 save_score 失败后重试时 $('clearRefereeSigBtn') 为 null 抛异常，save_score 永远无法二次发出。
-                if ($('canvasContainer')) {
-                    $('canvasContainer').innerHTML = `<img src="${signedReportBase64}" class="w-full rounded shadow-lg border border-emerald-500">`;
-                }
-
+                
+                // [PR#155 R3 FIX] 云端模式下，canvas/签名事件/清空按钮必须保留到服务端 success 后才替换。
+                // 失败后 canvas 仍在 DOM，用户可清空重签并再次提交。
+                
                 if (sysMode === 'local') {
+                    // 本地模式：请求前即可替换（无云端交互）
+                    if ($('canvasContainer')) {
+                        $('canvasContainer').innerHTML = `<img src="${signedReportBase64}" class="w-full rounded shadow-lg border border-emerald-500">`;
+                    }
                     if ($('clearRefereeSigBtn')) {
                         $('clearRefereeSigBtn').outerHTML = `<div class="text-xs text-amber-400 mt-2 font-black animate-pulse bg-amber-900/30 py-2 rounded">👆 长按上方生成的图片可保存或发往赛事群</div>`;
                     }
@@ -1254,7 +1255,10 @@
                 const res = await apiCall('save_score', window.finalPayload);
 
                 if(res.status === 'success') {
-                    // [PR#155 R2 FIX] 不可逆 DOM 变更（销毁清空画板按钮）只在云端确收后执行。
+                    // [PR#155 R3 FIX] 云端确收后才执行不可逆 DOM 变更：替换 canvas 为图片、销毁清空按钮。
+                    if ($('canvasContainer')) {
+                        $('canvasContainer').innerHTML = `<img src="${signedReportBase64}" class="w-full rounded shadow-lg border border-emerald-500">`;
+                    }
                     if ($('clearRefereeSigBtn')) {
                         $('clearRefereeSigBtn').outerHTML = `<div class="text-xs text-amber-400 mt-2 font-black animate-pulse bg-amber-900/30 py-2 rounded">👆 长按上方生成的图片可保存或发往赛事群</div>`;
                     }
