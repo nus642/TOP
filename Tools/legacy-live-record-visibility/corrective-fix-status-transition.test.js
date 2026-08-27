@@ -331,3 +331,59 @@ describe('release_task_acceptance API：清理投影并恢复状态', () => {
     );
   });
 });
+
+// ======================== 备份恢复路径 ========================
+describe('备份恢复：checkAndRestoreBackup 不提前升级设置阶段裁判状态', () => {
+  const src = readSource('referee.html');
+
+  it('checkAndRestoreBackup 中 updateRefereeStatus("执裁中") 仅在 data.step >= 3 时调用', () => {
+    const funcStart = 'function checkAndRestoreBackup()';
+    const i = src.indexOf(funcStart);
+    assert.ok(i >= 0, 'checkAndRestoreBackup 函数必须存在');
+
+    const funcBodyStart = src.indexOf('{', i);
+    let j = funcBodyStart;
+    let braceCount = 0;
+    for (; j < src.length; j++) {
+      if (src[j] === '{') braceCount++;
+      else if (src[j] === '}') {
+        braceCount--;
+        if (braceCount === 0) break;
+      }
+    }
+    const funcBody = src.slice(i, j + 1);
+
+    assert.ok(
+      funcBody.includes('data.step >= 3') || funcBody.includes('data.step >=3'),
+      'checkAndRestoreBackup 必须检查 data.step >= 3 才设置裁判为"执裁中"'
+    );
+    assert.ok(
+      funcBody.includes("data.step >= 3) { updateRefereeStatus('执裁中'") ||
+      funcBody.includes('data.step >= 3) {updateRefereeStatus'),
+      'updateRefereeStatus("执裁中") 必须在 data.step >= 3 条件内'
+    );
+  });
+
+  it('backupState 保存当前 step 信息', () => {
+    const funcStart = 'function backupState()';
+    const i = src.indexOf(funcStart);
+    assert.ok(i >= 0, 'backupState 函数必须存在');
+
+    const funcBodyStart = src.indexOf('{', i);
+    let j = funcBodyStart;
+    let braceCount = 0;
+    for (; j < src.length; j++) {
+      if (src[j] === '{') braceCount++;
+      else if (src[j] === '}') {
+        braceCount--;
+        if (braceCount === 0) break;
+      }
+    }
+    const funcBody = src.slice(i, j + 1);
+
+    assert.ok(
+      funcBody.includes('getCurrentStep()') || funcBody.includes('step:'),
+      'backupState 必须保存当前 step 信息'
+    );
+  });
+});

@@ -450,7 +450,10 @@
                                 if(matchState.over) $('endGameBtn').classList.remove('hidden');
                             } else showStep(data.step);
 
-                            updateRefereeStatus('执裁中', currentMatch.court); syncLiveScore(); return true;
+                            // [CORRECTIVE FIX] 只有恢复已开赛的比赛（step >= 3）才设置裁判为"执裁中"并同步比分。
+                            // step 2 备份表示比赛尚未开始，不得提前升级裁判状态或写入"比赛中"投影。
+                            if (data.step >= 3) { updateRefereeStatus('执裁中', currentMatch.court); syncLiveScore(); }
+                            return true;
                         } else clearBackup();
                     }
                 } catch(e) { clearBackup(); }
