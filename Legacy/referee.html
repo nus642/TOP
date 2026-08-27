@@ -796,7 +796,9 @@
             let t1s = `<option value="P1">${currentMatch.t1p1}</option>${currentMatch.type==='doubles'?`<option value="P2">${currentMatch.t1p2}</option>`:''}`; let t2s = `<option value="P1">${currentMatch.t2p1}</option>${currentMatch.type==='doubles'?`<option value="P2">${currentMatch.t2p2}</option>`:''}`;
             $('t1Stance').innerHTML = t1s; $('t2Stance').innerHTML = t2s;
             if(currentMatch.type === 'doubles') $('doublesStance').classList.remove('hidden'); else $('doublesStance').classList.add('hidden');
-            try { await updateRefereeStatus('执裁中', currentMatch.court); } catch(e){} showStep(2);
+            // [CORRECTIVE FIX] 进入比赛设置页不等于正式开赛，不得提前将裁判状态升级为"执裁中"。
+            // 裁判状态应在 executeStartMatch() 正式开赛成功后才更新，避免 dashboard 投影优先级冲突。
+            showStep(2);
         };
 
         window.backToStep1 = async () => {
