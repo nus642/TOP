@@ -599,7 +599,13 @@ switch ($action) {
             $refRegistered = false;
             foreach ($refs as $r) { if (normalizeId($r['name'] ?? '') === $referee_id) { $refRegistered = true; break; } }
             if (!$refRegistered) { $pdo->rollBack(); echo json_encode(['status' => 'error', 'message' => '该裁判未在本赛事注册，无法领取任务']); break; }
-            // 4. 归属检查：该 task 若已有任何投影（不限状态）
+            // 4. [PR#155 R5] task.status 仅允许缺省/未开始；比赛中或其他终态一律拒绝
+            //    必须在 live_scores 归属/幂等检查之前执行，防止待开赛投影绕过终态校验
+            $taskStatus = $task['status'] ?? '';
+            if ($taskStatus !== '' && $taskStatus !== '未开始') {
+                $pdo->rollBack(); echo json_encode(['status' => 'error', 'message' => "该任务状态为「{$taskStatus}」，不可领取"]); break;
+            }
+            // 5. 归属检查：该 task 若已有任何投影（不限状态）
             //    - 待开赛 + 相同 referee → 幂等 success（零写入）
             //    - 其他情况（不同 referee / 已开赛）→ 拒绝，原归属保持
             $live = kv_get($event_code, 'live_scores', []);
@@ -612,26 +618,21 @@ switch ($action) {
                     $pdo->rollBack(); echo json_encode(['status' => 'error', 'message' => "该任务已被裁判 {$other} 接受，不可重复领取"]); break 2;
                 }
             }
-            // 4a. [PR#155 R3] task.status 仅允许缺省/未开始；比赛中或其他终态一律拒绝
-            $taskStatus = $task['status'] ?? '';
-            if ($taskStatus !== '' && $taskStatus !== '未开始') {
-                $pdo->rollBack(); echo json_encode(['status' => 'error', 'message' => "该任务状态为「{$taskStatus}」，不可领取"]); break;
-            }
-            // 4b. [PR#155 R3] 同一裁判不得同时拥有两个不同 task/court 的投影（不论待开赛还是比赛中）
+            // 5a. [PR#155 R3] 同一裁判不得同时拥有两个不同 task/court 的投影（不论待开赛还是比赛中）
             foreach ($live as $court => $info) {
                 if (normalizeId($info['referee'] ?? '') === $referee_id && normalizeId($info['match_id'] ?? '') !== $match_id) {
                     $other_match = $info['match_id'];
                     $pdo->rollBack(); echo json_encode(['status' => 'error', 'message' => "该裁判已领取其他任务（{$other_match}），不可同时领取两个任务"]); break 2;
                 }
             }
-            // 5. 同一 court 上存在任何不同 match_id 的投影 → 拒绝，不论待开赛还是比赛中
+            // 6. 同一 court 上存在任何不同 match_id 的投影 → 拒绝，不论待开赛还是比赛中
             foreach ($live as $court => $info) {
                 if ((string)$court === (string)$assigned_court && normalizeId($info['match_id'] ?? '') !== $match_id) {
                     $other_match = $info['match_id'];
                     $pdo->rollBack(); echo json_encode(['status' => 'error', 'message' => "场地 #{$assigned_court} 已被其他任务（{$other_match}）占用，无法覆盖"]); break 2;
                 }
             }
-            // 6. 全部校验通过——使用服务端权威数据写入投影（court/t1/t2/is_team 均取自 task，忽略客户端伪造字段）
+            // 7. 全部校验通过——使用服务端权威数据写入投影（court/t1/t2/is_team 均取自 task，忽略客户端伪造字段）
             $live[$assigned_court] = [
                 'match_id' => $match_id,
                 'status' => '待开赛',

@@ -797,6 +797,97 @@ describe('R3-第三轮回归测试', () => {
   });
 });
 
+// ======================== accept_task 校验顺序：task.status 优先于 live_scores ========================
+describe('R5-accept_task：task.status 校验顺序（防止待开赛投影绕过终态）', () => {
+  // [PR#155 R5] task.status 必须在 live_scores 归属/幂等检查之前执行。
+  // 损坏态：task.status=比赛中 但 live_scores 仍有待开赛投影。
+  // 任何 accept_task 请求都必须 error，不得因待开赛投影返回幂等 success。
+
+  it('A: 比赛中 task + 同裁判待开赛投影 → accept 必须 error（不得幂等 success）', async () => {
+    const savedEvent = EVENT;
+    const code = await newEvent('ORD-A', ['001-01'], ['1']);
+    await assignCourt('001-01', '1');
+    // 步骤 2：accept_task 生成待开赛投影，referee=裁判A
+    const a1 = await accept('裁判A', '001-01');
+    assert.equal(a1.status, 'success');
+    assert.equal(a1.idempotent, false);
+    // 步骤 3：用 set_bulk_tasks 将 task.status 改成比赛中，保留现有投影
+    await post({ action: 'set_bulk_tasks', event_code: code, tasks: {
+      '001-01': { id: '001-01', court: '1', t1: 'A队', t2: 'B队', status: '比赛中', type: 'doubles', format: 1, is_team: true }
+    }});
+    // 步骤 4：保存四类快照
+    const dashBefore = await dashboard();
+    const tasksBefore = await get('get_personal_tasks');
+    const refsBefore = await get('get_referees');
+    const recordsBefore = dashBefore.records || [];
+    // 步骤 5：再以裁判A调用 accept_task
+    const a2 = await accept('裁判A', '001-01');
+    // 步骤 6：必须返回 error，不得返回 idempotent success
+    assert.equal(a2.status, 'error', `比赛中 task 不得因待开赛投影返回幂等 success: ${JSON.stringify(a2)}`);
+    // 步骤 7：四类快照必须全等
+    const dashAfter = await dashboard();
+    const tasksAfter = await get('get_personal_tasks');
+    const refsAfter = await get('get_referees');
+    assert.equal(JSON.stringify(dashAfter.courts), JSON.stringify(dashBefore.courts), 'courts 快照全等');
+    assert.equal(JSON.stringify(tasksAfter.tasks), JSON.stringify(tasksBefore.tasks), 'tasks 快照全等');
+    assert.equal(JSON.stringify(refsAfter.data), JSON.stringify(refsBefore.data), 'refs 快照全等');
+    assert.equal((dashAfter.records || []).length, recordsBefore.length, 'records 快照全等');
+    EVENT = savedEvent;
+  });
+
+  it('B: 比赛中 task + 不同裁判待开赛投影 → accept 必须 error，原归属不变', async () => {
+    const savedEvent = EVENT;
+    const code = await newEvent('ORD-B', ['001-01'], ['1']);
+    await assignCourt('001-01', '1');
+    // 裁判A 领取生成待开赛投影
+    await accept('裁判A', '001-01');
+    // 损坏态：task.status=比赛中
+    await post({ action: 'set_bulk_tasks', event_code: code, tasks: {
+      '001-01': { id: '001-01', court: '1', t1: 'A队', t2: 'B队', status: '比赛中', type: 'doubles', format: 1, is_team: true }
+    }});
+    // 快照
+    const dashBefore = await dashboard();
+    const tasksBefore = await get('get_personal_tasks');
+    const refsBefore = await get('get_referees');
+    const recordsBefore = dashBefore.records || [];
+    // 裁判B 尝试领取
+    const a2 = await accept('裁判B', '001-01');
+    assert.equal(a2.status, 'error', '不同裁判不得领取比赛中 task');
+    // 四类快照全等（courts/tasks/refs/records 均无变化）
+    const dashAfter = await dashboard();
+    const tasksAfter = await get('get_personal_tasks');
+    const refsAfter = await get('get_referees');
+    assert.equal(JSON.stringify(dashAfter.courts), JSON.stringify(dashBefore.courts), 'courts 快照全等');
+    assert.equal(JSON.stringify(tasksAfter.tasks), JSON.stringify(tasksBefore.tasks), 'tasks 快照全等');
+    assert.equal(JSON.stringify(refsAfter.data), JSON.stringify(refsBefore.data), 'refs 快照全等');
+    assert.equal((dashAfter.records || []).length, recordsBefore.length, 'records 快照全等');
+    EVENT = savedEvent;
+  });
+
+  it('C: 正常幂等不受影响（task.status=未开始 + 待开赛投影 + 同裁判重试）', async () => {
+    const savedEvent = EVENT;
+    const code = await newEvent('ORD-C', ['001-01'], ['1']);
+    await assignCourt('001-01', '1');
+    // 首次领取
+    const a1 = await accept('裁判A', '001-01');
+    assert.equal(a1.status, 'success');
+    assert.equal(a1.idempotent, false);
+    // 快照（确认有投影）
+    const dashBefore = await dashboard();
+    assert.equal(dashBefore.courts['1'].status, '待开赛');
+    assert.equal(dashBefore.courts['1'].referee, '裁判A');
+    // 同裁判重试 → 幂等 success
+    const a2 = await accept('裁判A', '001-01');
+    assert.equal(a2.status, 'success', '正常幂等必须 success');
+    assert.equal(a2.idempotent, true, '必须报告 idempotent=true');
+    // 零重复投影
+    const dashAfter = await dashboard();
+    assert.equal(dashAfter.courts['1'].status, '待开赛', '投影状态不变');
+    assert.equal(dashAfter.courts['1'].referee, '裁判A', '归属不变');
+    EVENT = savedEvent;
+  });
+});
+
 // ======================== 清理 ========================
 after(async () => {
   for (const code of createdEvents) {
