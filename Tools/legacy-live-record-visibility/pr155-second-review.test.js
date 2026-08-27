@@ -888,6 +888,159 @@ describe('R5-accept_task：task.status 校验顺序（防止待开赛投影绕�
   });
 });
 
+// ======================== R6: 响应丢失幂等恢复 ========================
+describe('R6-start_task：响应丢失幂等恢复', () => {
+  it('R6-S1: 首次开赛 success+idempotent=false', async () => {
+    const savedEvent = EVENT;
+    const code = await newEvent('R6S', ['001-01'], ['1']);
+    await assignCourt('001-01', '1');
+    await accept('裁判A', '001-01');
+    const startRes = await start('裁判A', '001-01');
+    assert.equal(startRes.status, 'success', '首次开赛必须 success');
+    assert.equal(startRes.idempotent, false, '首次开赛必须 idempotent=false');
+    assert.ok(startRes.court === '1', '必须返回权威场地');
+    // 验证服务端已为比赛中
+    const tasks = await get('get_personal_tasks');
+    assert.equal(tasks.tasks['001-01']?.status, '比赛中', 'task.status 必须为比赛中');
+    EVENT = savedEvent;
+  });
+
+  it('R6-S2: 相同 payload 重试 → success+idempotent=true，状态无二次变化', async () => {
+    const savedEvent = EVENT;
+    const code = await newEvent('R6S2', ['001-01'], ['1']);
+    await assignCourt('001-01', '1');
+    await accept('裁判A', '001-01');
+    const start1 = await start('裁判A', '001-01');
+    assert.equal(start1.status, 'success');
+    // 快照：首次开赛后的状态
+    const dashBefore = await dashboard();
+    const tasksBefore = await get('get_personal_tasks');
+    const refsBefore = await get('get_referees');
+    const recordsBefore = dashBefore.records || [];
+    // 相同 payload 重试（模拟响应丢失后重试）
+    const start2 = await start('裁判A', '001-01');
+    assert.equal(start2.status, 'success', '重试必须 success');
+    assert.equal(start2.idempotent, true, '重试必须 idempotent=true');
+    assert.equal(start2.court, '1', '必须返回权威场地');
+    // 三类状态无二次变化
+    const dashAfter = await dashboard();
+    const tasksAfter = await get('get_personal_tasks');
+    const refsAfter = await get('get_referees');
+    assert.equal(JSON.stringify(dashAfter.courts), JSON.stringify(dashBefore.courts), 'courts 无二次变化');
+    assert.equal(JSON.stringify(tasksAfter.tasks), JSON.stringify(tasksBefore.tasks), 'tasks 无二次变化');
+    assert.equal(JSON.stringify(refsAfter.data), JSON.stringify(refsBefore.data), 'refs 无二次变化');
+    assert.equal((dashAfter.records || []).length, recordsBefore.length, 'records 无二次变化');
+    EVENT = savedEvent;
+  });
+
+  it('R6-S3: score 已推进后发送旧 start payload → error', async () => {
+    const savedEvent = EVENT;
+    const code = await newEvent('R6S3', ['001-01'], ['1']);
+    await assignCourt('001-01', '1');
+    await accept('裁判A', '001-01');
+    await start('裁判A', '001-01');
+    // 推进比分
+    await post({ action: 'sync_live_score', event_code: code, court: '1', score_text: 'G1 5-3', status: '比赛中', match_name: 'A队 vs B队', match_id: '001-01', referee_id: '裁判A' });
+    // 用旧 score_text 重试 start
+    const start2 = await start('裁判A', '001-01');
+    assert.equal(start2.status, 'error', 'score 已推进后旧 start payload 必须 error');
+    EVENT = savedEvent;
+  });
+});
+
+describe('R6-save_score：响应丢失幂等恢复', () => {
+  it('R6-V1: 首次完赛 success+idempotent=false', async () => {
+    const savedEvent = EVENT;
+    const code = await newEvent('R6V', ['001-01'], ['1']);
+    await assignCourt('001-01', '1');
+    await accept('裁判A', '001-01');
+    await start('裁判A', '001-01');
+    const save = await post({
+      action: 'save_score', event_code: code, id: '001-01', referee_id: '裁判A',
+      t1: 'A队', t2: 'B队', score: '21-15', winner: 'A队', details: 'G1: 21-15', court: '1',
+      referee: '裁判A', signature: 'sig-r6v1', is_team: true
+    });
+    assert.equal(save.status, 'success', '首次完赛必须 success');
+    // 验证 record=1、task/live 已删除、match_count=1
+    const dash = await dashboard();
+    assert.equal((dash.records || []).length, 1, 'record 必须为 1');
+    assert.equal(dash.records[0].id, '001-01', 'record.id 必须为 001-01');
+    const refs = await get('get_referees');
+    const refA = refs.data.find(r => r.name === '裁判A');
+    assert.equal(refA.match_count, 1, 'match_count 必须为 1');
+    EVENT = savedEvent;
+  });
+
+  it('R6-V2: 相同 payload 重试 → success+idempotent=true，record 仍为 1', async () => {
+    const savedEvent = EVENT;
+    const code = await newEvent('R6V2', ['001-01'], ['1']);
+    await assignCourt('001-01', '1');
+    await accept('裁判A', '001-01');
+    await start('裁判A', '001-01');
+    const save1 = await post({
+      action: 'save_score', event_code: code, id: '001-01', referee_id: '裁判A',
+      t1: 'A队', t2: 'B队', score: '21-15', winner: 'A队', details: 'G1: 21-15', court: '1',
+      referee: '裁判A', signature: 'sig-r6v2', is_team: true
+    });
+    assert.equal(save1.status, 'success');
+    // 相同 payload 重试（模拟响应丢失后重试）
+    const save2 = await post({
+      action: 'save_score', event_code: code, id: '001-01', referee_id: '裁判A',
+      t1: 'A队', t2: 'B队', score: '21-15', winner: 'A队', details: 'G1: 21-15', court: '1',
+      referee: '裁判A', signature: 'sig-r6v2', is_team: true
+    });
+    assert.equal(save2.status, 'success', '重试必须 success');
+    assert.equal(save2.idempotent, true, '重试必须 idempotent=true');
+    // record 仍为 1
+    const dash = await dashboard();
+    assert.equal((dash.records || []).length, 1, 'record 必须仍为 1');
+    // match_count 仍为 1
+    const refs = await get('get_referees');
+    const refA = refs.data.find(r => r.name === '裁判A');
+    assert.equal(refA.match_count, 1, 'match_count 必须仍为 1');
+    EVENT = savedEvent;
+  });
+
+  it('R6-V3: 修改 signature/score/winner/referee 任一字段重试 → error', async () => {
+    const savedEvent = EVENT;
+    const code = await newEvent('R6V3', ['001-01'], ['1']);
+    await assignCourt('001-01', '1');
+    await accept('裁判A', '001-01');
+    await start('裁判A', '001-01');
+    await post({
+      action: 'save_score', event_code: code, id: '001-01', referee_id: '裁判A',
+      t1: 'A队', t2: 'B队', score: '21-15', winner: 'A队', details: 'G1: 21-15', court: '1',
+      referee: '裁判A', signature: 'sig-r6v3', is_team: true
+    });
+    // 修改 signature 重试
+    const save2 = await post({
+      action: 'save_score', event_code: code, id: '001-01', referee_id: '裁判A',
+      t1: 'A队', t2: 'B队', score: '21-15', winner: 'A队', details: 'G1: 21-15', court: '1',
+      referee: '裁判A', signature: 'sig-DIFFERENT', is_team: true
+    });
+    assert.equal(save2.status, 'error', '修改 signature 重试必须 error');
+    // 修改 score 重试
+    const save3 = await post({
+      action: 'save_score', event_code: code, id: '001-01', referee_id: '裁判A',
+      t1: 'A队', t2: 'B队', score: '21-10', winner: 'A队', details: 'G1: 21-15', court: '1',
+      referee: '裁判A', signature: 'sig-r6v3', is_team: true
+    });
+    assert.equal(save3.status, 'error', '修改 score 重试必须 error');
+    // 修改 winner 重试
+    const save4 = await post({
+      action: 'save_score', event_code: code, id: '001-01', referee_id: '裁判A',
+      t1: 'A队', t2: 'B队', score: '21-15', winner: 'B队', details: 'G1: 21-15', court: '1',
+      referee: '裁判A', signature: 'sig-r6v3', is_team: true
+    });
+    assert.equal(save4.status, 'error', '修改 winner 重试必须 error');
+    // 已保存 record 保持不变
+    const dash = await dashboard();
+    assert.equal((dash.records || []).length, 1, 'record 必须仍为 1');
+    assert.equal(dash.records[0].signature, 'sig-r6v3', 'record.signature 必须保持原值');
+    EVENT = savedEvent;
+  });
+});
+
 // ======================== 清理 ========================
 after(async () => {
   for (const code of createdEvents) {

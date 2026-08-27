@@ -163,9 +163,10 @@ describe('start_task：原子开赛', () => {
     assert.equal(start.status, 'error');
   });
 
-  it('重复开赛被拒绝（已比赛中）', async () => {
-    const start = await post({ action: 'start_task', event_code: EVENT, match_id: '001-01', referee_id: '裁判A', score_text: 'G1 0-0' });
-    assert.equal(start.status, 'error', '已开赛的 task 不得重复开赛');
+  it('重复开赛返回幂等 success（响应丢失恢复）', async () => {
+    const start = await post({ action: 'start_task', event_code: EVENT, match_id: '001-01', referee_id: '裁判A', score_text: 'G1 0-0', match_name: 'A队 vs B队' });
+    assert.equal(start.status, 'success', '已开赛 task 重复请求应返回幂等 success');
+    assert.equal(start.idempotent, true, '必须报告 idempotent=true');
   });
 });
 

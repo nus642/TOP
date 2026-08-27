@@ -828,6 +828,29 @@ switch ($action) {
             // 1a. [PR#155 R3] task.status 必须为缺省/未开始；异常的"比赛中 + 待开赛投影"不得再次开赛
             $taskStatus = $task['status'] ?? '';
             if ($taskStatus !== '' && $taskStatus !== '未开始') {
+                // [PR#155 R6] 响应丢失幂等恢复：task.status=比赛中时，检查完整权威状态
+                if ($taskStatus === '比赛中') {
+                    $liveCourt2 = null;
+                    foreach ($live as $court => $info) { if (normalizeId($info['match_id'] ?? '') === $match_id) { $liveCourt2 = $court; break; } }
+                    if ($liveCourt2 !== null
+                        && ($live[$liveCourt2]['status'] ?? '') === '比赛中'
+                        && normalizeId($live[$liveCourt2]['referee'] ?? '') === normalizeId($referee_id)
+                        && (string)$liveCourt2 === (string)$taskCourt
+                    ) {
+                        $refIdx2 = null;
+                        foreach ($refs as $idx => $r) { if (normalizeId($r['name'] ?? '') === normalizeId($referee_id)) { $refIdx2 = $idx; break; } }
+                        if ($refIdx2 !== null
+                            && ($refs[$refIdx2]['status'] ?? '') === '执裁中'
+                            && (string)($refs[$refIdx2]['current_court'] ?? '') === (string)$taskCourt
+                            && ($task['live_score'] ?? '') === ($live[$liveCourt2]['score'] ?? '')
+                            && ($task['live_score'] ?? '') === $score_text
+                        ) {
+                            $pdo->rollBack();
+                            echo json_encode(['status' => 'success', 'idempotent' => true, 'court' => $taskCourt]);
+                            break;
+                        }
+                    }
+                }
                 $pdo->rollBack(); echo json_encode(['status' => 'error', 'message' => "该任务状态为「{$taskStatus}」，不可开赛"]); break;
             }
             // 2. live_scores 中必须存在该 task 的待开赛投影，且投影场地与 task 权威场地一致
@@ -861,7 +884,7 @@ switch ($action) {
             $refs[$refIdx]['status'] = '执裁中'; $refs[$refIdx]['current_court'] = $taskCourt;
             kv_set($event_code, 'referees', $refs);
             $pdo->commit();
-            echo json_encode(['status' => 'success', 'court' => $taskCourt]);
+            echo json_encode(['status' => 'success', 'idempotent' => false, 'court' => $taskCourt]);
         } catch (Exception $e) {
             if ($pdo->inTransaction()) $pdo->rollBack();
             echo json_encode(['status' => 'error', 'message' => $e->getMessage()]);
@@ -930,6 +953,33 @@ switch ($action) {
             $tasks = kv_get($event_code, 'tasks', []);
             $live = kv_get($event_code, 'live_scores', []);
             $refs = kv_get($event_code, 'referees', []);
+            // 0. [PR#155 R6] 响应丢失幂等恢复：在 task 存在性检查之前，先检查是否已有相同比赛的已提交 record
+            $records = kv_get($event_code, 'records', []);
+            $existingRecord = null;
+            foreach ($records as $rec) {
+                if (normalizeId($rec['id'] ?? '') === $match_id) { $existingRecord = $rec; break; }
+            }
+            if ($existingRecord !== null) {
+                $reqScore = $req['score'] ?? '';
+                $reqWinner = trim($req['winner'] ?? '');
+                $reqDetails = $req['details'] ?? '';
+                $reqSignature = $req['signature'] ?? '';
+                $reqCourtVal = isset($req['court']) ? trim((string)$req['court']) : '';
+                if (normalizeId($existingRecord['referee'] ?? '') === $referee_id
+                    && (string)($existingRecord['court'] ?? '') === (string)($reqCourtVal !== '' ? $reqCourtVal : ($existingRecord['court'] ?? ''))
+                    && ($existingRecord['score'] ?? '') === $reqScore
+                    && ($existingRecord['winner'] ?? '') === $reqWinner
+                    && ($existingRecord['details'] ?? '') === $reqDetails
+                    && ($existingRecord['signature'] ?? '') === $reqSignature
+                ) {
+                    $pdo->rollBack();
+                    echo json_encode(['status' => 'success', 'idempotent' => true]);
+                    break;
+                }
+                $pdo->rollBack();
+                echo json_encode(['status' => 'error', 'message' => '比赛已完赛，但重试内容与已保存记录不一致']);
+                break;
+            }
             // 1. task 必须存在（保存实际 key，不假设 $tasks[$match_id] 存在）
             $task = null; $task_key = null; $taskCourt = '';
             foreach ($tasks as $key => $t) { if (normalizeId($key) === $match_id) { $task = $t; $task_key = $key; $taskCourt = trim((string)($t['court'] ?? '')); break; } }
@@ -962,7 +1012,6 @@ switch ($action) {
                 $pdo->rollBack(); echo json_encode(['status' => 'error', 'message' => '胜者必须为参赛队伍之一']); break;
             }
             // 所有校验通过——同一事务内原子写入（权威字段取自服务端 task/live/referee）
-            $records = kv_get($event_code, 'records', []);
             $records[] = [
                 'id' => $task_key,
                 'court' => $taskCourt,
@@ -982,7 +1031,7 @@ switch ($action) {
             $refs[$refIdx]['status'] = '空闲'; $refs[$refIdx]['current_court'] = ''; $refs[$refIdx]['match_count'] = ($refs[$refIdx]['match_count'] ?? 0) + 1;
             kv_set($event_code, 'referees', $refs);
             $pdo->commit();
-            echo json_encode(['status' => 'success']);
+            echo json_encode(['status' => 'success', 'idempotent' => false]);
         } catch (Exception $e) {
             if ($pdo->inTransaction()) $pdo->rollBack();
             echo json_encode(['status' => 'error', 'message' => $e->getMessage()]);
