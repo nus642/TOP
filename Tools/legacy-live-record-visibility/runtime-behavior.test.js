@@ -293,29 +293,39 @@ describe('进行中比赛返回流程：运行时行为（真实执行 resumeAct
 
   // 提取 resumeActiveMatch 函数
   const resumeStart = 'async function resumeActiveMatch() {';
-  const resumeEnd = '\n        }\n\n        function renderGame()';
+  const resumeEnd = 'function renderGame()';
   const resumeSrc = extractBetween(refSrc, resumeStart, resumeEnd, 'resumeActiveMatch');
 
   // 提取 confirmAndStart 函数
   const confirmStart = 'window.confirmAndStart = async () => {';
-  const confirmEnd = '\n        };\n\n        function showDndReminder';
+  const confirmEnd = 'function showDndReminder';
   const confirmSrc = extractBetween(refSrc, confirmStart, confirmEnd, 'confirmAndStart');
 
   // 提取 backupState 函数
   const backupStart = 'function backupState() {';
-  const backupEnd = '\n        }\n        function clearBackup';
+  const backupEnd = 'function clearBackup';
   const backupSrc = extractBetween(refSrc, backupStart, backupEnd, 'backupState');
+
+  // [PR#155 R10] 提取 backToStep2 函数
+  const backToStep2Src = extractBetween(refSrc, 'window.backToStep2 = async', 'function stopPrepCounting', 'backToStep2');
 
   function makeSandbox(overrides = {}) {
     const calls = { apiCalls: [], renders: 0, shows: [], toasts: [], backups: [] };
     const matchState = { t1Score: 10, t2Score: 8, t1Wins: 1, t2Wins: 0, currentGame: 1, history: [], timeline: [], halfSwitched: false, over: false, ...overrides.matchState };
     const gameState = { viewBa: false, servTeam: 1, initServTeam: 1, servNum: 2, court: 'Right', t1: { r: 'A', l: 'B' }, t2: { r: 'C', l: 'D' }, initRightP1: '', initRightP2: '', servingPlayer: '', ...overrides.gameState };
     const timeoutUsed = { t1: false, t2: false, medicalT1: false, medicalT2: false, ...overrides.timeoutUsed };
-    const currentMatch = { id: '001-01', court: '1', t1Name: '队A', t2Name: '队B', ref: '[L1] 裁判A', ...overrides.currentMatch };
+    const currentMatch = { id: '001-01', court: '1', t1Name: '队A', t2Name: '队B', ref: '裁判A', ...overrides.currentMatch };
     let matchPhase = overrides.matchPhase ?? 'not_started';
     let sysMode = overrides.sysMode ?? 'network';
     let currentStep = overrides.currentStep ?? 1;
-    const localStorage = overrides.localStorage ?? {};
+
+    // [PR#155 R10] Map-based localStorage sandbox
+    const storageMap = new Map();
+    const localStorage = {
+      setItem(key, value) { storageMap.set(key, String(value)); },
+      getItem(key) { return storageMap.has(key) ? storageMap.get(key) : null; },
+      removeItem(key) { storageMap.delete(key); }
+    };
 
     const sandbox = {
       matchState, gameState, timeoutUsed, currentMatch,
@@ -323,36 +333,39 @@ describe('进行中比赛返回流程：运行时行为（真实执行 resumeAct
       set matchPhase(v) { matchPhase = v; },
       get sysMode() { return sysMode; },
       set sysMode(v) { sysMode = v; },
+      BACKUP_KEY: 'pickle_referee_backup_v5',
+      getCurrentStep: () => currentStep,
+      $: () => ({ classList: { add() {}, remove() {}, contains() { return false; } } }),
       apiCall: async (action, params) => {
         calls.apiCalls.push({ action, params });
         if (overrides.apiResponses && overrides.apiResponses[action]) return overrides.apiResponses[action];
         return { status: 'success' };
       },
       renderGame: () => { calls.renders++; },
-      showStep: (step) => { currentStep = step; calls.shows.push(step); },
+      showStep: (step) => { currentStep = step; calls.shows.push(step); if (sandbox._backupState) sandbox._backupState(); },
       showToast: (msg, isError) => { calls.toasts.push({ msg, isError }); },
-      backupState: null, // will be injected
-      clearBackup: () => {},
-      syncLiveScore: () => {},
       updateRefereeStatus: async () => {},
+      syncLiveScore: () => {},
+      clearBackup: () => { localStorage.removeItem('pickle_referee_backup_v5'); },
       console,
       Promise,
       Object,
       String,
       JSON,
       Array,
-    };
-    // Inject real backupState
-    sandbox.backupState = function() {
-      calls.backups.push({ step: currentStep, matchPhase });
-      localStorage['pickle_referee_backup_v5'] = JSON.stringify({ step: currentStep, matchPhase, currentMatch, matchState, gameState, timeoutUsed });
+      localStorage,
     };
     vm.createContext(sandbox);
+    // [PR#155 R10] window 自引用，支持提取源码中的 window.xxx = ...
+    vm.runInContext('var window = globalThis;', sandbox);
+    // [PR#155 R10] 桥接 VM 上下文中的 backupState，供 showStep mock 调用
+    sandbox._backupState = function() { if (typeof sandbox.backupState === 'function') sandbox.backupState(); };
     return { sandbox, calls, matchState, gameState, timeoutUsed, currentMatch, get matchPhase() { return matchPhase; }, get currentStep() { return currentStep; }, localStorage };
   }
 
+  // [PR#155 R10] C1: 真实执行 backToStep2() → confirmAndStart()，非零比分深拷贝全等断言
   it('C1: 进行中比赛返回设置后不会再次 start_task', async () => {
-    const { sandbox, calls, matchState: beforeMatchState, gameState: beforeGameState, timeoutUsed: beforeTimeoutUsed, currentMatch: beforeCurrentMatch } = makeSandbox({
+    const { sandbox, calls, matchState, gameState, timeoutUsed, currentMatch, localStorage } = makeSandbox({
       matchPhase: 'in_progress',
       currentStep: 3,
       apiResponses: {
@@ -363,19 +376,41 @@ describe('进行中比赛返回流程：运行时行为（真实执行 resumeAct
         }
       }
     });
-
-    // 执行 normalizeMatchId + resumeActiveMatch + confirmAndStart
-    vm.runInContext(normalizeMatchIdSrc + '\n;' + resumeSrc + '\n;' + confirmSrc, sandbox);
-
-    // 模拟用户点击“返回进行中比赛”
+  
+    // 非零比分快照（至少 10-8）
+    const beforeMatchState = structuredClone(matchState);
+    const beforeGameState = structuredClone(gameState);
+    const beforeTimeoutUsed = structuredClone(timeoutUsed);
+    const beforeCurrentMatch = structuredClone(currentMatch);
+    assert.ok(beforeMatchState.t1Score >= 10 && beforeMatchState.t2Score >= 8, '初始比分至少 10-8');
+  
+    // 真实执行 backupState + backToStep2 + resumeActiveMatch + confirmAndStart
+    vm.runInContext(backupSrc, sandbox);
+    vm.runInContext(
+      normalizeMatchIdSrc + '\n;' + backToStep2Src + '\n;' + resumeSrc + '\n;' + confirmSrc,
+      sandbox
+    );
+  
+    // 真实执行 backToStep2() → showStep(2) → backupState()
+    await sandbox.backToStep2();
+    // confirmAndStart → resumeActiveMatch（matchPhase=in_progress）
     await sandbox.confirmAndStart();
-
-    // 断言：没有调用 start_task
+  
+    // 断言：start_task 调用次数为 0
     assert.equal(calls.apiCalls.filter(x => x.action === 'start_task').length, 0, '不得调用 start_task');
     // 断言：调用了 get_full_dashboard
     assert.ok(calls.apiCalls.some(x => x.action === 'get_full_dashboard'), '必须调用 get_full_dashboard');
     // 断言：回到了 step 3
-    assert.ok(calls.shows.includes(3), '必须回到 step 3');
+    assert.equal(calls.shows[calls.shows.length - 1], 3, '必须最终回到 step 3');
+    // 深拷贝全等断言：状态未被修改
+    assert.deepEqual(matchState, beforeMatchState, 'matchState 不得被修改');
+    assert.deepEqual(gameState, beforeGameState, 'gameState 不得被修改');
+    assert.deepEqual(timeoutUsed, beforeTimeoutUsed, 'timeoutUsed 不得被修改');
+    assert.deepEqual(currentMatch, beforeCurrentMatch, 'currentMatch 不得被修改');
+    // 断言：设置页备份为 step=3 / in_progress
+    const backup = JSON.parse(localStorage.getItem('pickle_referee_backup_v5'));
+    assert.equal(backup.step, 3, '备份 step 必须为 3');
+    assert.equal(backup.matchPhase, 'in_progress', '备份 matchPhase 必须为 in_progress');
   });
 
   it('C2: 本地模式可从设置页返回进行中比赛', async () => {
@@ -394,19 +429,19 @@ describe('进行中比赛返回流程：运行时行为（真实执行 resumeAct
     assert.ok(calls.shows.includes(3), '必须回到 step 3');
   });
 
+  // [PR#155 R10] C3: 真实执行 backupState()，Map-based localStorage 断言
   it('C3: 设置页备份仍保存进行中生命周期和 step 3', () => {
-    const ls = {};
-    const { sandbox } = makeSandbox({
+    const { sandbox, localStorage } = makeSandbox({
       matchPhase: 'in_progress',
       currentStep: 2,
-      localStorage: ls
     });
 
+    // 真实执行 backupState
     vm.runInContext(backupSrc + '\n;globalThis.backupState = backupState;', sandbox);
     sandbox.backupState();
 
-    // 断言：备份中 matchPhase 为 in_progress
-    const backup = JSON.parse(ls['pickle_referee_backup_v5']);
+    // 断言：Map-based localStorage 中的备份
+    const backup = JSON.parse(localStorage.getItem('pickle_referee_backup_v5'));
     assert.equal(backup.matchPhase, 'in_progress', '备份必须保存 matchPhase=in_progress');
     assert.equal(backup.step, 3, '进行中比赛备份 step 必须为 3');
   });
@@ -461,7 +496,7 @@ describe('editCourt：前端运行时行为（真实执行 master.html editCourt
 
   // 提取 editCourt 函数
   const editCourtStart = 'window.editCourt = async (taskId) => {';
-  const editCourtEnd = '\n        };\n\n        window.handleSendBroadcast';
+  const editCourtEnd = 'window.handleSendBroadcast';
   const editCourtSrc = extractBetween(masterSrc, editCourtStart, editCourtEnd, 'editCourt');
 
   function makeMasterSandbox(overrides = {}) {
@@ -479,6 +514,7 @@ describe('editCourt：前端运行时行为（真实执行 master.html editCourt
       Object,
     };
     vm.createContext(sandbox);
+    vm.runInContext('var window = globalThis;', sandbox);
     return { sandbox, calls };
   }
 
