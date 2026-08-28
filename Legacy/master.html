@@ -213,6 +213,26 @@
         </div>
     </div>
 
+    <!-- P1-3 赛果单详情弹窗（签名安全白名单见 SAFE_SIGNATURE_REGEX） -->
+    <div id="recordDetailModal" class="hidden-panel fixed inset-0 bg-black/80 z-[99999] flex items-center justify-center p-4">
+        <div class="bg-slate-800 p-6 rounded-xl w-full max-w-lg border border-emerald-500/50 shadow-2xl max-h-[90vh] overflow-y-auto custom-scrollbar">
+            <h3 class="text-lg font-bold text-emerald-400 mb-3 flex items-center gap-2"><span>📜</span> 赛果单详情</h3>
+            <div class="space-y-1.5 text-xs mb-3">
+                <div class="flex justify-between border-b border-slate-700/60 pb-1"><span class="text-slate-400">编号</span><span id="rdId" class="font-mono font-bold text-slate-200"></span></div>
+                <div class="flex justify-between border-b border-slate-700/60 pb-1"><span class="text-slate-400">场地</span><span id="rdCourt" class="font-bold text-slate-200"></span></div>
+                <div class="flex justify-between border-b border-slate-700/60 pb-1"><span class="text-slate-400">队伍</span><span id="rdTeams" class="font-bold text-slate-200 text-right"></span></div>
+                <div class="flex justify-between border-b border-slate-700/60 pb-1"><span class="text-slate-400">比分</span><span id="rdScore" class="font-black text-emerald-400"></span></div>
+                <div class="flex justify-between border-b border-slate-700/60 pb-1"><span class="text-slate-400">比分明细</span><span id="rdDetails" class="text-slate-300 text-right"></span></div>
+                <div class="flex justify-between border-b border-slate-700/60 pb-1"><span class="text-slate-400">胜方</span><span id="rdWinner" class="font-bold text-amber-300 text-right"></span></div>
+                <div class="flex justify-between border-b border-slate-700/60 pb-1"><span class="text-slate-400">裁判</span><span id="rdReferee" class="text-slate-200 text-right"></span></div>
+                <div class="flex justify-between border-b border-slate-700/60 pb-1"><span class="text-slate-400">时间</span><span id="rdTime" class="text-slate-300"></span></div>
+            </div>
+            <div class="text-[10px] text-slate-400 font-bold mb-1">✍️ 赛果确认签名</div>
+            <div id="rdSigArea" class="bg-white rounded-lg p-2 min-h-[80px] flex items-center justify-center mb-4"></div>
+            <button onclick="document.getElementById('recordDetailModal').classList.add('hidden-panel')" class="btn bg-slate-600 w-full">关闭</button>
+        </div>
+    </div>
+
     <!-- 主控面板 -->
     <div id="mainPanel" class="hidden-panel flex-grow w-full flex flex-col pb-10">
 
@@ -326,7 +346,7 @@
                         <div class="flex justify-between items-center mb-4">
                             <h2 class="text-sm font-bold text-slate-300 flex items-center gap-2"><span>📍</span> 比赛场地实况 · 裁判矩阵</h2>
                             <div class="flex items-center gap-3">
-                                <button onclick="window.open('umpire.html?code='+$('currentEventCode').innerText)" class="bg-blue-900/40 hover:bg-blue-800 border border-blue-500/30 text-blue-300 px-3 py-1 rounded text-[10px] font-bold transition-colors shadow">📂 裁判数据库</button>
+                                <button onclick="window.open('umpire.html?code='+$('currentEventCode').innerText)" class="bg-blue-900/40 hover:bg-blue-800 border border-blue-500/30 text-blue-300 px-3 py-1 rounded text-[10px] font-bold transition-colors shadow">📂 裁判员档案</button>
                                 <span class="text-[10px] bg-emerald-900 text-emerald-400 px-2 py-0.5 rounded animate-pulse shadow-md">LIVE</span>
                             </div>
                         </div>
@@ -486,6 +506,8 @@
         const DEFAULT_WAIVER_TEXT = `1. 本人自愿报名参加本次赛事及相关活动，已完全了解并理解本次赛事可能存在的风险（包括但不限于运动损伤、突发疾病、财产损失等）。\n\n2. 本人确认自身身体健康状况良好，没有任何不适合参与该项运动的疾病或症状。本人承诺在比赛中遵守赛事规则，服从裁判和工作人员的管理。\n\n3. 本人同意在赛事期间，如因个人原因、不可抗力或第三方原因导致的人身伤害或财产损失，赛事组织方及场地方免于承担任何法律与经济责任。\n\n4. 本人已仔细阅读并完全理解以上内容，签名即代表本人独立承担参与本次赛事的所有相关风险及责任。`;
 
         // ======================== 工具函数 ========================
+        const normalizeId = id => String(id ?? '').replace(/\s+/g, '').toUpperCase();
+
         function showToast(msg, isError = false) {
             const t = $('toast');
             t.innerText = msg;
@@ -1689,14 +1711,16 @@ window.generateTeamCodesFromGroups = async () => {
                 if (!data || data.status !== 'success') return;
                 globalDashboardData = data;
 
-                // 场地卡片
+                // 场地卡片（P1-2：task 投影由后端 get_full_dashboard 完成，此处仅渲染，不建立第二套状态）
                 let cHtml = '';
                 for (let c in data.courts) {
                     let info = data.courts[c];
-                    let isLive = info.status === '比赛中';
+                    // [P1-2 FIXUP] 扩展 isLive 定义：包括"比赛中"和"待开赛"
+                    let isLive = info.status === '比赛中' || info.status === '待开赛';
                     let statusClass = isLive ? 'badge live' : 'badge';
                     let statusText = info.status || '空闲';
-                    let matchDisplay = isLive ? `<span class="match-text text-[0.65rem] sm:text-xs text-slate-300 truncate">${info.match_name || '自由赛'}</span>` : `<span class="empty">空闲中</span>`;
+                    let matchIdChip = (isLive && info.match_id) ? ` <span class="meta">🆔 ${info.match_id}</span>` : '';
+                    let matchDisplay = isLive ? `<span class="match-text text-[0.65rem] sm:text-xs text-slate-300 truncate">${info.match_name || '自由赛'}${matchIdChip}</span>` : `<span class="empty">空闲中</span>`;
                     let scoreRef = isLive ? `<div class="row mt-1"><span class="score">${info.score || '0-0'}</span><span class="referee-name">👨‍⚖️ ${info.referee || '待分配'}</span></div>` : '';
                     cHtml += `<div class="unified-card"><div class="row"><span class="label"># ${c}</span><span class="${statusClass}">${statusText}</span></div>${matchDisplay}${scoreRef}</div>`;
                 }
@@ -1725,7 +1749,8 @@ window.generateTeamCodesFromGroups = async () => {
                 $('taskCount').innerText = `${tasksArr.length} 场`;
                 $('tasksList').innerHTML = tasksArr.map(t => {
                     const courtDisplay = t.court ? `<span class="text-amber-400 font-mono text-[10px] bg-amber-900/30 px-1.5 py-0.5 rounded">#${t.court}</span>` : `<span class="text-slate-600 text-[10px]">未分配</span>`;
-                    const liveBadge = (t.status === '比赛中' && t.live_score) ? `<span class="text-emerald-400 font-bold ml-2 text-[10px] animate-pulse">${t.live_score}</span>` : '';
+                    // [PR#155 R8] 比赛中的任务不再重复显示实时比分，替换为“比赛中”
+                    const liveBadge = (t.status === '比赛中') ? `<span class="text-emerald-400 font-bold ml-2 text-[10px]">比赛中</span>` : '';
                     return `<div class="bg-slate-900/40 p-2 rounded border border-slate-700/50 flex justify-between items-center text-xs">
                         <div class="flex items-center gap-2 flex-1 min-w-0"><span class="font-black text-blue-300 w-20 truncate">${t.id}</span><span class="text-slate-300 truncate">${t.t1} <span class="text-slate-600 mx-1">vs</span> ${t.t2}</span>${courtDisplay}${liveBadge}</div>
                         <div class="flex gap-1 shrink-0">
@@ -1736,11 +1761,12 @@ window.generateTeamCodesFromGroups = async () => {
                     </div>`;
                 }).join('') || '<div class="text-xs text-slate-500 text-center py-2">无该模式队列</div>';
 
-                // 完赛记录
+                // 完赛记录（P1-3：卡片可点击，showRecordDetail 展示完整赛果单）
                 let recordsArr = data.records.slice(0, 20);
                 recordsArr = recordsArr.filter(r => sysMode === 'team' ? r.is_team === true : r.is_team !== true);
-                $('recordsList').innerHTML = recordsArr.map(r => {
-                    return `<div class="bg-slate-900/40 p-2.5 rounded border border-slate-700/50 text-xs mb-2"><div class="flex justify-between items-center mb-1"><span class="font-black text-slate-300">${r.id} <span class="text-slate-500 ml-1">#${r.court}场</span></span><span class="text-emerald-400 font-black">${r.score}</span></div><div class="text-slate-400 flex justify-between items-center"><span class="truncate pr-2">${r.t1} vs ${r.t2}</span></div></div>`;
+                window.lastRecordsArr = recordsArr;
+                $('recordsList').innerHTML = recordsArr.map((r, idx) => {
+                    return `<div onclick="showRecordDetail(${idx})" class="bg-slate-900/40 p-2.5 rounded border border-slate-700/50 text-xs mb-2 cursor-pointer hover:border-emerald-500/50 transition-colors"><div class="flex justify-between items-center mb-1"><span class="font-black text-slate-300">${r.id} <span class="text-slate-500 ml-1">#${r.court}场</span></span><span class="text-emerald-400 font-black">${r.score}</span></div><div class="text-slate-400 flex justify-between items-center"><span class="truncate pr-2">${r.t1} vs ${r.t2}</span><span class="text-[9px] text-slate-600 shrink-0">点击查看 ▸</span></div></div>`;
                 }).join('') || '<div class="text-xs text-slate-500 text-center py-2">尚无完赛成绩</div>';
 
                 // 团队雷达统计
@@ -1828,40 +1854,10 @@ for (let [key, info] of teamMap) {
                                 if (isTeamLineupSubmitted) submittedCount++;
                                 let statusText = roomData.status === 'completed' ? '对决已下发' : (isTeamLineupSubmitted ? '阵容已定' : `选手已到(${checked}/${total})`);
                                 let statusColor = roomData.status === 'completed' ? 'text-blue-400' : (isTeamLineupSubmitted ? 'text-emerald-400' : 'text-amber-400');
-// --- 获取完整队伍编号（宽松匹配） ---
+// [P2] 团队房间卡直接显示 team.team_code（T01/T02）；
+// 禁止从第一名球员 id_code 推导（跨队宽松匹配曾导致错码）。
+// 镜像测试：Tools/legacy-live-record-visibility/team-room-display-logic.js
 let displayCode = t.team_code || '';
-// 如果当前编号不包含 '-'（即不完整），则尝试从球员库中提取
-if (displayCode && !displayCode.includes('-')) {
-    // 清理房间中的队伍名：去除首尾空格
-    const roomTeam = t.team_name ? t.team_name.trim() : '';
-    // 1. 先尝试精确匹配（忽略组别）
-    let player = playersData.find(p => {
-        const pTeam = p.team ? p.team.trim() : '';
-        return pTeam === roomTeam;
-    });
-    // 2. 如果找不到，尝试包含匹配
-    if (!player) {
-        player = playersData.find(p => {
-            const pTeam = p.team ? p.team.trim() : '';
-            return pTeam.includes(roomTeam) || roomTeam.includes(pTeam);
-        });
-    }
-    // 3. 如果还找不到，尝试去除所有空格和特殊字符后比较
-    if (!player) {
-        const normalize = s => s ? s.replace(/\s+/g, '').toLowerCase() : '';
-        const normRoom = normalize(roomTeam);
-        player = playersData.find(p => {
-            const normPlayer = normalize(p.team);
-            return normPlayer === normRoom;
-        });
-    }
-    if (player && player.id_code && player.id_code.includes('-')) {
-        const parts = player.id_code.split('-');
-        if (parts.length >= 2) {
-            displayCode = parts.slice(0, 2).join('-');
-        }
-    }
-}
 let teamCodeDisplay = displayCode ? `<span onclick="editTeamCode('${room}', '${t.team_name}')" class="bg-slate-700 px-1.5 py-0.5 rounded cursor-pointer hover:bg-slate-600 border border-slate-500 text-[10px] text-white mr-1" title="点击修改队伍编号">${displayCode}</span>` : '';
                                 tHtml.push(`<div class="team-name text-xs font-bold ${statusColor} flex items-center">${teamCodeDisplay} <span onclick="editTeamName('${room}', '${t.team_name}')" class="cursor-pointer hover:text-amber-300">${t.team_name}</span> <span class="bg-slate-900/80 px-1 rounded text-[10px] ml-1">[${statusText}]</span></div>`);
                             });
@@ -1926,13 +1922,16 @@ let teamCodeDisplay = displayCode ? `<span onclick="editTeamCode('${room}', '${t
         };
 
         window.editCourt = async (taskId) => {
-            const newCourt = prompt(`请输入【${taskId}】的新场地号：`, '');
+            // [P2 FIXUP] 换场独立确认提示语：不得复用暂停/医疗暂停/球拍留场等语义。
+            const oldTask = Object.values(globalDashboardData?.tasks || {}).find(t => normalizeId(t.id) === normalizeId(taskId));
+            const oldCourt = oldTask ? String(oldTask.court ?? '未分配') : '未知';
+            const newCourt = prompt(`确认将本场比赛从 #${oldCourt} 号场调整至新场地？\n请输入新场地号（如 3、4...）：`, '');
             if (newCourt === null) return;
             const courtNum = newCourt.trim();
             if (!courtNum) return showToast('场地号不能为空', true);
             try {
                 const res = await apiPost('update_task_court', { match_id: taskId, court: courtNum });
-                if (res.status === 'success') { showToast(`✅ 已成功将 ${taskId} 改到 ${courtNum} 号场`); loadDashboard(); } else { showToast('修改失败：' + (res.message || ''), true); }
+                if (res.status === 'success') { showToast(`✅ 已成功将 ${taskId} 改到 ${courtNum} 号场；旧场地立即恢复空闲`); loadDashboard(); } else { showToast('修改失败：' + (res.message || ''), true); }
             } catch (e) {
                 showToast('网络错误', true);
             }
@@ -2308,6 +2307,37 @@ let teamCodeDisplay = displayCode ? `<span onclick="editTeamCode('${room}', '${t
             }
             $('pushTeamMatchesBtn').innerText = '⚡ 扫描核碰双方盲排，并下发至裁判队列';
             $('pushTeamMatchesBtn').disabled = false;
+        };
+
+        // ======================== P1-3 赛果单详情 ========================
+        // 签名安全白名单：仅接受画布导出的 data:image base64，拒绝任意 HTML/伪协议注入。
+        // 镜像测试模块：Tools/legacy-live-record-visibility/record-detail-logic.js
+        const SAFE_SIGNATURE_REGEX = /^data:image\/(?:png|jpe?g|gif|webp);base64,[A-Za-z0-9+\/=]+$/;
+        window.showRecordDetail = (idx) => {
+            const list = window.lastRecordsArr || [];
+            const r = list[idx];
+            if (!r) return;
+            const fill = (id, val) => { const el = $(id); if (el) el.textContent = (val === undefined || val === null || val === '') ? '—' : String(val); };
+            fill('rdId', r.id); fill('rdCourt', r.court ? `#${r.court} 场` : ''); fill('rdTeams', `${r.t1} vs ${r.t2}`);
+            fill('rdScore', r.score); fill('rdDetails', r.details); fill('rdWinner', r.winner);
+            fill('rdReferee', r.referee); fill('rdTime', r.time);
+            const area = $('rdSigArea');
+            if (area) {
+                area.innerHTML = '';
+                if (r.signature && SAFE_SIGNATURE_REGEX.test(r.signature)) {
+                    const img = document.createElement('img');
+                    img.src = r.signature;
+                    img.alt = '赛果确认签名';
+                    img.className = 'max-h-40 rounded';
+                    area.appendChild(img);
+                } else {
+                    const ph = document.createElement('span');
+                    ph.textContent = '（无签名图）';
+                    ph.className = 'text-slate-400 text-xs';
+                    area.appendChild(ph);
+                }
+            }
+            document.getElementById('recordDetailModal').classList.remove('hidden-panel');
         };
 
         // ======================== 手动录分 ========================

@@ -10,11 +10,11 @@ $db_user = getenv('MYSQL_USER') ?: 'root';
 $db_pass = getenv('MYSQL_PASS') ?: '';   // 与 docker-compose 里的 root 密码一致
 
 header('Content-Type: application/json; charset=utf-8');
-header('Access-Control-Allow-Origin: *'); 
+header('Access-Control-Allow-Origin: *');
 header('Access-Control-Allow-Methods: POST, GET, OPTIONS');
 header('Access-Control-Allow-Headers: Content-Type');
 
-if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') exit(0); 
+if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') exit(0);
 
 try {
     $pdo = new PDO("mysql:host=$db_host;port=$db_port;charset=utf8mb4", $db_user, $db_pass, [PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION, PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC]);
@@ -31,15 +31,16 @@ try {
     }
 } catch (PDOException $e) { echo json_encode(['status' => 'error', 'message' => '数据库连接失败']); exit; }
 
-function kv_get($event, $key, $default = []) { 
-    global $pdo; $stmt = $pdo->prepare("SELECT data_value FROM nhpa_store WHERE event_code = ? AND data_key = ?"); 
+function kv_get($event, $key, $default = []) {
+    global $pdo; $stmt = $pdo->prepare("SELECT data_value FROM nhpa_store WHERE event_code = ? AND data_key = ?");
     $stmt->execute([$event, $key]); $res = $stmt->fetchColumn(); if ($res === false) return $default;
-    $decoded = json_decode($res, true); return (json_last_error() === JSON_ERROR_NONE && (is_array($decoded) || is_object($decoded))) ? $decoded : $res; 
+    $decoded = json_decode($res, true); return (json_last_error() === JSON_ERROR_NONE && (is_array($decoded) || is_object($decoded))) ? $decoded : $res;
 }
-function kv_set($event, $key, $value) { 
-    global $pdo; $valStr = is_string($value) ? $value : json_encode($value, JSON_UNESCAPED_UNICODE); 
-    $stmt = $pdo->prepare("INSERT INTO nhpa_store (event_code, data_key, data_value) VALUES (?, ?, ?) ON DUPLICATE KEY UPDATE data_value = ?"); 
-    $stmt->execute([$event, $key, $valStr, $valStr]); 
+function kv_set($event, $key, $value) {
+    global $pdo;
+    $valStr = is_string($value) ? $value : json_encode($value, JSON_UNESCAPED_UNICODE);
+    $stmt = $pdo->prepare("INSERT INTO nhpa_store (event_code, data_key, data_value) VALUES (?, ?, ?) ON DUPLICATE KEY UPDATE data_value = ?");
+    $stmt->execute([$event, $key, $valStr, $valStr]);
 }
 function normalizeId($id) { return strtoupper(trim(preg_replace('/\s+/', '', $id))); }
 
@@ -83,8 +84,8 @@ if ($action === 'super_admin_get_events') {
 if ($action === 'super_admin_delete_event') {
     if (($req['super_pwd'] ?? '') !== $SUPER_ADMIN_PWD) { echo json_encode(['status' => 'error', 'message' => '超管鉴权失败']); exit; }
     $delCode = $req['target_code'];
-    $pdo->prepare("DELETE FROM nhpa_store WHERE event_code = ?")->execute([$delCode]); 
-    $pdo->prepare("DELETE FROM nhpa_waivers WHERE event_code = ?")->execute([$delCode]); 
+    $pdo->prepare("DELETE FROM nhpa_store WHERE event_code = ?")->execute([$delCode]);
+    $pdo->prepare("DELETE FROM nhpa_waivers WHERE event_code = ?")->execute([$delCode]);
     echo json_encode(['status' => 'success']); exit;
 }
 
@@ -93,16 +94,16 @@ if ($action === 'create_event') {
     $code = $req['custom_code'] ?? 'PICKLE' . rand(1000, 9999);
     $stmt = $pdo->prepare("SELECT 1 FROM nhpa_store WHERE event_code = ? LIMIT 1"); $stmt->execute([$code]);
     if ($stmt->fetchColumn()) { echo json_encode(['status' => 'error', 'message' => "赛事码 {$code} 已存在"]); exit; }
-    
+
     $config = ['event_name' => $req['event_name'], 'event_type' => $req['event_type'] ?? 'ind', 'courts' => $req['courts'] ?? ['1', '2', '3', '4'], 'referee_password' => $req['referee_password'], 'created_at' => date('Y-m-d H:i:s'), 'waiver_text' => ''];
     kv_set($code, 'config', $config); kv_set($code, 'players', []); kv_set($code, 'tasks', []); kv_set($code, 'records', []); kv_set($code, 'lineups', []); kv_set($code, 'referees', []); kv_set($code, 'team_event', []); kv_set($code, 'team_lineups', []); kv_set($code, 'team_template', []);
-    kv_set($code, 'event_notice', [['text' => 'Pickle球-无纸化裁判协作，全面适配网球记', 'image' => '']]); 
+    kv_set($code, 'event_notice', [['text' => 'Pickle球-无纸化裁判协作，全面适配网球记', 'image' => '']]);
     echo json_encode(['status' => 'success', 'event_code' => $code]); exit;
 }
 
 switch ($action) {
     case 'get_event_config': echo json_encode(['status' => 'success', 'data' => kv_get($event_code, 'config')]); break;
-	
+
 	case 'sync_team_player_ids':
     $room_code = normalizeId($req['room_code'] ?? '');
     $team_name = $req['team_name'] ?? '';
@@ -111,7 +112,7 @@ switch ($action) {
         echo json_encode(['status' => 'error', 'message' => '缺少必要参数']);
         break;
     }
-    
+
     // 获取队伍在房间中的组别信息
     $team_event = kv_get($event_code, 'team_event', []);
     $group = '未知组别';
@@ -123,7 +124,7 @@ switch ($action) {
             }
         }
     }
-    
+
     $players = kv_get($event_code, 'players', []);
     $counter = 1;
     $updated = 0;
@@ -146,7 +147,7 @@ switch ($action) {
     kv_set($event_code, 'players', $players);
     echo json_encode(['status' => 'success', 'updated' => $updated]);
     break;
-	
+
 	case 'ai_generate_greeting':
     $notices = kv_get($event_code, 'event_notice', []);
     $customTexts = [];
@@ -157,22 +158,20 @@ switch ($action) {
     }
     $hasNotice = !empty($customTexts);
     $noticeText = $hasNotice ? implode(' | ', $customTexts) : '';
-    
+
     // 从环境变量读取 DeepSeek API Key
     $apiKey = getenv('DEEPSEEK_API_KEY') ?: 'sk-你的备用Key（仅测试用）';
     if (empty($apiKey) || $apiKey === 'sk-你的备用Key（仅测试用）') {
-        // 若未配置，返回本地生成内容
-        $hour = date('H');
-        $timeGreeting = ($hour < 6) ? '夜深了' : (($hour < 12) ? '早上好' : (($hour < 18) ? '下午好' : '晚上好'));
-        $greeting = "小P说：{$timeGreeting}！今天是 " . date('Y年n月j日 l') . "，阳光正好，赛场见真章！加油，选手们！🏓";
-        echo json_encode(['status' => 'success', 'greeting' => $greeting, 'has_notice' => $hasNotice]);
+        // [Checkin FIXUP] 若无 AI Key，仅返回公告聚合文本；日期和时段由前端 JS 按 Asia/Shanghai 计算。
+        echo json_encode(['status' => 'success', 'greeting_body' => '', 'notice' => $noticeText, 'timezone' => 'Asia/Shanghai']);
         break;
     }
-    
-    $prompt = $hasNotice 
-        ? "以下是赛事公告内容：\"$noticeText\"。请根据这些公告内容，生成一段热情洋溢的赛场欢迎语或提示语，语气亲切，以'小P说'开头，不超过60字。"
-        : "今天是 " . date('Y年n月j日 l') . "。请生成一段热情洋溢的赛场欢迎语，包含对选手的鼓励，以'小P说'开头，不超过60字。";
-    
+
+    // [Checkin FIXUP] AI prompt 不包含具体日期和时段问候——避免跨日过期。
+    $prompt = $hasNotice
+        ? "以下是赛事公告内容：\"$noticeText\"。请根据这些公告内容，生成一段热情洋溢的赛场欢迎语或提示语，语气亲切，以'小P说'开头，不超过60字。不要包含具体日期或早上/下午/晚上等易过时的时间词。"
+        : "请生成一段热情洋溢的赛场欢迎语，包含对选手的鼓励，以'小P说'开头，不超过60字。不要包含具体日期或早上/下午/晚上等易过时的时间词。";
+
     $ch = curl_init('https://api.deepseek.com/v1/chat/completions');
     curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
     curl_setopt($ch, CURLOPT_POST, true);
@@ -192,24 +191,22 @@ switch ($action) {
     $response = curl_exec($ch);
     $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
     curl_close($ch);
-    
+
     if ($httpCode === 200) {
         $result = json_decode($response, true);
-        $greeting = $result['choices'][0]['message']['content'] ?? '';
+        $greetingBody = $result['choices'][0]['message']['content'] ?? '';
     } else {
-        $greeting = '';
+        $greetingBody = '';
     }
-    
-    if (empty($greeting)) {
-        // 降级
-        $hour = date('H');
-        $timeGreeting = ($hour < 6) ? '夜深了' : (($hour < 12) ? '早上好' : (($hour < 18) ? '下午好' : '晚上好'));
-        $greeting = "小P说：{$timeGreeting}！今天是 " . date('Y年n月j日 l') . "，阳光正好，赛场见真章！加油，选手们！🏓";
+
+    // [Checkin FIXUP] AI 失败时返回空正文而非带日期的降级文本。
+    if (empty($greetingBody)) {
+        $greetingBody = '';
     }
-    
-    echo json_encode(['status' => 'success', 'greeting' => $greeting, 'has_notice' => $hasNotice]);
+
+    echo json_encode(['status' => 'success', 'greeting_body' => $greetingBody, 'notice' => $noticeText, 'timezone' => 'Asia/Shanghai']);
     break;
-	
+
 	case 'update_task_date':
     $match_id = normalizeId($req['match_id'] ?? '');
     $new_date = trim($req['date'] ?? '');
@@ -233,7 +230,7 @@ switch ($action) {
     kv_set($event_code, 'tasks', $tasks);
     echo json_encode(['status' => 'success']);
     break;
-	
+
 	case 'clear_all_team_rooms':
     $conf = kv_get($event_code, 'config');
     if (($req['password'] ?? '') !== ($conf['referee_password'] ?? '')) {
@@ -244,7 +241,7 @@ switch ($action) {
     kv_set($event_code, 'team_lineups', []);
     echo json_encode(['status' => 'success']);
     break;
-	
+
 	case 'update_event_config':
     // 验证超管密码
     if (($req['super_pwd'] ?? '') !== $SUPER_ADMIN_PWD) {
@@ -270,7 +267,7 @@ switch ($action) {
     kv_set($target_code, 'config', $config);
     echo json_encode(['status' => 'success', 'data' => $config]);
     break;
-	
+
 	case 'update_event_code':
     if (($req['super_pwd'] ?? '') !== $SUPER_ADMIN_PWD) {
         echo json_encode(['status' => 'error', 'message' => '超管鉴权失败']);
@@ -322,14 +319,14 @@ switch ($action) {
         echo json_encode(['status' => 'error', 'message' => '迁移失败：' . $e->getMessage()]);
     }
     break;
-    
+
 	case 'get_live_scoreboard':
     $match_id = $_GET['match_id'] ?? '';
     if (!$match_id) {
         echo json_encode(['status' => 'error', 'message' => '缺少 match_id']);
         break;
     }
-    
+
     // 从 tasks 中查找该比赛
     $tasks = kv_get($event_code, 'tasks', []);
     $match = null;
@@ -339,18 +336,18 @@ switch ($action) {
             break;
         }
     }
-    
+
     if (!$match) {
         echo json_encode(['status' => 'success', 'data' => null]);
         break;
     }
-    
+
     // 解析比分（假设格式为 "21-15" 或 "G2 11-8"）
     $score = $match['live_score'] ?? '0-0';
     $parts = explode('-', preg_replace('/[^0-9-]/', '', $score));
     $t1_score = isset($parts[0]) ? intval($parts[0]) : 0;
     $t2_score = isset($parts[1]) ? intval($parts[1]) : 0;
-    
+
     // 从 match 中提取局分、盘分（需在 referee.html 保存时一并存储）
     // 如果没有单独存储，可简单返回 0
     $response = [
@@ -367,17 +364,17 @@ switch ($action) {
         'status' => $match['status'] ?? '待开始',
         'match_name' => $match['match_name'] ?? ($match['t1'] ?? '') . ' vs ' . ($match['t2'] ?? '')
     ];
-    
+
     echo json_encode(['status' => 'success', 'data' => $response]);
     break;
-	
+
     case 'referee_login':
         $conf = kv_get($event_code, 'config'); if (empty($conf) || $conf['referee_password'] !== $req['password']) { echo json_encode(['status' => 'error', 'message' => '密码错误']); exit; }
         $refs = kv_get($event_code, 'referees', []); $name = $req['name']; $found = false;
         foreach ($refs as &$r) { if ($r['name'] === $name) { $r['last_login'] = date('Y-m-d H:i:s'); $found = true; break; } }
         if (!$found) $refs[] = ['name' => $name, 'status' => '空闲', 'current_court' => '', 'match_count' => 0, 'comment' => '', 'last_login' => date('Y-m-d H:i:s')];
         kv_set($event_code, 'referees', $refs); echo json_encode(['status' => 'success', 'referee_id' => $name, 'name' => $name]); break;
-        
+
     case 'get_full_dashboard':
         $res = ['status' => 'success', 'tasks' => kv_get($event_code, 'tasks', []), 'records' => array_reverse(kv_get($event_code, 'records', [])), 'team_lineups' => kv_get($event_code, 'team_lineups', []), 'team_event' => kv_get($event_code, 'team_event', []), 'courts' => []];
         $conf = kv_get($event_code, 'config', []); $courts = $conf['courts'] ?? []; $refs = kv_get($event_code, 'referees', []); $live = kv_get($event_code, 'live_scores', []);
@@ -388,8 +385,40 @@ switch ($action) {
                 if (isset($live[$r['current_court']])) { $res['courts'][$r['current_court']]['score'] = $live[$r['current_court']]['score']; $res['courts'][$r['current_court']]['match_name'] = $live[$r['current_court']]['match_name']; $res['courts'][$r['current_court']]['match_id'] = $live[$r['current_court']]['match_id']; }
             }
         }
+        // P1-2：以 task id/court 为唯一关联，将活动比赛投影到对应场地卡片（不建立第二套状态）。
+        // 比分来自 tasks[].live_score（referee sync_live_score 实时写入）；
+        // 完赛后 save_score 删除 task，投影自动消失，场地恢复空闲不残留。
+        // [P1-2 FIXUP] 扩展 status='待开赛' 覆盖：accept_task 写入 live_scores 后 Master 可提前显示真实队名。
+        // 镜像测试：Tools/legacy-live-record-visibility/court-projection-logic.js
+        foreach ($res['tasks'] as $t) {
+            $tc = trim($t['court'] ?? '');
+            if (($t['status'] ?? '') === '比赛中' && $tc !== '' && isset($res['courts'][$tc]) && $res['courts'][$tc]['match_id'] === '') {
+                $res['courts'][$tc]['status'] = '比赛中';
+                $res['courts'][$tc]['match_id'] = $t['id'] ?? '';
+                $res['courts'][$tc]['match_name'] = trim(($t['t1'] ?? '') . ' vs ' . ($t['t2'] ?? ''));
+                $res['courts'][$tc]['score'] = $t['live_score'] ?? '';
+            }
+            // [P1-2 FIXUP] 同理由 live_scores 中的待开赛状态覆盖：如果此 court 已被 accept_task 写入，且尚未被 task 投影占据。
+            if (isset($live[$tc]) && ($live[$tc]['status'] ?? '') === '待开赛' && isset($res['courts'][$tc]) && $res['courts'][$tc]['match_id'] === '') {
+                $res['courts'][$tc]['status'] = $live[$tc]['status'] ?? '待开赛';
+                $res['courts'][$tc]['match_id'] = $live[$tc]['match_id'] ?? '';
+                $res['courts'][$tc]['match_name'] = $live[$tc]['match_name'] ?? '';
+                $res['courts'][$tc]['score'] = $live[$tc]['score'] ?? '0-0';
+                $res['courts'][$tc]['referee'] = $live[$tc]['referee'] ?? '';
+            }
+        }
+        // [PR#155 R8] 返回裁判矩阵数据（不返回密码或不必要内部字段）
+        $res['referees'] = array_map(function ($r) {
+            return [
+                'name' => $r['name'] ?? '',
+                'status' => $r['status'] ?? '空闲',
+                'current_court' => $r['current_court'] ?? '',
+                'match_count' => $r['match_count'] ?? 0,
+                'last_login' => $r['last_login'] ?? ''
+            ];
+        }, $refs);
         echo json_encode($res); break;
-        
+
     case 'change_event_mode':
         if (($req['super_pwd'] ?? '') !== $SUPER_ADMIN_PWD) { echo json_encode(['status' => 'error', 'message' => 'Auth Failed']); exit; }
         $cfg = kv_get($event_code, 'config', []);
@@ -400,7 +429,7 @@ switch ($action) {
 
     case 'get_players': echo json_encode(['status' => 'success', 'data' => kv_get($event_code, 'players', [])]); break;
     case 'set_players': kv_set($event_code, 'players', $req['players']); echo json_encode(['status' => 'success']); break;
-    
+
     case 'get_waivers':
         $stmt = $pdo->prepare("SELECT player_name, id_last4, signature, sign_time, waiver_text FROM nhpa_waivers WHERE event_code = ? ORDER BY sign_time DESC");
         $stmt->execute([$event_code]);
@@ -439,7 +468,7 @@ switch ($action) {
         if (!$found) $players[] = ['id_code' => 'P'.rand(1000, 9999), 'group' => '现场加报', 'position' => count($players)+1, 'name' => $req['player_name'], 'team' => '', 'checked_in' => true, 'id_last4' => $req['id_last4'], 'sign_time' => date('Y-m-d H:i:s')];
         kv_set($event_code, 'players', $players);
         echo json_encode(['status' => 'success']); break;
-		
+
 		case 'check_waiver':
     $player_name = trim($req['player_name'] ?? $_GET['player_name'] ?? '');
     if (!$player_name) {
@@ -455,7 +484,7 @@ switch ($action) {
         echo json_encode(['status' => 'success', 'data' => null]);
     }
     break;
-	
+
 	case 'clear_players':
     $conf = kv_get($event_code, 'config');
     if (($req['password'] ?? '') !== ($conf['referee_password'] ?? '')) {
@@ -484,31 +513,205 @@ switch ($action) {
         // 这里的关键是：确保传入的每一场任务都包含 'date' 字段（如果有的话）
         $combined = array_merge(array_values($existing), $new_tasks);
         $final_tasks = [];
-        foreach($combined as $t) { 
+        foreach($combined as $t) {
             // 确保日期戳被持久化存储
-            $final_tasks[$t['id']] = $t; 
+            $final_tasks[$t['id']] = $t;
         }
         kv_set($event_code, 'tasks', $final_tasks);
         echo json_encode(['status' => 'success']); break;
     case 'delete_task': $tasks = kv_get($event_code, 'tasks', []); $normId = normalizeId($req['match_id']); unset($tasks[$normId]); kv_set($event_code, 'tasks', $tasks); echo json_encode(['status' => 'success']); break;
     case 'update_task_court':
+        // [P2 FIXUP + SECOND HARDENING] 更换比赛场地（Master 改场）：迁移 live_scores 投影。
+        // - 目标场地被其他 task 占用 → 拒绝且零写入（含 tasks KV）
+        // - 同场地重复提交 → 幂等 success
+        // - 比分权威回退：旧场地 live_scores.score → task.live_score → task.score → 0-0
+        // - 不复制 pause/timeout 等 stale 状态
         $match_id = normalizeId($req['match_id'] ?? '');
         $new_court = trim($req['court'] ?? '');
         if (!$match_id || !$new_court) { echo json_encode(['status' => 'error', 'message' => '缺少比赛ID或场地号']); break; }
         $tasks = kv_get($event_code, 'tasks', []);
-        $found = false;
-        foreach ($tasks as $key => &$task) {
-            if (normalizeId($key) === $match_id) { $task['court'] = $new_court; $found = true; break; }
+        $task = null; $task_key = null;
+        foreach ($tasks as $key => $t) {
+            if (normalizeId($key) === $match_id) { $task = $t; $task_key = $key; break; }
         }
-        if (!$found) { echo json_encode(['status' => 'error', 'message' => '未找到该比赛']); break; }
-        kv_set($event_code, 'tasks', $tasks);
+        if (!$task) { echo json_encode(['status' => 'error', 'message' => '未找到该比赛']); break; }
         $live = kv_get($event_code, 'live_scores', []);
         $old_court = null;
-        foreach ($live as $court => $info) {
-            if (isset($info['match_id']) && normalizeId($info['match_id']) === $match_id) { $old_court = $court; break; }
+        foreach ($live as $c => $info) {
+            if (isset($info['match_id']) && normalizeId($info['match_id']) === $match_id) { $old_court = $c; break; }
         }
-        if ($old_court && $old_court !== $new_court) { $live[$new_court] = $live[$old_court]; unset($live[$old_court]); kv_set($event_code, 'live_scores', $live); }
+        // 幂等：live 投影或 task 已在目标场地 → 不重复迁移（覆盖"无投影仅 task"的重复提交）
+        if (($old_court !== null && $old_court === $new_court) || trim($task['court'] ?? '') === $new_court) {
+            echo json_encode(['status' => 'success', 'idempotent' => true]);
+            break;
+        }
+        // 目标场地被其他 task 占用 → 拒绝且零写入（不得先写 tasks KV）
+        if (isset($live[$new_court]) && normalizeId($live[$new_court]['match_id'] ?? '') !== $match_id) {
+            $occ = $live[$new_court]['match_id'];
+            echo json_encode(['status' => 'error', 'message' => "场地 #{$new_court} 已被其他任务（{$occ}）占用，禁止改场"]);
+            break;
+        }
+        $tasks[$task_key]['court'] = $new_court;
+        kv_set($event_code, 'tasks', $tasks);
+        if ($old_court !== $new_court) {
+            $src = ($old_court !== null && isset($live[$old_court])) ? $live[$old_court] : null;
+            $has_authoritative_score = isset($task['live_score']) && $task['live_score'] !== '';
+            if ($src !== null || $has_authoritative_score) {
+                // 比分权威回退链：旧投影 score → task.live_score → task.score → 0-0
+                if ($src !== null && isset($src['score'])) {
+                    $new_score = $src['score'];
+                } else if ($has_authoritative_score) {
+                    $new_score = $task['live_score'];
+                } else if (isset($task['score']) && $task['score'] !== '') {
+                    $new_score = $task['score'];
+                } else {
+                    $new_score = '0-0';
+                }
+                $live[$new_court] = [
+                    'match_id' => ($src['match_id'] ?? '') !== '' ? $src['match_id'] : $match_id,
+                    'status' => $src['status'] ?? ((($task['status'] ?? '') !== '') ? $task['status'] : '比赛中'),
+                    'match_name' => ($src['match_name'] ?? '') !== '' ? $src['match_name'] : trim(($task['t1'] ?? '') . ' vs ' . ($task['t2'] ?? '')),
+                    'score' => $new_score,
+                    'referee' => $src['referee'] ?? ($task['referee'] ?? ''),
+                    'court' => $new_court,
+                    'is_team' => $src['is_team'] ?? ($task['is_team'] ?? false),
+                ];
+                if ($old_court !== null) unset($live[$old_court]);
+                kv_set($event_code, 'live_scores', $live);
+            }
+            // 既无 live 投影也无 live_score（未开赛任务）：只更新 task.court（已在上方完成），
+            // 不伪造投影——避免把未开始的任务伪造成"比赛中"。
+        }
         echo json_encode(['status' => 'success']);
+        break;
+    case 'accept_task':
+        // [PR#155 R2] 原子事务版领取：事件级互斥锁 + 锁内全量校验 + 单事务写入。
+        // 消除两个 PHP worker 同时领取成功的竞态窗口；权威数据全部取自服务端 KV。
+        $match_id = normalizeId($req['match_id'] ?? '');
+        $referee_id = normalizeId($req['referee_id'] ?? trim($req['ref'] ?? ''));
+        if (!$match_id) { echo json_encode(['status' => 'error', 'message' => '缺少比赛ID']); break; }
+        if (!$referee_id) { echo json_encode(['status' => 'error', 'message' => '缺少裁判ID']); break; }
+        try {
+            $pdo->beginTransaction();
+            $lockStmt = $pdo->prepare("SELECT data_value FROM nhpa_store WHERE event_code = ? AND data_key = 'config' FOR UPDATE");
+            $lockStmt->execute([$event_code]);
+            if ($lockStmt->fetchColumn() === false) { $pdo->rollBack(); echo json_encode(['status' => 'error', 'message' => '赛事不存在']); break; }
+            // 1. 锁内读取权威 tasks；按实际 key 查找，不得假设 $tasks[$match_id] 存在
+            $tasks = kv_get($event_code, 'tasks', []);
+            $task = null;
+            foreach ($tasks as $key => $t) { if (normalizeId($key) === $match_id) { $task = $t; break; } }
+            if (!$task) { $pdo->rollBack(); echo json_encode(['status' => 'error', 'message' => '未找到该比赛任务']); break; }
+            // 2. task.court 必须非空（否则说明主控尚未分配场地）
+            $assigned_court = trim($task['court'] ?? '');
+            if ($assigned_court === '') { $pdo->rollBack(); echo json_encode(['status' => 'error', 'message' => '该任务尚未分配场地，无法接受。请先由主控分配场地。']); break; }
+            // 3. referee_id 必须已注册于 referees KV（防止伪造裁判领取）
+            $refs = kv_get($event_code, 'referees', []);
+            $refRegistered = false;
+            foreach ($refs as $r) { if (normalizeId($r['name'] ?? '') === $referee_id) { $refRegistered = true; break; } }
+            if (!$refRegistered) { $pdo->rollBack(); echo json_encode(['status' => 'error', 'message' => '该裁判未在本赛事注册，无法领取任务']); break; }
+            // 4. [PR#155 R5] task.status 仅允许缺省/未开始；比赛中或其他终态一律拒绝
+            //    必须在 live_scores 归属/幂等检查之前执行，防止待开赛投影绕过终态校验
+            $taskStatus = $task['status'] ?? '';
+            if ($taskStatus !== '' && $taskStatus !== '未开始') {
+                $pdo->rollBack(); echo json_encode(['status' => 'error', 'message' => "该任务状态为「{$taskStatus}」，不可领取"]); break;
+            }
+            // 5. 归属检查：该 task 若已有任何投影（不限状态）
+            //    - 待开赛 + 相同 referee → 幂等 success（零写入）
+            //    - 其他情况（不同 referee / 已开赛）→ 拒绝，原归属保持
+            $live = kv_get($event_code, 'live_scores', []);
+            foreach ($live as $court => $info) {
+                if (normalizeId($info['match_id'] ?? '') === $match_id) {
+                    if (($info['status'] ?? '') === '待开赛' && normalizeId($info['referee'] ?? '') === $referee_id) {
+                        $pdo->rollBack(); echo json_encode(['status' => 'success', 'idempotent' => true]); break 2;
+                    }
+                    $other = $info['referee'] ?? '未知';
+                    $pdo->rollBack(); echo json_encode(['status' => 'error', 'message' => "该任务已被裁判 {$other} 接受，不可重复领取"]); break 2;
+                }
+            }
+            // 5a. [PR#155 R3] 同一裁判不得同时拥有两个不同 task/court 的投影（不论待开赛还是比赛中）
+            foreach ($live as $court => $info) {
+                if (normalizeId($info['referee'] ?? '') === $referee_id && normalizeId($info['match_id'] ?? '') !== $match_id) {
+                    $other_match = $info['match_id'];
+                    $pdo->rollBack(); echo json_encode(['status' => 'error', 'message' => "该裁判已领取其他任务（{$other_match}），不可同时领取两个任务"]); break 2;
+                }
+            }
+            // 6. 同一 court 上存在任何不同 match_id 的投影 → 拒绝，不论待开赛还是比赛中
+            foreach ($live as $court => $info) {
+                if ((string)$court === (string)$assigned_court && normalizeId($info['match_id'] ?? '') !== $match_id) {
+                    $other_match = $info['match_id'];
+                    $pdo->rollBack(); echo json_encode(['status' => 'error', 'message' => "场地 #{$assigned_court} 已被其他任务（{$other_match}）占用，无法覆盖"]); break 2;
+                }
+            }
+            // 7. 全部校验通过——使用服务端权威数据写入投影（court/t1/t2/is_team 均取自 task，忽略客户端伪造字段）
+            $live[$assigned_court] = [
+                'match_id' => $match_id,
+                'status' => '待开赛',
+                'match_name' => ($task['t1'] ?? '') . ' vs ' . ($task['t2'] ?? ''),
+                'score' => '0-0',
+                'referee' => $referee_id,
+                'court' => $assigned_court,
+                'is_team' => $task['is_team'] ?? false,
+                'accepted_at' => date('Y-m-d H:i:s'),
+            ];
+            kv_set($event_code, 'live_scores', $live);
+            $pdo->commit();
+            echo json_encode(['status' => 'success', 'idempotent' => false]);
+        } catch (Exception $e) {
+            if ($pdo->inTransaction()) $pdo->rollBack();
+            echo json_encode(['status' => 'error', 'message' => $e->getMessage()]);
+        }
+        break;
+    case 'release_task_acceptance':
+        // [PR#155 R2] 原子事务版释放：删除待开赛投影 + 裁判重置在同一事务内完成，
+        // 避免“先删投影、后写 referees”第二次写入失败形成部分状态。
+        $referee_id = normalizeId($req['referee_id'] ?? '');
+        if (!$referee_id) { echo json_encode(['status' => 'error', 'message' => '缺少裁判ID']); break; }
+        $req_match = normalizeId($req['match_id'] ?? '');
+        try {
+            $pdo->beginTransaction();
+            $lockStmt = $pdo->prepare("SELECT data_value FROM nhpa_store WHERE event_code = ? AND data_key = 'config' FOR UPDATE");
+            $lockStmt->execute([$event_code]);
+            if ($lockStmt->fetchColumn() === false) { $pdo->rollBack(); echo json_encode(['status' => 'error', 'message' => '赛事不存在']); break; }
+            $live = kv_get($event_code, 'live_scores', []);
+            $target_court = null;
+            foreach ($live as $court => $info) {
+                $is_mine = normalizeId($info['referee'] ?? '') === $referee_id;
+                if ($req_match !== '') {
+                    if (normalizeId($info['match_id'] ?? '') !== $req_match) continue;
+                    if (($info['status'] ?? '') !== '待开赛') {
+                        $pdo->rollBack(); echo json_encode(['status' => 'error', 'message' => '比赛已开始，禁止普通释放；请使用正式中断或完赛流程']); break 2;
+                    }
+                    if (!$is_mine) {
+                        $pdo->rollBack(); echo json_encode(['status' => 'error', 'message' => '该任务由其他裁判接受，无权释放']); break 2;
+                    }
+                    $target_court = $court;
+                    break;
+                }
+                if ($is_mine && ($info['status'] ?? '') === '待开赛') { $target_court = $court; break; }
+            }
+            if ($target_court === null) {
+                $pdo->rollBack();
+                echo json_encode(['status' => 'success', 'released' => false]); // 无可释放投影：幂等且零写入
+                break;
+            }
+            // 同一事务内同时完成：删除投影 + 裁判重置；任一步失败整体 rollback
+            unset($live[$target_court]);
+            kv_set($event_code, 'live_scores', $live);
+            $refs = kv_get($event_code, 'referees', []);
+            foreach ($refs as $idx => $r) {
+                if (normalizeId($r['name'] ?? '') === $referee_id) {
+                    $refs[$idx]['status'] = '空闲';
+                    $refs[$idx]['current_court'] = '';
+                    break;
+                }
+            }
+            kv_set($event_code, 'referees', $refs);
+            $pdo->commit();
+            echo json_encode(['status' => 'success', 'released' => true, 'court' => (string)$target_court]);
+        } catch (Exception $e) {
+            if ($pdo->inTransaction()) $pdo->rollBack();
+            echo json_encode(['status' => 'error', 'message' => $e->getMessage()]);
+        }
         break;
     case 'clear_all_tasks': kv_set($event_code, 'tasks', []); echo json_encode(['status' => 'success']); break;
     case 'delete_team_room':
@@ -594,7 +797,7 @@ switch ($action) {
     echo json_encode(['status' => 'success']);
     break;
     case 'get_personal_task':
-        $tasks = kv_get($event_code, 'tasks', []); $match_id = normalizeId($_GET['match_id'] ?? ''); $found = null; 
+        $tasks = kv_get($event_code, 'tasks', []); $match_id = normalizeId($_GET['match_id'] ?? ''); $found = null;
         foreach ($tasks as $key => $task) { if (normalizeId($key) === $match_id) { $found = $task; break; } } echo $found ? json_encode(['status' => 'success', 'data' => $found]) : json_encode(['status' => 'empty']); break;
     case 'get_personal_tasks': echo json_encode(['status' => 'success', 'tasks' => kv_get($event_code, 'tasks', [])]); break;
     case 'get_referees': echo json_encode(['status' => 'success', 'data' => kv_get($event_code, 'referees', [])]); break;
@@ -602,39 +805,249 @@ switch ($action) {
         $refs = kv_get($event_code, 'referees', []); foreach ($refs as &$r) { if ($r['name'] === $req['referee_id']) { $r['comment'] = $req['comment']; break; } } kv_set($event_code, 'referees', $refs); echo json_encode(['status' => 'success']); break;
     case 'delete_referee':
         $refs = kv_get($event_code, 'referees', []); $refs = array_filter($refs, function($r) use ($req) { return $r['name'] !== $req['referee_id']; }); kv_set($event_code, 'referees', array_values($refs)); echo json_encode(['status' => 'success']); break;
-    case 'set_referees': kv_set($event_code, 'referees', $req['referees'] ?? []); echo json_encode(['status' => 'success']); break;    
+    case 'set_referees': kv_set($event_code, 'referees', $req['referees'] ?? []); echo json_encode(['status' => 'success']); break;
     case 'referee_update_status':
+        // [PR#155 REVIEW FIX] referee_update_status 只负责更新裁判状态和场地，不再删除 live_scores 投影。
+        // 投影清除只能由 release_task_acceptance（待开赛释放）或 save_score（完赛事务）执行，
+        // 防止裁判登录时因 courtNo 默认值误删待开赛/比赛中投影。
         $refs = kv_get($event_code, 'referees', []); foreach ($refs as &$r) { if ($r['name'] === $req['referee_id']) { $r['status'] = $req['status']; $r['current_court'] = $req['court']; } } kv_set($event_code, 'referees', $refs);
-        if ($req['status'] === '空闲' && !empty($req['court'])) { $live = kv_get($event_code, 'live_scores', []); unset($live[$req['court']]); kv_set($event_code, 'live_scores', $live); } echo json_encode(['status' => 'success']); break;
-    case 'sync_live_score':
-        $courts = kv_get($event_code, 'courts', []); $c = $req['court'] ?? '';
-        if($c && isset($courts[$c])) {
-            $courts[$c] = array_merge($courts[$c], ['score' => $req['score_text'], 'status' => $req['status'], 'match_name' => $req['match_name']]);
-            kv_set($event_code, 'courts', $courts);
-        }
-        $tasks = kv_get($event_code, 'tasks', []);
-        $mid = $req['match_id'] ?? '';
-        if ($mid && isset($tasks[$mid])) {
-            $tasks[$mid]['live_score'] = $req['score_text'];
-            $tasks[$mid]['status'] = $req['status'];
-            kv_set($event_code, 'tasks', $tasks);
-        }
         echo json_encode(['status' => 'success']); break;
+    case 'start_task':
+        // [PR#155 R2] 原子开赛动作（修正版）：事件锁内全量校验 + 单事务写入。
+        // 修正：目标场地存在不同 match_id 投影一律拒绝（不论待开赛/比赛中）；
+        // 补充：referee 必须已注册、投影场地与 task 场地一致、裁判已在其他场地执裁时拒绝。
+        $match_id = normalizeId($req['match_id'] ?? '');
+        $referee_id = $req['referee_id'] ?? '';
+        $score_text = $req['score_text'] ?? '0-0';
+        if (!$match_id) { echo json_encode(['status' => 'error', 'message' => '缺少比赛ID']); break; }
+        if (!$referee_id) { echo json_encode(['status' => 'error', 'message' => '缺少裁判ID']); break; }
+        try {
+            $pdo->beginTransaction();
+            // 事件级互斥锁：锁定 config 行防止并发开赛
+            $lockStmt = $pdo->prepare("SELECT data_value FROM nhpa_store WHERE event_code = ? AND data_key = 'config' FOR UPDATE");
+            $lockStmt->execute([$event_code]);
+            if ($lockStmt->fetchColumn() === false) { $pdo->rollBack(); echo json_encode(['status' => 'error', 'message' => '赛事不存在']); break; }
+            $tasks = kv_get($event_code, 'tasks', []);
+            $live = kv_get($event_code, 'live_scores', []);
+            $refs = kv_get($event_code, 'referees', []);
+            // 1. task 必须存在且已分配场地；保存实际 task key，不得假设 $tasks[$match_id] 存在
+            $task = null; $task_key = null; $taskCourt = '';
+            foreach ($tasks as $key => $t) { if (normalizeId($key) === $match_id) { $task = $t; $task_key = $key; $taskCourt = trim($t['court'] ?? ''); break; } }
+            if (!$task) { $pdo->rollBack(); echo json_encode(['status' => 'error', 'message' => '未找到该比赛任务']); break; }
+            if ($taskCourt === '') { $pdo->rollBack(); echo json_encode(['status' => 'error', 'message' => '该任务未分配场地']); break; }
+            // 1a. [PR#155 R3] task.status 必须为缺省/未开始；异常的"比赛中 + 待开赛投影"不得再次开赛
+            $taskStatus = $task['status'] ?? '';
+            if ($taskStatus !== '' && $taskStatus !== '未开始') {
+                // [PR#155 R6] 响应丢失幂等恢复：task.status=比赛中时，检查完整权威状态
+                if ($taskStatus === '比赛中') {
+                    $liveCourt2 = null;
+                    foreach ($live as $court => $info) { if (normalizeId($info['match_id'] ?? '') === $match_id) { $liveCourt2 = $court; break; } }
+                    if ($liveCourt2 !== null
+                        && ($live[$liveCourt2]['status'] ?? '') === '比赛中'
+                        && normalizeId($live[$liveCourt2]['referee'] ?? '') === normalizeId($referee_id)
+                        && (string)$liveCourt2 === (string)$taskCourt
+                    ) {
+                        $refIdx2 = null;
+                        foreach ($refs as $idx => $r) { if (normalizeId($r['name'] ?? '') === normalizeId($referee_id)) { $refIdx2 = $idx; break; } }
+                        if ($refIdx2 !== null
+                            && ($refs[$refIdx2]['status'] ?? '') === '执裁中'
+                            && (string)($refs[$refIdx2]['current_court'] ?? '') === (string)$taskCourt
+                            && ($task['live_score'] ?? '') === ($live[$liveCourt2]['score'] ?? '')
+                            && ($task['live_score'] ?? '') === $score_text
+                        ) {
+                            $pdo->rollBack();
+                            echo json_encode(['status' => 'success', 'idempotent' => true, 'court' => $taskCourt]);
+                            break;
+                        }
+                    }
+                }
+                $pdo->rollBack(); echo json_encode(['status' => 'error', 'message' => "该任务状态为「{$taskStatus}」，不可开赛"]); break;
+            }
+            // 2. live_scores 中必须存在该 task 的待开赛投影，且投影场地与 task 权威场地一致
+            $liveCourt = null;
+            foreach ($live as $court => $info) { if (normalizeId($info['match_id'] ?? '') === $match_id) { $liveCourt = $court; break; } }
+            if ($liveCourt === null) { $pdo->rollBack(); echo json_encode(['status' => 'error', 'message' => '无待开赛投影']); break; }
+            if ((string)$liveCourt !== (string)$taskCourt) { $pdo->rollBack(); echo json_encode(['status' => 'error', 'message' => '投影场地与任务场地不一致，请重新领取']); break; }
+            if (($live[$liveCourt]['status'] ?? '') !== '待开赛') { $pdo->rollBack(); echo json_encode(['status' => 'error', 'message' => '投影状态不是待开赛']); break; }
+            // 3. 投影 referee 与请求 referee_id 一致
+            if (normalizeId($live[$liveCourt]['referee'] ?? '') !== normalizeId($referee_id)) { $pdo->rollBack(); echo json_encode(['status' => 'error', 'message' => '裁判归属不匹配']); break; }
+            // 4. 目标场地存在任何不同 match_id 的投影 → 一律拒绝，不论待开赛还是比赛中
+            foreach ($live as $court => $info) {
+                if ((string)$court === (string)$taskCourt && normalizeId($info['match_id'] ?? '') !== $match_id) {
+                    $pdo->rollBack(); echo json_encode(['status' => 'error', 'message' => '场地已被其他比赛占用']); break 2;
+                }
+            }
+            // 5. referee 必须已注册；找不到时 rollback，不得把 task/live 改为比赛中（零部分写入）
+            $refIdx = null;
+            foreach ($refs as $idx => $r) { if (normalizeId($r['name'] ?? '') === normalizeId($referee_id)) { $refIdx = $idx; break; } }
+            if ($refIdx === null) { $pdo->rollBack(); echo json_encode(['status' => 'error', 'message' => '裁判未注册，无法开赛']); break; }
+            // 6. 裁判当前若已在其他 court 执裁 → 拒绝开赛（同场重复开赛不受此限）
+            if (($refs[$refIdx]['status'] ?? '') === '执裁中' && (string)($refs[$refIdx]['current_court'] ?? '') !== (string)$taskCourt) {
+                $pdo->rollBack(); echo json_encode(['status' => 'error', 'message' => '该裁判正在其他场地执裁，无法开赛']); break;
+            }
+            // 所有校验通过——原子写入（均使用实际 key/场地）
+            $tasks[$task_key]['status'] = '比赛中'; $tasks[$task_key]['live_score'] = $score_text;
+            kv_set($event_code, 'tasks', $tasks);
+            $live[$liveCourt]['status'] = '比赛中'; $live[$liveCourt]['score'] = $score_text;
+            if (!empty($req['match_name'])) $live[$liveCourt]['match_name'] = $req['match_name'];
+            kv_set($event_code, 'live_scores', $live);
+            $refs[$refIdx]['status'] = '执裁中'; $refs[$refIdx]['current_court'] = $taskCourt;
+            kv_set($event_code, 'referees', $refs);
+            $pdo->commit();
+            echo json_encode(['status' => 'success', 'idempotent' => false, 'court' => $taskCourt]);
+        } catch (Exception $e) {
+            if ($pdo->inTransaction()) $pdo->rollBack();
+            echo json_encode(['status' => 'error', 'message' => $e->getMessage()]);
+        }
+        break;
+    case 'sync_live_score':
+        // [PR#155 REVIEW FIX] 加固归属校验：每次比分同步必须验证 referee_id 与投影归属一致。
+        $courts = kv_get($event_code, 'courts', []); $c = $req['court'] ?? '';
+        $mid = $req['match_id'] ?? '';
+        $referee_id = $req['referee_id'] ?? '';
+        $norm_mid = normalizeId($mid);
+        if (!$mid || !$referee_id) { echo json_encode(['status' => 'error', 'message' => '缺少 match_id 或 referee_id']); break; }
+        try {
+            $pdo->beginTransaction();
+            $lockStmt = $pdo->prepare("SELECT data_value FROM nhpa_store WHERE event_code = ? AND data_key = 'config' FOR UPDATE");
+            $lockStmt->execute([$event_code]);
+            if ($lockStmt->fetchColumn() === false) { $pdo->rollBack(); echo json_encode(['status' => 'error', 'message' => '赛事不存在']); break; }
+            $tasks = kv_get($event_code, 'tasks', []);
+            $live = kv_get($event_code, 'live_scores', []);
+            // 1. task 必须存在
+            $taskExists = false;
+            foreach ($tasks as $key => $t) { if (normalizeId($key) === $norm_mid) { $taskExists = true; break; } }
+            if (!$taskExists) { $pdo->rollBack(); echo json_encode(['status' => 'error', 'message' => '任务不存在']); break; }
+            // 2. live_scores 投影必须存在
+            $liveCourt = null;
+            foreach ($live as $court => $info) { if (normalizeId($info['match_id'] ?? '') === $norm_mid) { $liveCourt = $court; break; } }
+            if (!$liveCourt) { $pdo->rollBack(); echo json_encode(['status' => 'error', 'message' => '无有效投影']); break; }
+            // 3. 投影必须为比赛中
+            if (($live[$liveCourt]['status'] ?? '') !== '比赛中') { $pdo->rollBack(); echo json_encode(['status' => 'error', 'message' => '比赛未在进行中']); break; }
+            // 4. referee 归属一致
+            if (normalizeId($live[$liveCourt]['referee'] ?? '') !== normalizeId($referee_id)) { $pdo->rollBack(); echo json_encode(['status' => 'error', 'message' => '裁判归属不匹配']); break; }
+            // 5. court 与权威投影一致（PHP 数组键 int/string 自动转换，用 == 比较）
+            if ($c && (string)$c !== (string)$liveCourt) { $pdo->rollBack(); echo json_encode(['status' => 'error', 'message' => '场地不一致']); break; }
+            // 校验通过——更新比分
+            if (isset($courts[$liveCourt])) {
+                $courts[$liveCourt] = array_merge($courts[$liveCourt], ['score' => $req['score_text'], 'status' => '比赛中', 'match_name' => $req['match_name']]);
+                kv_set($event_code, 'courts', $courts);
+            }
+            foreach ($tasks as $key => &$t) {
+                if (normalizeId($key) === $norm_mid) { $t['live_score'] = $req['score_text']; $t['status'] = '比赛中'; break; }
+            }
+            kv_set($event_code, 'tasks', $tasks);
+            $live[$liveCourt]['status'] = '比赛中'; $live[$liveCourt]['score'] = $req['score_text'];
+            kv_set($event_code, 'live_scores', $live);
+            $pdo->commit();
+            echo json_encode(['status' => 'success']);
+        } catch (Exception $e) {
+            if ($pdo->inTransaction()) $pdo->rollBack();
+            echo json_encode(['status' => 'error', 'message' => $e->getMessage()]);
+        }
+        break;
     case 'save_score':
-        $records = kv_get($event_code, 'records', []); 
-        $records[] = [ 'id' => $req['id'], 'court' => $req['court'], 't1' => $req['t1'], 't2' => $req['t2'], 'score' => $req['score'], 'winner' => $req['winner'], 'details' => $req['details'], 'referee' => $req['referee'], 'signature' => $req['signature'] ?? '', 'is_team' => $req['is_team'] ?? false, 'time' => date('Y-m-d H:i:s') ]; 
-        kv_set($event_code, 'records', $records);
-        $tasks = kv_get($event_code, 'tasks', []); $normId = normalizeId($req['id']); if (isset($tasks[$normId])) { unset($tasks[$normId]); kv_set($event_code, 'tasks', $tasks); }
-        $refs = kv_get($event_code, 'referees', []);
-        $refId = $req['referee_id'] ?? $req['referee'] ?? '';
-        foreach ($refs as &$r) {
-            if ($r['name'] === $refId) {
-                $r['match_count'] = ($r['match_count'] ?? 0) + 1;
+        // [PR#155 R2] 原子完赛事务（归属加固版）：写入前完成 task/live/referee 全量权威校验，
+        // 任何一项不符即 rollback；record 的队伍/场地/裁判等权威字段全部取自服务端，
+        // 客户端只提交比分、详情、签名等比赛结果数据，不信任其展示的 t1/t2/court/referee。
+        $match_id = normalizeId($req['id'] ?? '');
+        $referee_id = normalizeId($req['referee_id'] ?? $req['referee'] ?? '');
+        $req_court = isset($req['court']) ? trim((string)$req['court']) : '';
+        if (!$match_id) { echo json_encode(['status' => 'error', 'message' => '缺少比赛ID']); break; }
+        if (!$referee_id) { echo json_encode(['status' => 'error', 'message' => '缺少裁判ID']); break; }
+        // [PR#155 R7] req.court 必须非空（首次提交和幂等重试均适用）
+        if ($req_court === '') { echo json_encode(['status' => 'error', 'message' => '缺少场地信息']); break; }
+        try {
+            $pdo->beginTransaction();
+            $lockStmt = $pdo->prepare("SELECT data_value FROM nhpa_store WHERE event_code = ? AND data_key = 'config' FOR UPDATE");
+            $lockStmt->execute([$event_code]);
+            if ($lockStmt->fetchColumn() === false) { $pdo->rollBack(); echo json_encode(['status' => 'error', 'message' => '赛事不存在']); break; }
+            $tasks = kv_get($event_code, 'tasks', []);
+            $live = kv_get($event_code, 'live_scores', []);
+            $refs = kv_get($event_code, 'referees', []);
+            // 0. [PR#155 R6] 响应丢失幂等恢复：在 task 存在性检查之前，先检查是否已有相同比赛的已提交 record
+            $records = kv_get($event_code, 'records', []);
+            $existingRecord = null;
+            foreach ($records as $rec) {
+                if (normalizeId($rec['id'] ?? '') === $match_id) { $existingRecord = $rec; break; }
+            }
+            if ($existingRecord !== null) {
+                $reqScore = $req['score'] ?? '';
+                $reqWinner = trim($req['winner'] ?? '');
+                $reqDetails = $req['details'] ?? '';
+                $reqSignature = $req['signature'] ?? '';
+                // [PR#155 R7] 严格比较，不使用自匹配回退
+                if (normalizeId($existingRecord['referee'] ?? '') === $referee_id
+                    && (string)($existingRecord['court'] ?? '') === (string)$req_court
+                    && ($existingRecord['score'] ?? '') === $reqScore
+                    && ($existingRecord['winner'] ?? '') === $reqWinner
+                    && ($existingRecord['details'] ?? '') === $reqDetails
+                    && ($existingRecord['signature'] ?? '') === $reqSignature
+                ) {
+                    $pdo->rollBack();
+                    echo json_encode(['status' => 'success', 'idempotent' => true]);
+                    break;
+                }
+                $pdo->rollBack();
+                echo json_encode(['status' => 'error', 'message' => '比赛已完赛，但重试内容与已保存记录不一致']);
                 break;
             }
+            // 1. task 必须存在（保存实际 key，不假设 $tasks[$match_id] 存在）
+            $task = null; $task_key = null; $taskCourt = '';
+            foreach ($tasks as $key => $t) { if (normalizeId($key) === $match_id) { $task = $t; $task_key = $key; $taskCourt = trim((string)($t['court'] ?? '')); break; } }
+            if (!$task) { $pdo->rollBack(); echo json_encode(['status' => 'error', 'message' => '任务不存在']); break; }
+            // 2. live 投影必须存在且 match_id 一致
+            $liveCourt = null;
+            foreach ($live as $court => $info) { if (normalizeId($info['match_id'] ?? '') === $match_id) { $liveCourt = $court; break; } }
+            if ($liveCourt === null) { $pdo->rollBack(); echo json_encode(['status' => 'error', 'message' => '无有效投影']); break; }
+            // 3. live.status 必须为比赛中
+            if (($live[$liveCourt]['status'] ?? '') !== '比赛中') { $pdo->rollBack(); echo json_encode(['status' => 'error', 'message' => '比赛尚未开始，无法提交成绩']); break; }
+            // 4. 投影归属与请求裁判一致（不得用客户端展示的 referee 作为权威）
+            if (normalizeId($live[$liveCourt]['referee'] ?? '') !== $referee_id) { $pdo->rollBack(); echo json_encode(['status' => 'error', 'message' => '裁判归属不匹配，无权提交该场比赛成绩']); break; }
+            // 5. task.court、live court、请求 court 三者一致（请求 court 可省略，省略时以权威场地为准）
+            if ((string)$liveCourt !== (string)$taskCourt) { $pdo->rollBack(); echo json_encode(['status' => 'error', 'message' => '场地数据不一致']); break; }
+            if ($req_court !== '' && (string)$req_court !== (string)$taskCourt) { $pdo->rollBack(); echo json_encode(['status' => 'error', 'message' => '请求场地与比赛场地不符']); break; }
+            // 6. referee 必须存在、状态为执裁中、且 current_court 与比赛场地一致（防伪造裁判完赛）
+            $refIdx = null;
+            foreach ($refs as $idx => $r) { if (normalizeId($r['name'] ?? '') === $referee_id) { $refIdx = $idx; break; } }
+            if ($refIdx === null) { $pdo->rollBack(); echo json_encode(['status' => 'error', 'message' => '裁判不存在']); break; }
+            if (($refs[$refIdx]['status'] ?? '') !== '执裁中') { $pdo->rollBack(); echo json_encode(['status' => 'error', 'message' => '裁判当前非执裁状态']); break; }
+            if ((string)($refs[$refIdx]['current_court'] ?? '') !== (string)$taskCourt) { $pdo->rollBack(); echo json_encode(['status' => 'error', 'message' => '裁判当前场地与比赛场地不符']); break; }
+            // 7. [PR#155 R3+R4] winner 必须严格等于服务端 task.t1 或 task.t2；空值/缺失队伍一律拒绝
+            $winner = trim($req['winner'] ?? '');
+            $taskT1 = trim($task['t1'] ?? '');
+            $taskT2 = trim($task['t2'] ?? '');
+            if ($taskT1 === '' || $taskT2 === '') {
+                $pdo->rollBack(); echo json_encode(['status' => 'error', 'message' => '任务队伍信息不完整，无法完赛']); break;
+            }
+            if ($winner !== $taskT1 && $winner !== $taskT2) {
+                $pdo->rollBack(); echo json_encode(['status' => 'error', 'message' => '胜者必须为参赛队伍之一']); break;
+            }
+            // 所有校验通过——同一事务内原子写入（权威字段取自服务端 task/live/referee）
+            $records[] = [
+                'id' => $task_key,
+                'court' => $taskCourt,
+                't1' => $task['t1'] ?? ($live[$liveCourt]['t1'] ?? ''),
+                't2' => $task['t2'] ?? ($live[$liveCourt]['t2'] ?? ''),
+                'score' => $req['score'] ?? '',
+                'winner' => $winner,
+                'details' => $req['details'] ?? '',
+                'referee' => $refs[$refIdx]['name'] ?? $referee_id,
+                'signature' => $req['signature'] ?? '',
+                'is_team' => (bool)($task['is_team'] ?? false),
+                'time' => date('Y-m-d H:i:s')
+            ];
+            kv_set($event_code, 'records', $records);
+            unset($tasks[$task_key]); kv_set($event_code, 'tasks', $tasks);
+            unset($live[$liveCourt]); kv_set($event_code, 'live_scores', $live);
+            $refs[$refIdx]['status'] = '空闲'; $refs[$refIdx]['current_court'] = ''; $refs[$refIdx]['match_count'] = ($refs[$refIdx]['match_count'] ?? 0) + 1;
+            kv_set($event_code, 'referees', $refs);
+            $pdo->commit();
+            echo json_encode(['status' => 'success', 'idempotent' => false]);
+        } catch (Exception $e) {
+            if ($pdo->inTransaction()) $pdo->rollBack();
+            echo json_encode(['status' => 'error', 'message' => $e->getMessage()]);
         }
-        kv_set($event_code, 'referees', $refs); 
-        echo json_encode(['status' => 'success']); 
         break;
     case 'get_qrcode': echo json_encode(['status' => 'success', 'qrcode' => kv_get($event_code, 'qrcode', '')]); break;
 
@@ -705,14 +1118,14 @@ switch ($action) {
         header('Content-Type: text/csv; charset=utf-8'); header('Content-Disposition: attachment; filename="Pickle球_Waivers_'.$event_code.'.csv"');
         $out = fopen('php://output', 'w'); fprintf($out, chr(0xEF).chr(0xBB).chr(0xBF)); fputcsv($out, ['赛事码', '姓名', '身份证后4位', '签到时间']);
         $stmt = $pdo->prepare("SELECT event_code, player_name, id_last4, sign_time FROM nhpa_waivers WHERE event_code = ? ORDER BY sign_time DESC"); $stmt->execute([$event_code]);
-        while($row = $stmt->fetch(PDO::FETCH_ASSOC)) { fputcsv($out, [$row['event_code'], $row['player_name'], $row['id_last4'], $row['sign_time']]); } 
+        while($row = $stmt->fetch(PDO::FETCH_ASSOC)) { fputcsv($out, [$row['event_code'], $row['player_name'], $row['id_last4'], $row['sign_time']]); }
         fclose($out); break;
     case 'get_sys_data':
         $type = $req['type'] ?? $_GET['type']; echo json_encode(['status' => 'success', 'data' => kv_get('SYSTEM_GLOBAL', $type, [])]); break;
     case 'save_sys_data':
         if (($req['pwd'] ?? '') !== $SUPER_ADMIN_PWD) { echo json_encode(['status' => 'error', 'message' => '鉴权失败']); exit; }
         $type = $req['type']; $list = kv_get('SYSTEM_GLOBAL', $type, []);
-        if (isset($req['delete_id'])) { $list = array_filter($list, function($item) use ($req) { return $item['id'] !== $req['delete_id']; }); $list = array_values($list); } 
+        if (isset($req['delete_id'])) { $list = array_filter($list, function($item) use ($req) { return $item['id'] !== $req['delete_id']; }); $list = array_values($list); }
         else { $newItem = $req['item']; $newItem['id'] = uniqid('ID_'); $newItem['date'] = date('Y-m-d H:i'); array_unshift($list, $newItem); }
         kv_set('SYSTEM_GLOBAL', $type, $list); echo json_encode(['status' => 'success']); break;
     default: echo json_encode(['status' => 'error', 'message' => '无效路由指令']);
