@@ -506,6 +506,8 @@
         const DEFAULT_WAIVER_TEXT = `1. 本人自愿报名参加本次赛事及相关活动，已完全了解并理解本次赛事可能存在的风险（包括但不限于运动损伤、突发疾病、财产损失等）。\n\n2. 本人确认自身身体健康状况良好，没有任何不适合参与该项运动的疾病或症状。本人承诺在比赛中遵守赛事规则，服从裁判和工作人员的管理。\n\n3. 本人同意在赛事期间，如因个人原因、不可抗力或第三方原因导致的人身伤害或财产损失，赛事组织方及场地方免于承担任何法律与经济责任。\n\n4. 本人已仔细阅读并完全理解以上内容，签名即代表本人独立承担参与本次赛事的所有相关风险及责任。`;
 
         // ======================== 工具函数 ========================
+        const normalizeId = id => String(id ?? '').replace(/\s+/g, '').toUpperCase();
+
         function showToast(msg, isError = false) {
             const t = $('toast');
             t.innerText = msg;
@@ -1747,7 +1749,8 @@ window.generateTeamCodesFromGroups = async () => {
                 $('taskCount').innerText = `${tasksArr.length} 场`;
                 $('tasksList').innerHTML = tasksArr.map(t => {
                     const courtDisplay = t.court ? `<span class="text-amber-400 font-mono text-[10px] bg-amber-900/30 px-1.5 py-0.5 rounded">#${t.court}</span>` : `<span class="text-slate-600 text-[10px]">未分配</span>`;
-                    const liveBadge = (t.status === '比赛中' && t.live_score) ? `<span class="text-emerald-400 font-bold ml-2 text-[10px] animate-pulse">${t.live_score}</span>` : '';
+                    // [PR#155 R8] 比赛中的任务不再重复显示实时比分，替换为“比赛中”
+                    const liveBadge = (t.status === '比赛中') ? `<span class="text-emerald-400 font-bold ml-2 text-[10px]">比赛中</span>` : '';
                     return `<div class="bg-slate-900/40 p-2 rounded border border-slate-700/50 flex justify-between items-center text-xs">
                         <div class="flex items-center gap-2 flex-1 min-w-0"><span class="font-black text-blue-300 w-20 truncate">${t.id}</span><span class="text-slate-300 truncate">${t.t1} <span class="text-slate-600 mx-1">vs</span> ${t.t2}</span>${courtDisplay}${liveBadge}</div>
                         <div class="flex gap-1 shrink-0">

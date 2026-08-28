@@ -241,8 +241,8 @@
             </div>
 
             <div class="flex gap-3">
-                <button onclick="backToStep1()" class="bg-slate-700 w-1/3 py-3.5 rounded-xl font-bold btn-press shadow-md border border-slate-500">← 退回</button>
-                <button onclick="confirmAndStart()" class="bg-emerald-600 w-2/3 py-3.5 rounded-xl font-black text-lg shadow-[0_5px_15px_rgba(16,185,129,0.3)] btn-press">✓ 确认开赛</button>
+                <button id="backToSetupBtn" onclick="backToStep1()" class="bg-slate-700 w-1/3 py-3.5 rounded-xl font-bold btn-press shadow-md border border-slate-500">← 退回</button>
+                <button id="confirmStartBtn" onclick="confirmAndStart()" class="bg-emerald-600 w-2/3 py-3.5 rounded-xl font-black text-lg shadow-[0_5px_15px_rgba(16,185,129,0.3)] btn-press">✓ 确认开赛</button>
             </div>
         </div>
 
@@ -254,7 +254,7 @@
                 </div>
                 <div class="flex flex-col items-end">
                     <div id="gameNum" class="bg-indigo-900/80 border border-indigo-500/50 px-3 py-0.5 rounded text-sm font-black text-indigo-300 shadow-inner">G1</div>
-                    <button onclick="backToStep2()" class="text-[10px] text-slate-400 underline mt-1 btn-press">退回重设</button>
+                    <button id="viewSettingsBtn" onclick="backToStep2()" class="text-[10px] text-slate-400 underline mt-1 btn-press">退回重设</button>
                 </div>
             </div>
 
@@ -394,6 +394,9 @@
         let matchState = { t1Score: 0, t2Score: 0, t1Wins: 0, t2Wins: 0, currentGame: 1, history: [], timeline: [], halfSwitched: false, over: false };
         let gameState = { viewBa: false, servTeam: 1, initServTeam: 1, servNum: 2, court: 'Right', t1: { r: '', l: '' }, t2: { r: '', l: '' }, initRightP1: '', initRightP2: '', servingPlayer: '' };
 
+        // [PR#155 R8] 独立生命周期字段：not_started | in_progress | completed
+        let matchPhase = 'not_started';
+
         let timeoutUsed = { t1: false, t2: false, medicalT1: false, medicalT2: false };
 
         let activeTimer = null, prepInterval = null, prepSec = 0, playerDB = [];
@@ -424,7 +427,10 @@
 
         function backupState() {
             if(currentMatch && currentMatch.id && !matchState.over) {
-                try { localStorage.setItem(BACKUP_KEY, JSON.stringify({ step: getCurrentStep(), currentMatch, matchState, gameState, timeoutUsed })); } catch(e) { }
+                // [PR#155 R8] 进行中比赛即使暂时显示 step 2，备份仍必须保存 phase=in_progress，恢复目标必须是 step 3
+                let backupStep = getCurrentStep();
+                if (matchPhase === 'in_progress') backupStep = 3;
+                try { localStorage.setItem(BACKUP_KEY, JSON.stringify({ step: backupStep, currentMatch, matchState, gameState, timeoutUsed, matchPhase })); } catch(e) { }
             }
         }
         function clearBackup() { localStorage.removeItem(BACKUP_KEY); }
@@ -441,6 +447,8 @@
                             currentMatch = data.currentMatch; matchState = data.matchState;
                             if(!matchState.timeline) matchState.timeline = [];
                             gameState = data.gameState; timeoutUsed = data.timeoutUsed || {t1:false, t2:false, medicalT1:false, medicalT2:false};
+                            // [PR#155 R8] 恢复 matchPhase
+                            matchPhase = data.matchPhase || (data.step >= 3 ? 'in_progress' : 'not_started');
 
                             if(data.step === 2) {
                                 $('label-init-ba-f').innerText = `${currentMatch.t1Name} (左)`; $('label-init-ba-t').innerText = `${currentMatch.t2Name} (左)`;
@@ -755,6 +763,29 @@
         function showStep(step){
             for(let i=1; i<=4; i++) { $(`step${i}`).classList.add('hidden-section'); }
             $(`step${step}`).classList.remove('hidden-section');
+            // [PR#155 R8] 根据 matchPhase 更新按钮文案
+            if (step === 2) {
+                const confirmBtn = $('confirmStartBtn');
+                if (confirmBtn) {
+                    if (matchPhase === 'in_progress') {
+                        confirmBtn.innerText = '↩️ 返回进行中比赛';
+                        confirmBtn.classList.remove('bg-emerald-600');
+                        confirmBtn.classList.add('bg-blue-600');
+                    } else {
+                        confirmBtn.innerText = '✓ 确认开赛';
+                        confirmBtn.classList.remove('bg-blue-600');
+                        confirmBtn.classList.add('bg-emerald-600');
+                    }
+                }
+            }
+            if (step === 3) {
+                // §4: “退回重设”改为“← 查看比赛设置”，触控高度至少 44px
+                const settingsBtn = $('viewSettingsBtn');
+                if (settingsBtn) {
+                    settingsBtn.innerText = '← 查看比赛设置';
+                    settingsBtn.classList.add('text-sm', 'min-h-[44px]');
+                }
+            }
             backupState();
         }
 
@@ -886,6 +917,11 @@
         };
 
         window.confirmAndStart = async () => {
+            // [PR#155 R8] 进行中比赛返回设置页时，主按钮调用 resumeActiveMatch 而非重新开赛
+            if (matchPhase === 'in_progress') {
+                await resumeActiveMatch();
+                return;
+            }
             showDndReminder();
         };
 
@@ -962,11 +998,45 @@
                 try { await updateRefereeStatus('执裁中', currentMatch.court); } catch(e){}
             }
 
+            // [PR#155 R8] 开赛成功后设置生命周期为 in_progress
+            matchPhase = 'in_progress';
+
             $('recoveryBadge').classList.add('hidden');
             renderGame();
             if (sysMode === 'local') syncLiveScore();
             showStep(3);
             backupState();
+        }
+
+        // [PR#155 R8] 进行中比赛返回设置页后，直接返回计分页，不调用 start_task
+        async function resumeActiveMatch() {
+            try {
+                // 先读取服务端 Dashboard 确认状态
+                const dashRes = await apiCall('get_full_dashboard', {});
+                if (!dashRes || dashRes.status !== 'success') {
+                    showToast('❗ 服务端不可达，留在设置页', true);
+                    return; // fail closed
+                }
+                // 确认相同 task/court 仍为“比赛中”
+                const tasks = dashRes.tasks || [];
+                const task = Object.values(tasks).find(t => String(t.id) === String(currentMatch.id));
+                if (!task || task.status !== '比赛中') {
+                    showToast('❗ 服务端状态不一致，该任务已非比赛中', true);
+                    return; // fail closed
+                }
+                // 确认 court 一致
+                if (String(task.court) !== String(currentMatch.court)) {
+                    showToast('❗ 场地信息不一致', true);
+                    return;
+                }
+                // 成功后直接 renderGame() + showStep(3)，不清零或重建 matchState/gameState
+                renderGame();
+                showStep(3);
+                syncLiveScore();
+                showToast('✅ 已返回进行中比赛');
+            } catch (e) {
+                showToast('❗ 网络错误，留在设置页', true);
+            }
         }
 
         function renderGame() {
@@ -1157,9 +1227,9 @@
 
             if (maxScore === switchPoint && !matchState.halfSwitched) {
                 setTimeout(() => {
-                    alert(`🔥 场地交换提示：\n\n一方已达到 ${switchPoint} 分！\n请指挥双方交换场地并休整 60 秒。\n\n⚠️ 【重要提醒】：双方选手请携带球拍交换场区，确认站位后继续比赛。`);
+                    alert(`🔥 场地交换提示：\n\n一方已达到 ${switchPoint} 分！\n请指挥双方交换场地。\n\n⚠️ 【重要提醒】：请双方选手交换场区，确认站位后继续比赛。如使用球队暂停，球拍请放在场内。`);
                     gameState.viewBa = !gameState.viewBa; matchState.halfSwitched = true; renderGame(); backupState();
-                    startTimer(60, '🔄 交换场区（官方暂停 60 秒）：请双方选手携带球拍交换场区，确认站位后继续比赛。');
+                    startTimer(60, '🔄 交换场区：请双方选手交换场区，确认站位后继续比赛。如使用球队暂停，球拍请放在场内。');
                 }, 300);
             }
 
@@ -1193,7 +1263,7 @@
                 let details = matchState.results.join(' | ');
                 let finalScoreDisplay = currentMatch.format === 1 ? `${matchState.t1Score} - ${matchState.t2Score}` : `${matchState.t1Wins} - ${matchState.t2Wins}`;
 
-                let report = `【Pickle球 认证结算单】\n编号: ${currentMatch.id} | 场地: ${currentMatch.court}\n------------------------\n⚔️ ${currentMatch.t1Name} [${matchState.t1Wins}]\n⚔️ ${currentMatch.t2Name} [${matchState.t2Wins}]\n\n比分明细: ${details}\n\n🏆 决胜方: ${winner}\n👨‍⚖️ 执裁人: [${currentRefLevel}] ${currentMatch.ref}\n时间戳: ${new Date().toLocaleString()}`;
+                let report = `【Pickle球 认证结算单】\n编号: ${currentMatch.id} | 场地: ${currentMatch.court}\n------------------------\n⚔️ ${currentMatch.t1Name} [${matchState.t1Wins}]\n⚔️ ${currentMatch.t2Name} [${matchState.t2Wins}]\n\n比分明细: ${details}\n\n🏆 决胜方: ${winner}\n👨‍⚖️ 执裁人: ${currentMatch.ref}\n时间戳: ${new Date().toLocaleString()}`;
                 $('reportText').innerText = report; $('finalScore').innerText = finalScoreDisplay;
 
                 showStep(4);
@@ -1245,7 +1315,7 @@
                 window.finalPayload = {
                     action: 'save_score', id: currentMatch.id, t1: currentMatch.t1Name, t2: currentMatch.t2Name,
                     score: dbScoreData, details: details, winner: winner, court: currentMatch.court,
-                    referee_id: currentRefereeId, referee: `[${currentRefLevel}] ${currentMatch.ref}`, signature: signatureData,
+                    referee_id: currentRefereeId, referee: currentMatch.ref, signature: signatureData,
                     is_team: currentMatch.is_team || false
                 };
 

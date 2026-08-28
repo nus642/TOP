@@ -407,6 +407,16 @@ switch ($action) {
                 $res['courts'][$tc]['referee'] = $live[$tc]['referee'] ?? '';
             }
         }
+        // [PR#155 R8] 返回裁判矩阵数据（不返回密码或不必要内部字段）
+        $res['referees'] = array_map(function ($r) {
+            return [
+                'name' => $r['name'] ?? '',
+                'status' => $r['status'] ?? '空闲',
+                'current_court' => $r['current_court'] ?? '',
+                'match_count' => $r['match_count'] ?? 0,
+                'last_login' => $r['last_login'] ?? ''
+            ];
+        }, $refs);
         echo json_encode($res); break;
 
     case 'change_event_mode':

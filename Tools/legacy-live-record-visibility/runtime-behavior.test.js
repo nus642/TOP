@@ -5,12 +5,12 @@
  * 在 node:vm 沙箱中以桩环境【实际执行】，验证运行时行为：
  *
  * A. 交换场区（referee.html award 内 halfSwitch 块）：
- *    - 官方暂停 60 秒、文案正确（携带球拍交换场区）
+ *    - 60 秒倒计时（Legacy 默认行为）、文案不含“官方暂停 60 秒”
  *    - 不扣球队暂停、不改变比分/发球队员/发球顺序
  *    - 不改变 task/court/referee
- *    - 不出现"球拍留在场内"
+ *    - 不出现“携带球拍”“球拍留在场内”
  *    - halfSwitched 置位、viewBa 翻转、只触发一次
- *    - 常规球队暂停"球拍请放在场内"提示保留（源码锚定）
+ *    - 常规球队暂停“球拍请放在场内”提示保留（源码锚定）
  *
  * B. Checkin 欢迎词（checkin.html 确定性渲染链路）：
  *    - 初次加载 AI 请求最多一次；visibilitychange 不再请求
@@ -73,24 +73,25 @@ describe('交换场区：运行时行为（真实执行 award 内 halfSwitch 块
     return { sandbox, calls, matchState, gameState, timeoutUsed, currentMatch };
   }
 
-  it('R1: 达到换场分 → 官方暂停 60 秒且文案为"携带球拍交换场区"', () => {
+  it('R1: 达到换场分 → 60 秒倒计时且文案不含“官方暂停 60 秒”', () => {
     const { sandbox, calls } = makeSandbox();
     vm.runInContext(block, sandbox);
     assert.equal(calls.timers.length, 1, '应恰好启动一个倒计时');
-    assert.equal(calls.timers[0].sec, 60, '官方暂停必须为 60 秒');
-    assert.ok(calls.timers[0].msg.includes('交换场区（官方暂停 60 秒）'), '倒计时文案应含"交换场区（官方暂停 60 秒）"');
-    assert.ok(calls.timers[0].msg.includes('携带球拍交换场区'), '倒计时文案应要求携带球拍交换场区');
-    assert.ok(!calls.timers[0].msg.includes('球拍留在场内'), '交换场区文案不得出现"球拍留在场内"');
+    assert.equal(calls.timers[0].sec, 60, '倒计时必须为 60 秒');
+    assert.ok(calls.timers[0].msg.includes('交换场区'), '倒计时文案应含“交换场区”');
+    assert.ok(!calls.timers[0].msg.includes('官方暂停 60 秒'), '倒计时文案不得宣称“官方暂停 60 秒”');
+    assert.ok(!calls.timers[0].msg.includes('携带球拍'), '倒计时文案不得要求“携带球拍”');
+    assert.ok(calls.timers[0].msg.includes('如使用球队暂停，球拍请放在场内'), '倒计时文案应含球队暂停提示');
   });
 
-  it('R2: alert 提示文案正确且不含"球拍留在场内"', () => {
+  it('R2: alert 提示文案正确且不含“官方固定 60 秒”', () => {
     const { sandbox, calls } = makeSandbox();
     vm.runInContext(block, sandbox);
     assert.equal(calls.alerts.length, 1);
     assert.ok(calls.alerts[0].includes('交换场地'), 'alert 应提示交换场地');
-    assert.ok(calls.alerts[0].includes('携带球拍'), 'alert 应要求携带球拍');
-    assert.ok(calls.alerts[0].includes('60 秒'), 'alert 应说明 60 秒休整');
-    assert.ok(!calls.alerts[0].includes('球拍留在场内'), 'alert 不得出现"球拍留在场内"');
+    assert.ok(!calls.alerts[0].includes('携带球拍'), 'alert 不得要求“携带球拍”');
+    assert.ok(!calls.alerts[0].includes('60 秒'), 'alert 不得宣称固定 60 秒休整');
+    assert.ok(calls.alerts[0].includes('如使用球队暂停，球拍请放在场内'), 'alert 应含球队暂停提示');
   });
 
   it('R3: 不扣球队暂停、不改变比分/发球队员/发球顺序', () => {
@@ -144,7 +145,7 @@ describe('交换场区：运行时行为（真实执行 award 内 halfSwitch 块
     assert.ok(src.includes("startTimer(60, '⏸️ 左队暂停：球拍请放在场内')"), '左队暂停文案必须保留');
     assert.ok(src.includes("startTimer(60, '⏸️ 右队暂停：球拍请放在场内')"), '右队暂停文案必须保留');
     // 交换场区倒计时文案只应出现一次
-    assert.equal(src.split('交换场区（官方暂停 60 秒）').length - 1, 1, '交换场区倒计时文案应唯一');
+    assert.equal(src.split('交换场区：请双方选手交换场区').length - 1, 1, '交换场区倒计时文案应唯一');
   });
 });
 
