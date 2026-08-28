@@ -191,6 +191,34 @@ describe('PR#155 R8 整改验证', () => {
       assert.ok(content.includes('async function resumeActiveMatch'), '必须定义 resumeActiveMatch');
     });
 
+    it('R9-1: referee.html 包含 normalizeMatchId 函数', () => {
+      const content = fs.readFileSync(REFEREE_HTML, 'utf8');
+      assert.ok(content.includes('const normalizeMatchId'), '必须定义 normalizeMatchId');
+    });
+
+    it('R9-2: resumeActiveMatch 不含 syncLiveScore', () => {
+      const content = fs.readFileSync(REFEREE_HTML, 'utf8');
+      // resumeActiveMatch 不得包含 syncLiveScore（返回计分页是 UI 导航，不产生额外写入）
+      const resumeStart = content.indexOf('async function resumeActiveMatch()');
+      const resumeEnd = content.indexOf('function renderGame()', resumeStart);
+      const resumeBody = content.slice(resumeStart, resumeEnd);
+      assert.ok(!resumeBody.includes('syncLiveScore'), 'resumeActiveMatch 不得调用 syncLiveScore');
+    });
+
+    it('R9-3: viewSettingsBtn HTML 直接设置正确样式', () => {
+      const content = fs.readFileSync(REFEREE_HTML, 'utf8');
+      assert.ok(content.includes('id="viewSettingsBtn"'), '必须存在 viewSettingsBtn');
+      assert.ok(content.includes('min-h-[44px]'), '必须包含触控高度 44px');
+      assert.ok(content.includes('← 查看比赛设置'), '按钮文案必须为“← 查看比赛设置”');
+      // 不得包含旧样式
+      assert.ok(!content.includes('text-[10px] text-slate-400 underline'), '不得包含旧样式');
+    });
+
+    it('R9-4: 完赛后 matchPhase 设为 completed', () => {
+      const content = fs.readFileSync(REFEREE_HTML, 'utf8');
+      assert.ok(content.includes("matchPhase = 'completed'"), '完赛后必须设置 matchPhase=completed');
+    });
+
     it('R8-15: master.html 任务池不显示实时比分', () => {
       const content = fs.readFileSync(MASTER_HTML, 'utf8');
       // 比赛中的任务应显示"比赛中"而非比分

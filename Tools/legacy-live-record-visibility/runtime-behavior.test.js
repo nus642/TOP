@@ -283,3 +283,244 @@ describe('Checkin 欢迎词：运行时行为（真实执行确定性渲染链�
     assert.equal(g(0), '晚上好');
   });
 });
+
+// ======================== C. 进行中比赛返回流程运行时验证 ========================
+describe('进行中比赛返回流程：运行时行为（真实执行 resumeActiveMatch + confirmAndStart + backupState）', () => {
+  const refSrc = readSource('referee.html');
+
+  // 提取 normalizeMatchId
+  const normalizeMatchIdSrc = extractBetween(refSrc, 'const normalizeMatchId = id =>', ';', 'normalizeMatchId');
+
+  // 提取 resumeActiveMatch 函数
+  const resumeStart = 'async function resumeActiveMatch() {';
+  const resumeEnd = '\n        }\n\n        function renderGame()';
+  const resumeSrc = extractBetween(refSrc, resumeStart, resumeEnd, 'resumeActiveMatch');
+
+  // 提取 confirmAndStart 函数
+  const confirmStart = 'window.confirmAndStart = async () => {';
+  const confirmEnd = '\n        };\n\n        function showDndReminder';
+  const confirmSrc = extractBetween(refSrc, confirmStart, confirmEnd, 'confirmAndStart');
+
+  // 提取 backupState 函数
+  const backupStart = 'function backupState() {';
+  const backupEnd = '\n        }\n        function clearBackup';
+  const backupSrc = extractBetween(refSrc, backupStart, backupEnd, 'backupState');
+
+  function makeSandbox(overrides = {}) {
+    const calls = { apiCalls: [], renders: 0, shows: [], toasts: [], backups: [] };
+    const matchState = { t1Score: 10, t2Score: 8, t1Wins: 1, t2Wins: 0, currentGame: 1, history: [], timeline: [], halfSwitched: false, over: false, ...overrides.matchState };
+    const gameState = { viewBa: false, servTeam: 1, initServTeam: 1, servNum: 2, court: 'Right', t1: { r: 'A', l: 'B' }, t2: { r: 'C', l: 'D' }, initRightP1: '', initRightP2: '', servingPlayer: '', ...overrides.gameState };
+    const timeoutUsed = { t1: false, t2: false, medicalT1: false, medicalT2: false, ...overrides.timeoutUsed };
+    const currentMatch = { id: '001-01', court: '1', t1Name: '队A', t2Name: '队B', ref: '[L1] 裁判A', ...overrides.currentMatch };
+    let matchPhase = overrides.matchPhase ?? 'not_started';
+    let sysMode = overrides.sysMode ?? 'network';
+    let currentStep = overrides.currentStep ?? 1;
+    const localStorage = overrides.localStorage ?? {};
+
+    const sandbox = {
+      matchState, gameState, timeoutUsed, currentMatch,
+      get matchPhase() { return matchPhase; },
+      set matchPhase(v) { matchPhase = v; },
+      get sysMode() { return sysMode; },
+      set sysMode(v) { sysMode = v; },
+      apiCall: async (action, params) => {
+        calls.apiCalls.push({ action, params });
+        if (overrides.apiResponses && overrides.apiResponses[action]) return overrides.apiResponses[action];
+        return { status: 'success' };
+      },
+      renderGame: () => { calls.renders++; },
+      showStep: (step) => { currentStep = step; calls.shows.push(step); },
+      showToast: (msg, isError) => { calls.toasts.push({ msg, isError }); },
+      backupState: null, // will be injected
+      clearBackup: () => {},
+      syncLiveScore: () => {},
+      updateRefereeStatus: async () => {},
+      console,
+      Promise,
+      Object,
+      String,
+      JSON,
+      Array,
+    };
+    // Inject real backupState
+    sandbox.backupState = function() {
+      calls.backups.push({ step: currentStep, matchPhase });
+      localStorage['pickle_referee_backup_v5'] = JSON.stringify({ step: currentStep, matchPhase, currentMatch, matchState, gameState, timeoutUsed });
+    };
+    vm.createContext(sandbox);
+    return { sandbox, calls, matchState, gameState, timeoutUsed, currentMatch, get matchPhase() { return matchPhase; }, get currentStep() { return currentStep; }, localStorage };
+  }
+
+  it('C1: 进行中比赛返回设置后不会再次 start_task', async () => {
+    const { sandbox, calls, matchState: beforeMatchState, gameState: beforeGameState, timeoutUsed: beforeTimeoutUsed, currentMatch: beforeCurrentMatch } = makeSandbox({
+      matchPhase: 'in_progress',
+      currentStep: 3,
+      apiResponses: {
+        get_full_dashboard: {
+          status: 'success',
+          tasks: { '001-01': { id: '001-01', status: '比赛中', court: '1' } },
+          courts: { '1': { status: '比赛中', match_id: '001-01' } }
+        }
+      }
+    });
+
+    // 执行 normalizeMatchId + resumeActiveMatch + confirmAndStart
+    vm.runInContext(normalizeMatchIdSrc + '\n;' + resumeSrc + '\n;' + confirmSrc, sandbox);
+
+    // 模拟用户点击“返回进行中比赛”
+    await sandbox.confirmAndStart();
+
+    // 断言：没有调用 start_task
+    assert.equal(calls.apiCalls.filter(x => x.action === 'start_task').length, 0, '不得调用 start_task');
+    // 断言：调用了 get_full_dashboard
+    assert.ok(calls.apiCalls.some(x => x.action === 'get_full_dashboard'), '必须调用 get_full_dashboard');
+    // 断言：回到了 step 3
+    assert.ok(calls.shows.includes(3), '必须回到 step 3');
+  });
+
+  it('C2: 本地模式可从设置页返回进行中比赛', async () => {
+    const { sandbox, calls } = makeSandbox({
+      matchPhase: 'in_progress',
+      sysMode: 'local',
+      currentStep: 2
+    });
+
+    vm.runInContext(normalizeMatchIdSrc + '\n;' + resumeSrc + '\n;globalThis.resumeActiveMatch = resumeActiveMatch;', sandbox);
+    await sandbox.resumeActiveMatch();
+
+    // 断言：没有 API 调用
+    assert.equal(calls.apiCalls.length, 0, '本地模式不得调用 API');
+    // 断言：回到了 step 3
+    assert.ok(calls.shows.includes(3), '必须回到 step 3');
+  });
+
+  it('C3: 设置页备份仍保存进行中生命周期和 step 3', () => {
+    const ls = {};
+    const { sandbox } = makeSandbox({
+      matchPhase: 'in_progress',
+      currentStep: 2,
+      localStorage: ls
+    });
+
+    vm.runInContext(backupSrc + '\n;globalThis.backupState = backupState;', sandbox);
+    sandbox.backupState();
+
+    // 断言：备份中 matchPhase 为 in_progress
+    const backup = JSON.parse(ls['pickle_referee_backup_v5']);
+    assert.equal(backup.matchPhase, 'in_progress', '备份必须保存 matchPhase=in_progress');
+    assert.equal(backup.step, 3, '进行中比赛备份 step 必须为 3');
+  });
+
+  it('C4: 服务端不可达时 fail closed，留在设置页', async () => {
+    const { sandbox, calls } = makeSandbox({
+      matchPhase: 'in_progress',
+      sysMode: 'network',
+      currentStep: 2,
+      apiResponses: {
+        get_full_dashboard: { status: 'error', message: '网络错误' }
+      }
+    });
+
+    vm.runInContext(normalizeMatchIdSrc + '\n;' + resumeSrc + '\n;globalThis.resumeActiveMatch = resumeActiveMatch;', sandbox);
+    await sandbox.resumeActiveMatch();
+
+    // 断言：没有回到 step 3
+    assert.ok(!calls.shows.includes(3), 'fail closed 不得回到 step 3');
+    // 断言：显示了错误提示
+    assert.ok(calls.toasts.some(t => t.isError), '必须显示错误提示');
+  });
+
+  it('C5: 服务端状态不一致时 fail closed', async () => {
+    const { sandbox, calls } = makeSandbox({
+      matchPhase: 'in_progress',
+      sysMode: 'network',
+      currentStep: 2,
+      apiResponses: {
+        get_full_dashboard: {
+          status: 'success',
+          tasks: { '001-01': { id: '001-01', status: '未开始', court: '1' } },
+          courts: { '1': { status: '空闲', match_id: '' } }
+        }
+      }
+    });
+
+    vm.runInContext(normalizeMatchIdSrc + '\n;' + resumeSrc + '\n;globalThis.resumeActiveMatch = resumeActiveMatch;', sandbox);
+    await sandbox.resumeActiveMatch();
+
+    assert.ok(!calls.shows.includes(3), '状态不一致不得回到 step 3');
+    assert.ok(calls.toasts.some(t => t.msg.includes('已非比赛中')), '必须提示状态不一致');
+  });
+});
+
+// ======================== D. editCourt 前端运行时验证 ========================
+describe('editCourt：前端运行时行为（真实执行 master.html editCourt 函数）', () => {
+  const masterSrc = readSource('master.html');
+
+  // 提取 normalizeId
+  const normalizeIdSrc = extractBetween(masterSrc, 'const normalizeId = id =>', ';', 'normalizeId');
+
+  // 提取 editCourt 函数
+  const editCourtStart = 'window.editCourt = async (taskId) => {';
+  const editCourtEnd = '\n        };\n\n        window.handleSendBroadcast';
+  const editCourtSrc = extractBetween(masterSrc, editCourtStart, editCourtEnd, 'editCourt');
+
+  function makeMasterSandbox(overrides = {}) {
+    const calls = { prompts: [], apiPosts: [], loadDashboards: 0, toasts: [] };
+    const sandbox = {
+      globalDashboardData: overrides.dashboardData ?? { tasks: { '001-01': { id: '001-01', court: '1' } } },
+      prompt: (msg, def) => { calls.prompts.push({ msg, def }); return overrides.promptResult ?? null; },
+      apiPost: async (action, params) => { calls.apiPosts.push({ action, params }); return overrides.apiPostResult ?? { status: 'success' }; },
+      loadDashboard: () => { calls.loadDashboards++; },
+      showToast: (msg, isError) => { calls.toasts.push({ msg, isError }); },
+      normalizeId: null,
+      console,
+      String,
+      Promise,
+      Object,
+    };
+    vm.createContext(sandbox);
+    return { sandbox, calls };
+  }
+
+  it('D1: editCourt 取消时零请求', async () => {
+    const { sandbox, calls } = makeMasterSandbox({ promptResult: null });
+    vm.runInContext(normalizeIdSrc + '\n;' + editCourtSrc + '\n;globalThis.editCourt = editCourt;', sandbox);
+    await sandbox.editCourt('001-01');
+    assert.equal(calls.prompts.length, 1, '必须调用 prompt');
+    assert.equal(calls.apiPosts.length, 0, '取消时不得发送 API 请求');
+    assert.equal(calls.loadDashboards, 0, '取消时不得刷新 Dashboard');
+  });
+
+  it('D2: editCourt 输入新场地后发送 update_task_court', async () => {
+    const { sandbox, calls } = makeMasterSandbox({ promptResult: '3', apiPostResult: { status: 'success' } });
+    vm.runInContext(normalizeIdSrc + '\n;' + editCourtSrc + '\n;globalThis.editCourt = editCourt;', sandbox);
+    await sandbox.editCourt('001-01');
+    assert.equal(calls.apiPosts.length, 1, '必须发送一次 API 请求');
+    assert.equal(calls.apiPosts[0].action, 'update_task_court', '必须调用 update_task_court');
+    assert.equal(calls.apiPosts[0].params.match_id, '001-01', 'match_id 必须正确');
+    assert.equal(calls.apiPosts[0].params.court, '3', 'court 必须为新场地');
+  });
+
+  it('D3: editCourt 成功后刷新 Dashboard', async () => {
+    const { sandbox, calls } = makeMasterSandbox({ promptResult: '2', apiPostResult: { status: 'success' } });
+    vm.runInContext(normalizeIdSrc + '\n;' + editCourtSrc + '\n;globalThis.editCourt = editCourt;', sandbox);
+    await sandbox.editCourt('001-01');
+    assert.equal(calls.loadDashboards, 1, '成功后必须刷新 Dashboard');
+  });
+
+  it('D4: editCourt 空场地号显示错误', async () => {
+    const { sandbox, calls } = makeMasterSandbox({ promptResult: '' });
+    vm.runInContext(normalizeIdSrc + '\n;' + editCourtSrc + '\n;globalThis.editCourt = editCourt;', sandbox);
+    await sandbox.editCourt('001-01');
+    assert.equal(calls.apiPosts.length, 0, '空场地不得发送请求');
+    assert.ok(calls.toasts.some(t => t.isError && t.msg.includes('不能为空')), '必须显示错误提示');
+  });
+
+  it('D5: editCourt 失败时不刷新 Dashboard', async () => {
+    const { sandbox, calls } = makeMasterSandbox({ promptResult: '5', apiPostResult: { status: 'error', message: '场地被占用' } });
+    vm.runInContext(normalizeIdSrc + '\n;' + editCourtSrc + '\n;globalThis.editCourt = editCourt;', sandbox);
+    await sandbox.editCourt('001-01');
+    assert.equal(calls.loadDashboards, 0, '失败时不得刷新 Dashboard');
+    assert.ok(calls.toasts.some(t => t.isError), '必须显示错误提示');
+  });
+});

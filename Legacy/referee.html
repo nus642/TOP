@@ -254,7 +254,7 @@
                 </div>
                 <div class="flex flex-col items-end">
                     <div id="gameNum" class="bg-indigo-900/80 border border-indigo-500/50 px-3 py-0.5 rounded text-sm font-black text-indigo-300 shadow-inner">G1</div>
-                    <button id="viewSettingsBtn" onclick="backToStep2()" class="text-[10px] text-slate-400 underline mt-1 btn-press">退回重设</button>
+                    <button id="viewSettingsBtn" onclick="backToStep2()" class="mt-2 min-h-[44px] px-4 py-2 rounded-lg border border-slate-500 bg-slate-700 text-sm font-bold text-slate-100 shadow-sm btn-press">← 查看比赛设置</button>
                 </div>
             </div>
 
@@ -381,6 +381,7 @@
 
     <script>
         function $(id) { return document.getElementById(id); }
+const normalizeMatchId = id => String(id ?? '').replace(/\s+/g, '').toUpperCase();
 
         const API = '/data.php';
         const BACKUP_KEY = 'pickle_referee_backup_v5';
@@ -779,12 +780,7 @@
                 }
             }
             if (step === 3) {
-                // §4: “退回重设”改为“← 查看比赛设置”，触控高度至少 44px
-                const settingsBtn = $('viewSettingsBtn');
-                if (settingsBtn) {
-                    settingsBtn.innerText = '← 查看比赛设置';
-                    settingsBtn.classList.add('text-sm', 'min-h-[44px]');
-                }
+                // [PR#155 R9] viewSettingsBtn 已在 HTML 中直接设置正确样式，无需运行时修改
             }
             backupState();
         }
@@ -1008,34 +1004,63 @@
             backupState();
         }
 
-        // [PR#155 R8] 进行中比赛返回设置页后，直接返回计分页，不调用 start_task
+        // [PR#155 R9] 进行中比赛返回设置页后，直接返回计分页，不调用 start_task
         async function resumeActiveMatch() {
-            try {
-                // 先读取服务端 Dashboard 确认状态
-                const dashRes = await apiCall('get_full_dashboard', {});
-                if (!dashRes || dashRes.status !== 'success') {
-                    showToast('❗ 服务端不可达，留在设置页', true);
-                    return; // fail closed
-                }
-                // 确认相同 task/court 仍为“比赛中”
-                const tasks = dashRes.tasks || [];
-                const task = Object.values(tasks).find(t => String(t.id) === String(currentMatch.id));
-                if (!task || task.status !== '比赛中') {
-                    showToast('❗ 服务端状态不一致，该任务已非比赛中', true);
-                    return; // fail closed
-                }
-                // 确认 court 一致
-                if (String(task.court) !== String(currentMatch.court)) {
-                    showToast('❗ 场地信息不一致', true);
-                    return;
-                }
-                // 成功后直接 renderGame() + showStep(3)，不清零或重建 matchState/gameState
+            if (matchPhase !== 'in_progress') {
+                showToast('❗ 当前比赛尚未处于进行中状态', true);
+                return;
+            }
+
+            // 本地模式没有服务端 task，直接恢复现有内存状态。
+            if (sysMode === 'local') {
                 renderGame();
                 showStep(3);
-                syncLiveScore();
                 showToast('✅ 已返回进行中比赛');
-            } catch (e) {
-                showToast('❗ 网络错误，留在设置页', true);
+                return;
+            }
+
+            try {
+                const dashRes = await apiCall('get_full_dashboard', {});
+
+                if (!dashRes || dashRes.status !== 'success') {
+                    showToast('❗ 无法确认服务端比赛状态，已留在设置页', true);
+                    return;
+                }
+
+                const matchId = normalizeMatchId(currentMatch.id);
+                const tasks = Object.values(dashRes.tasks || {});
+                const task = tasks.find(
+                    item => normalizeMatchId(item?.id) === matchId
+                );
+
+                if (!task || task.status !== '比赛中') {
+                    showToast('❗ 服务端状态不一致，该任务已非比赛中', true);
+                    return;
+                }
+
+                if (String(task.court ?? '') !== String(currentMatch.court ?? '')) {
+                    showToast('❗ 服务端任务场地与本地状态不一致', true);
+                    return;
+                }
+
+                const courtInfo = dashRes.courts?.[String(currentMatch.court)] ?? null;
+
+                if (
+                    !courtInfo ||
+                    courtInfo.status !== '比赛中' ||
+                    normalizeMatchId(courtInfo.match_id) !== matchId
+                ) {
+                    showToast('❗ 服务端场地投影不一致，已阻断返回', true);
+                    return;
+                }
+
+                // 只恢复 UI，不重新开赛，不重新同步或改写服务端状态。
+                renderGame();
+                showStep(3);
+                showToast('✅ 已返回进行中比赛');
+            } catch (error) {
+                console.error('resumeActiveMatch failed', error);
+                showToast('❗ 网络异常，已留在设置页', true);
             }
         }
 
@@ -1309,6 +1334,7 @@
                     if ($('clearRefereeSigBtn')) {
                         $('clearRefereeSigBtn').outerHTML = `<div class="text-xs text-amber-400 mt-2 font-black animate-pulse bg-amber-900/30 py-2 rounded">👆 长按上方生成的图片可保存或发往赛事群</div>`;
                     }
+                    matchPhase = 'completed';
                     showToast('单机模式：无需上传', false); btn.innerText = '✅ 本地裁决结束'; clearBackup(); return;
                 }
 
@@ -1332,6 +1358,7 @@
                     if ($('clearRefereeSigBtn')) {
                         $('clearRefereeSigBtn').outerHTML = `<div class="text-xs text-amber-400 mt-2 font-black animate-pulse bg-amber-900/30 py-2 rounded">👆 长按上方生成的图片可保存或发往赛事群</div>`;
                     }
+                    matchPhase = 'completed';
                     showToast('☁️ 成绩与签名凭证已入库'); btn.innerText = '✅ 云端确收完结'; btn.disabled = true; clearBackup();
                 } else throw new Error(res.message || "服务器拒绝了请求");
             } catch(e) {
