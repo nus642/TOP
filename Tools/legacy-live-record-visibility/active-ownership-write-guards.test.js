@@ -47,8 +47,11 @@ describe('active match ownership write guards', () => {
     assertTransactional(deletion);
     assertTransactional(replacement);
     assert.match(deletion, /referee_owns_projection/);
-    assert.match(replacement, /\['current_court'\]/);
-    assert.match(replacement, /\['status'\]/);
+    assert.match(replacement, /foreach \(\$live as \$court => \$projection\)/);
+    assert.match(replacement, /\$old_is_legal/);
+    assert.match(replacement, /\$incoming_is_legal/);
+    assert.match(replacement, /\$expected_status/);
+    assert.match(replacement, /\$expected_court/);
     assert.ok(replacement.indexOf('rollBack()') < replacement.indexOf("kv_set($event_code, 'referees'"));
   });
 
@@ -59,6 +62,14 @@ describe('active match ownership write guards', () => {
     assert.match(block, /\$incoming\[\$id\] != \$task/);
     assert.match(block, /projection_for_match/);
     assert.ok(block.indexOf('rollBack()') < block.indexOf("kv_set($event_code, 'tasks'"));
+  });
+
+  it('bulk task equality remains semantic across JSON scalar type boundaries', () => {
+    // PHP loose array equality is intentionally used: key order does not matter and
+    // JSON 1/"1" representations compare as the same task, unlike strict array identity.
+    const block = actionBlock('set_bulk_tasks', 'delete_task');
+    assert.match(block, /\$incoming\[\$id\] != \$task/);
+    assert.doesNotMatch(block, /\$incoming\[\$id\] !== \$task/);
   });
 
   it('acceptance continues to create pending projection without making referee active', () => {

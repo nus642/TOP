@@ -887,13 +887,31 @@ switch ($action) {
             $pdo->beginTransaction();
             if (!lock_event_for_update($pdo, $event_code)) { $pdo->rollBack(); echo json_encode(['status' => 'error', 'message' => '赛事不存在']); break; }
             $refs = kv_get($event_code, 'referees', []); $new_refs = $req['referees'] ?? []; $live = kv_get($event_code, 'live_scores', []);
-            foreach ($refs as $old) {
-                $id = normalizeId($old['name'] ?? '');
-                if (!referee_owns_projection($live, $id)) continue;
-                $replacement = null;
-                foreach ($new_refs as $candidate) if (normalizeId($candidate['name'] ?? '') === $id) { $replacement = $candidate; break; }
-                if ($replacement === null || ($replacement['name'] ?? '') !== ($old['name'] ?? '') || ($replacement['status'] ?? '') !== ($old['status'] ?? '') || ($replacement['current_court'] ?? '') !== ($old['current_court'] ?? '')) {
-                    $pdo->rollBack(); echo json_encode(['status' => 'error', 'message' => '不得覆盖活动任务裁判的身份或状态']); break 2;
+            // 必须从 live_scores 反向验证每一个 owner；旧 referees 缺失 owner 也是损坏态，禁止借覆盖请求猜测或修复。
+            foreach ($live as $court => $projection) {
+                if (!is_ownership_projection($projection)) continue;
+                $owner_name = $projection['referee'] ?? '';
+                $owner_id = normalizeId($owner_name);
+                $old_matches = array_values(array_filter($refs, function ($candidate) use ($owner_id) {
+                    return normalizeId($candidate['name'] ?? '') === $owner_id;
+                }));
+                $incoming_matches = array_values(array_filter($new_refs, function ($candidate) use ($owner_id) {
+                    return normalizeId($candidate['name'] ?? '') === $owner_id;
+                }));
+                $old = count($old_matches) === 1 ? $old_matches[0] : null;
+                $incoming = count($incoming_matches) === 1 ? $incoming_matches[0] : null;
+                $expected_status = ($projection['status'] ?? '') === '比赛中' ? '执裁中' : '空闲';
+                $expected_court = ($projection['status'] ?? '') === '比赛中' ? (string)$court : '';
+                $old_is_legal = $owner_id !== '' && $old !== null
+                    && ($old['name'] ?? '') === $owner_name
+                    && ($old['status'] ?? '') === $expected_status
+                    && (string)($old['current_court'] ?? '') === $expected_court;
+                $incoming_is_legal = $incoming !== null
+                    && ($incoming['name'] ?? '') === $owner_name
+                    && ($incoming['status'] ?? '') === $expected_status
+                    && (string)($incoming['current_court'] ?? '') === $expected_court;
+                if (!$old_is_legal || !$incoming_is_legal) {
+                    $pdo->rollBack(); echo json_encode(['status' => 'error', 'message' => '活动任务裁判缺失、状态非法或场地不一致']); break 2;
                 }
             }
             kv_set($event_code, 'referees', $new_refs); $pdo->commit(); echo json_encode(['status' => 'success']);
