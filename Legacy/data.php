@@ -70,17 +70,31 @@ function referee_owns_projection($live, $referee_id, $status = null) {
 }
 
 function recovery_find_state($tasks, $live, $refs, $records, $match_id) {
-    $task = null; $task_key = null; $court = null; $projection = null; $referee = null;
-    foreach ($tasks as $key => $candidate) if (normalizeId($candidate['id'] ?? $key) === $match_id) { $task = $candidate; $task_key = $key; break; }
-    foreach ($live as $key => $candidate) if (normalizeId($candidate['match_id'] ?? '') === $match_id) { $court = (string)$key; $projection = $candidate; break; }
+    $task_matches = []; $projection_matches = []; $referee_matches = []; $conflicts = [];
+    foreach ($tasks as $key => $candidate) if (normalizeId($candidate['id'] ?? $key) === $match_id) $task_matches[] = ['key'=>$key, 'value'=>$candidate];
+    foreach ($live as $key => $candidate) if (normalizeId($candidate['match_id'] ?? '') === $match_id) $projection_matches[] = ['court'=>(string)$key, 'value'=>$candidate];
+    if (count($task_matches) > 1) $conflicts[] = '同一比赛ID匹配多个 task';
+    if (count($projection_matches) > 1) $conflicts[] = '同一比赛存在多个实时投影';
+    $task = count($task_matches) === 1 ? $task_matches[0]['value'] : null;
+    $task_key = count($task_matches) === 1 ? $task_matches[0]['key'] : null;
+    $projection = count($projection_matches) === 1 ? $projection_matches[0]['value'] : null;
+    $court = count($projection_matches) === 1 ? $projection_matches[0]['court'] : null;
     if ($court === null && $task !== null) $court = trim((string)($task['court'] ?? ''));
-    $owner = normalizeId($projection['referee'] ?? '');
-    foreach ($refs as $key => $candidate) if ($owner !== '' && normalizeId($candidate['name'] ?? '') === $owner) { $referee = $candidate; break; }
+    $owners = [];
+    foreach ($projection_matches as $match) { $candidate_owner = normalizeId($match['value']['referee'] ?? ''); if ($candidate_owner !== '') $owners[$candidate_owner] = true; }
+    $owner = count($owners) === 1 ? array_key_first($owners) : '';
+    foreach ($refs as $key => $candidate) if ($owner !== '' && normalizeId($candidate['name'] ?? '') === $owner) $referee_matches[] = ['key'=>$key, 'value'=>$candidate];
+    if (count($owners) > 1) $conflicts[] = '实时投影对应多个 owner/referee';
+    if ($projection !== null && $owner === '') $conflicts[] = '实时投影缺少 owner/referee';
+    if (count($referee_matches) > 1) $conflicts[] = 'owner 对应多个 referee';
+    if ($projection !== null && $owner !== '' && count($referee_matches) === 0) $conflicts[] = 'owner/referee 在赛事中不存在';
+    if ($task !== null && $projection !== null && (string)($task['court'] ?? '') !== (string)$court) $conflicts[] = 'task 与实时投影场地不一致';
+    $referee = count($referee_matches) === 1 ? $referee_matches[0]['value'] : null;
     $matching_records = [];
     foreach ($records as $record) if (normalizeId($record['id'] ?? '') === $match_id) $matching_records[] = [
         'id' => $record['id'] ?? '', 'court' => $record['court'] ?? '', 'time' => $record['time'] ?? ''
     ];
-    return compact('task', 'task_key', 'court', 'projection', 'referee', 'matching_records');
+    return compact('task', 'task_key', 'court', 'projection', 'referee', 'matching_records', 'task_matches', 'projection_matches', 'referee_matches', 'conflicts') + ['corrupted'=>count($conflicts) > 0];
 }
 
 function recovery_summary($state) {
@@ -99,6 +113,8 @@ function recovery_summary($state) {
             'current_court' => $state['referee']['current_court'] ?? '',
         ],
         'records' => $state['matching_records'],
+        'corrupted' => $state['corrupted'], 'conflicts' => $state['conflicts'],
+        'match_counts' => ['tasks'=>count($state['task_matches']), 'projections'=>count($state['projection_matches']), 'referees'=>count($state['referee_matches'])],
     ];
 }
 
@@ -120,7 +136,7 @@ function recovery_audit_existing($audit, $request_id, $action, $match_id) {
 function recovery_audit_entry($event_code, $match_id, $action, $req, $before, $after) {
     return [
         'event_code' => $event_code, 'match_id' => $match_id, 'action' => $action,
-        'operator' => trim((string)($req['operator'] ?? 'Master')) ?: 'Master',
+        'operator' => 'Master',
         'reason' => trim((string)($req['reason'] ?? '')), 'time' => date('Y-m-d H:i:s'),
         'expected' => [
             'match_id' => $req['expected_match_id'] ?? '', 'court' => $req['expected_court'] ?? '',
@@ -128,6 +144,13 @@ function recovery_audit_entry($event_code, $match_id, $action, $req, $before, $a
         ],
         'before' => $before, 'after' => $after, 'request_id' => trim((string)($req['request_id'] ?? '')),
     ];
+}
+
+function recovery_password($req) { return $req['password'] ?? $req['pwd'] ?? $_GET['password'] ?? $_GET['pwd'] ?? ''; }
+
+function has_full_recovery_payload($req) {
+    foreach (['request_id','reason','expected_match_id','expected_court','expected_referee','expected_status'] as $field) if (!array_key_exists($field, $req)) return false;
+    return true;
 }
 
 function check_referee_pwd($pdo, $event_code, $pwd) {
@@ -640,13 +663,15 @@ switch ($action) {
         // Read-only by construction: this route only reads the four authoritative KVs.
         $match_id = normalizeId($req['match_id'] ?? $_GET['match_id'] ?? '');
         if (!$match_id) { echo json_encode(['status'=>'error','message'=>'缺少比赛ID']); break; }
+        if (!check_referee_pwd($pdo, $event_code, recovery_password($req))) { echo json_encode(['status'=>'error','message'=>'赛事密码错误，无权查看恢复信息']); break; }
         $tasks = kv_get($event_code, 'tasks', []); $live = kv_get($event_code, 'live_scores', []); $refs = kv_get($event_code, 'referees', []); $records = kv_get($event_code, 'records', []);
         $state = recovery_find_state($tasks, $live, $refs, $records, $match_id); $summary = recovery_summary($state); $actions = [];
         $has_record = count($state['matching_records']) > 0; $projection_status = $state['projection']['status'] ?? '';
-        $actions['undo_pending_keep_court'] = ['allowed'=>$state['task'] !== null && !$has_record && $projection_status === '待开赛', 'changes'=>'删除本场实时投影；task 恢复未开始并保留场地；owner 恢复空闲', 'reason'=>$has_record ? '已有正式赛果，必须进入赛果更正流程' : ($projection_status === '待开赛' ? null : '比赛不是待开赛状态')];
+        $corrupt_reason = $state['corrupted'] ? '比赛状态存在冲突：' . implode('；', $state['conflicts']) : null;
+        $actions['undo_pending_keep_court'] = ['allowed'=>!$state['corrupted'] && $state['task'] !== null && !$has_record && $projection_status === '待开赛', 'changes'=>'删除本场实时投影；task 恢复未开始并保留场地；owner 恢复空闲', 'reason'=>$corrupt_reason ?: ($has_record ? '已有正式赛果，必须进入赛果更正流程' : ($projection_status === '待开赛' ? null : '比赛不是待开赛状态'))];
         $actions['undo_pending_unschedule'] = ['allowed'=>$actions['undo_pending_keep_court']['allowed'], 'changes'=>'删除本场实时投影；task 恢复未开始并清空场地；owner 恢复空闲', 'reason'=>$actions['undo_pending_keep_court']['reason']];
-        $actions['return_running_unscheduled'] = ['allowed'=>$state['task'] !== null && !$has_record && $projection_status === '比赛中', 'changes'=>'删除本场实时投影；task 恢复未开始、清空场地及临时比分；owner 恢复空闲', 'reason'=>$has_record ? '已有正式赛果，必须进入赛果更正流程' : ($projection_status === '比赛中' ? null : '比赛不是进行中状态')];
-        $actions['move_court'] = ['allowed'=>$state['task'] !== null && !$has_record && in_array($projection_status, ['', '待开赛', '比赛中'], true), 'changes'=>'原子更新 task、实时投影及执裁中裁判场地', 'reason'=>$has_record ? '已有正式赛果，不支持改场' : ($state['task'] ? null : '比赛任务不存在')];
+        $actions['return_running_unscheduled'] = ['allowed'=>!$state['corrupted'] && $state['task'] !== null && !$has_record && $projection_status === '比赛中', 'changes'=>'删除本场实时投影；task 恢复未开始、清空场地及临时比分；owner 恢复空闲', 'reason'=>$corrupt_reason ?: ($has_record ? '已有正式赛果，必须进入赛果更正流程' : ($projection_status === '比赛中' ? null : '比赛不是进行中状态'))];
+        $actions['move_court'] = ['allowed'=>!$state['corrupted'] && $state['task'] !== null && !$has_record && in_array($projection_status, ['', '待开赛', '比赛中'], true), 'changes'=>'原子更新 task、实时投影及执裁中裁判场地', 'reason'=>$corrupt_reason ?: ($has_record ? '已有正式赛果，不支持改场' : ($state['task'] ? null : '比赛任务不存在'))];
         echo json_encode(['status'=>'success','data'=>$summary,'court_occupied'=>$state['court'] !== null,'actions'=>$actions]);
         break;
     case 'recover_match':
@@ -657,10 +682,12 @@ switch ($action) {
         try {
             $pdo->beginTransaction();
             if (!lock_event_for_update($pdo, $event_code)) { $pdo->rollBack(); echo json_encode(['status'=>'error','message'=>'赛事不存在']); break; }
+            if (!check_referee_pwd($pdo, $event_code, recovery_password($req))) { $pdo->rollBack(); echo json_encode(['status'=>'error','message'=>'赛事密码错误，无权执行恢复']); break; }
             $tasks = kv_get($event_code, 'tasks', []); $live = kv_get($event_code, 'live_scores', []); $refs = kv_get($event_code, 'referees', []); $records = kv_get($event_code, 'records', []); $audit = kv_get($event_code, 'recovery_audit', []);
+            $state = recovery_find_state($tasks, $live, $refs, $records, $match_id);
+            if ($state['corrupted']) { $pdo->rollBack(); echo json_encode(['status'=>'error','message'=>'比赛状态存在冲突，拒绝自动恢复：'.implode('；',$state['conflicts'])]); break; }
             $existing = recovery_audit_existing($audit, $request_id, $recovery_action, $match_id);
             if ($existing !== null) { $pdo->rollBack(); echo json_encode($existing === false ? ['status'=>'error','message'=>'幂等请求标识已用于其他恢复动作'] : ['status'=>'success','idempotent'=>true,'changes'=>$existing['after']]); break; }
-            $state = recovery_find_state($tasks, $live, $refs, $records, $match_id);
             if (!$state['task'] || !$state['projection']) { $pdo->rollBack(); echo json_encode(['status'=>'error','message'=>'恢复目标任务或实时投影不存在，请刷新预览']); break; }
             if (count($state['matching_records']) > 0) { $pdo->rollBack(); echo json_encode(['status'=>'error','message'=>'比赛已有正式赛果，不能回退；请进入赛果更正流程']); break; }
             $expected_error = recovery_expected_error($req, $match_id, $state);
@@ -683,26 +710,45 @@ switch ($action) {
         break;
     case 'get_recovery_audit':
         // Minimal operational read model; audit never contains config, credentials, signatures, or full records.
+        if (!check_referee_pwd($pdo, $event_code, recovery_password($req))) { echo json_encode(['status'=>'error','message'=>'赛事密码错误，无权查看恢复审计']); break; }
         echo json_encode(['status'=>'success','data'=>kv_get($event_code, 'recovery_audit', [])]); break;
     case 'update_task_court':
         $match_id = normalizeId($req['match_id'] ?? '');
         $new_court = trim($req['court'] ?? '');
-        $request_id = trim((string)($req['request_id'] ?? '')); $reason = trim((string)($req['reason'] ?? ''));
-        if (!$match_id || !$new_court || !$request_id || !$reason) { echo json_encode(['status' => 'error', 'message' => '缺少比赛ID、目标场地、恢复原因或幂等请求标识']); break; }
+        if (!$match_id || !array_key_exists('court', $req)) { echo json_encode(['status'=>'error','message'=>'缺少比赛ID或目标场地']); break; }
+        $recovery_requested = false;
+        foreach (['request_id','reason','expected_match_id','expected_court','expected_referee','expected_status','password','pwd'] as $field) if (array_key_exists($field, $req)) { $recovery_requested = true; break; }
         try {
             $pdo->beginTransaction();
             if (!lock_event_for_update($pdo, $event_code)) { $pdo->rollBack(); echo json_encode(['status' => 'error', 'message' => '赛事不存在']); break; }
             $tasks = kv_get($event_code, 'tasks', []); $live = kv_get($event_code, 'live_scores', []); $refs = kv_get($event_code, 'referees', []); $records = kv_get($event_code, 'records', []); $audit = kv_get($event_code, 'recovery_audit', []);
+            $state = recovery_find_state($tasks, $live, $refs, $records, $match_id);
+            if ($state['corrupted']) { $pdo->rollBack(); echo json_encode(['status'=>'error','message'=>'比赛状态存在冲突，拒绝自动改场：'.implode('；',$state['conflicts'])]); break; }
+            if (!$state['task']) { $pdo->rollBack(); echo json_encode(['status'=>'error','message'=>'未找到该比赛']); break; }
+            $config = kv_get($event_code, 'config', []); $valid_courts = array_map('strval', $config['courts'] ?? []);
+            if ($new_court !== '' && !in_array($new_court, $valid_courts, true)) { $pdo->rollBack(); echo json_encode(['status'=>'error','message'=>'目标场地不在本赛事场地列表中']); break; }
+            foreach ($live as $court => $projection) if ($new_court !== '' && (string)$court === $new_court && normalizeId($projection['match_id'] ?? '') !== $match_id) { $pdo->rollBack(); echo json_encode(['status'=>'error','message'=>"目标场地 #{$new_court} 存在其他比赛投影，请先处理场地异常"]); break 2; }
+
+            // Compatibility for the exact legacy UI payload {match_id, court}: only a plain,
+            // unclaimed, unstarted task may move, still under the event lock and transaction.
+            if (!$recovery_requested) {
+                if (count($state['projection_matches']) !== 0) { $pdo->rollBack(); echo json_encode(['status'=>'error','message'=>'比赛已有待开赛或比赛中投影，请使用完整恢复流程改场']); break; }
+                if (!in_array($state['task']['status'] ?? '', ['', '未开始'], true)) { $pdo->rollBack(); echo json_encode(['status'=>'error','message'=>'只有未开始且未被领取的任务可使用普通改场']); break; }
+                if ((string)($state['task']['court'] ?? '') === $new_court) { $pdo->rollBack(); echo json_encode(['status'=>'success','idempotent'=>true,'legacy_compatible'=>true]); break; }
+                $tasks[$state['task_key']]['court'] = $new_court;
+                kv_set($event_code, 'tasks', $tasks); $pdo->commit();
+                echo json_encode(['status'=>'success','idempotent'=>false,'legacy_compatible'=>true]); break;
+            }
+
+            if (!has_full_recovery_payload($req) || trim((string)($req['request_id'] ?? '')) === '' || trim((string)($req['reason'] ?? '')) === '') { $pdo->rollBack(); echo json_encode(['status'=>'error','message'=>'恢复改场必须提供完整 expected 状态、原因和幂等请求标识']); break; }
+            if ($new_court === '') { $pdo->rollBack(); echo json_encode(['status'=>'error','message'=>'恢复改场必须指定目标场地；返回待编排请使用对应恢复动作']); break; }
+            if (!check_referee_pwd($pdo, $event_code, recovery_password($req))) { $pdo->rollBack(); echo json_encode(['status'=>'error','message'=>'赛事密码错误，无权执行恢复改场']); break; }
+            $request_id = trim((string)$req['request_id']);
             $existing = recovery_audit_existing($audit, $request_id, 'move_court', $match_id);
             if ($existing !== null) { $pdo->rollBack(); echo json_encode($existing === false ? ['status'=>'error','message'=>'幂等请求标识已用于其他恢复动作'] : ['status'=>'success','idempotent'=>true,'changes'=>$existing['after']]); break; }
-            $state = recovery_find_state($tasks, $live, $refs, $records, $match_id);
-            if (!$state['task']) { $pdo->rollBack(); echo json_encode(['status'=>'error','message'=>'未找到该比赛']); break; }
             $expected_error = recovery_expected_error($req, $match_id, $state);
             if ($expected_error) { $pdo->rollBack(); echo json_encode(['status'=>'error','message'=>$expected_error]); break; }
-            if ($state['projection'] && (string)($state['task']['court'] ?? '') !== (string)$state['court']) { $pdo->rollBack(); echo json_encode(['status'=>'error','message'=>'task 与实时投影源场地不一致，拒绝部分改场']); break; }
             if ($state['projection'] && !in_array($state['projection']['status'] ?? '', ['待开赛','比赛中'], true)) { $pdo->rollBack(); echo json_encode(['status'=>'error','message'=>'当前投影状态不支持改场']); break; }
-            if (($state['projection']['status'] ?? '') === '比赛中' && $reason === '') { $pdo->rollBack(); echo json_encode(['status'=>'error','message'=>'进行中比赛改场必须填写恢复原因']); break; }
-            foreach ($live as $court => $projection) if ((string)$court === $new_court && normalizeId($projection['match_id'] ?? '') !== $match_id && is_ownership_projection($projection)) { $pdo->rollBack(); echo json_encode(['status'=>'error','message'=>"目标场地 #{$new_court} 已被其他比赛占用"]); break 2; }
             $before = recovery_summary($state); $source_court = $state['court'];
             $tasks[$state['task_key']]['court'] = $new_court;
             if ($state['projection']) { $live[$new_court] = $state['projection']; $live[$new_court]['court'] = $new_court; if ((string)$source_court !== $new_court) unset($live[$source_court]); }
