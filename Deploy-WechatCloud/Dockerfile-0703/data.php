@@ -43,6 +43,17 @@ function kv_set($event, $key, $value) {
 }
 function normalizeId($id) { return strtoupper(trim(preg_replace('/\s+/', '', $id))); }
 
+function parse_live_score($score) {
+    if (!is_string($score)) return [0, 0];
+    if (preg_match('/(?:^|\s)G\d+\s+(\d+)\s*-\s*(\d+)(?=\s|$)/', $score, $matches)) {
+        return [intval($matches[1]), intval($matches[2])];
+    }
+    if (preg_match('/^\s*(\d+)\s*-\s*(\d+)\s*$/', $score, $matches)) {
+        return [intval($matches[1]), intval($matches[2])];
+    }
+    return [0, 0];
+}
+
 function is_super_admin_authorized($provided) {
     $configured = getenv('SUPER_ADMIN_PWD');
     return is_string($configured) && $configured !== '' && is_string($provided) && hash_equals($configured, $provided);
@@ -351,9 +362,7 @@ switch ($action) {
     
     // 解析比分（假设格式为 "21-15" 或 "G2 11-8"）
     $score = $match['live_score'] ?? '0-0';
-    $parts = explode('-', preg_replace('/[^0-9-]/', '', $score));
-    $t1_score = isset($parts[0]) ? intval($parts[0]) : 0;
-    $t2_score = isset($parts[1]) ? intval($parts[1]) : 0;
+    [$t1_score, $t2_score] = parse_live_score($score);
     
     // 从 match 中提取局分、盘分（需在 referee.html 保存时一并存储）
     // 如果没有单独存储，可简单返回 0
