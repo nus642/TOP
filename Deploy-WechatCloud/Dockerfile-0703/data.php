@@ -43,6 +43,11 @@ function kv_set($event, $key, $value) {
 }
 function normalizeId($id) { return strtoupper(trim(preg_replace('/\s+/', '', $id))); }
 
+function is_super_admin_authorized($provided) {
+    $configured = getenv('SUPER_ADMIN_PWD');
+    return is_string($configured) && $configured !== '' && is_string($provided) && hash_equals($configured, $provided);
+}
+
 function check_referee_pwd($pdo, $event_code, $pwd) {
     $conf = kv_get($event_code, 'config');
     return isset($conf['referee_password']) && $conf['referee_password'] === $pwd;
@@ -52,7 +57,6 @@ $req = json_decode(file_get_contents('php://input'), true);
 $action = $req['action'] ?? $_GET['action'] ?? '';
 $event_code = $req['event_code'] ?? $_GET['event_code'] ?? '';
 
-$SUPER_ADMIN_PWD = 'Wuxian666';
 $global_actions = ['create_event', 'get_sys_data', 'save_sys_data', 'get_all_events_public', 'super_admin_get_events', 'super_admin_delete_event'];
 
 if (!$event_code && !in_array($action, $global_actions)) { echo json_encode(['status' => 'error', 'message' => '缺少赛事验证码']); exit; }
@@ -68,7 +72,7 @@ if ($action === 'get_all_events_public') {
 }
 
 if ($action === 'super_admin_get_events') {
-    if (($req['super_pwd'] ?? '') !== $SUPER_ADMIN_PWD) { echo json_encode(['status' => 'error', 'message' => '超管鉴权失败']); exit; }
+    if (!is_super_admin_authorized($req['super_pwd'] ?? '')) { echo json_encode(['status' => 'error', 'message' => '超管鉴权失败']); exit; }
     $stmt = $pdo->query("SELECT event_code, data_value, updated_at FROM nhpa_store WHERE data_key = 'config' ORDER BY updated_at DESC");
     $events = [];
     while ($row = $stmt->fetch()) {
@@ -81,7 +85,7 @@ if ($action === 'super_admin_get_events') {
 }
 
 if ($action === 'super_admin_delete_event') {
-    if (($req['super_pwd'] ?? '') !== $SUPER_ADMIN_PWD) { echo json_encode(['status' => 'error', 'message' => '超管鉴权失败']); exit; }
+    if (!is_super_admin_authorized($req['super_pwd'] ?? '')) { echo json_encode(['status' => 'error', 'message' => '超管鉴权失败']); exit; }
     $delCode = $req['target_code'];
     $pdo->prepare("DELETE FROM nhpa_store WHERE event_code = ?")->execute([$delCode]); 
     $pdo->prepare("DELETE FROM nhpa_waivers WHERE event_code = ?")->execute([$delCode]); 
@@ -89,7 +93,7 @@ if ($action === 'super_admin_delete_event') {
 }
 
 if ($action === 'create_event') {
-    if (($req['super_pwd'] ?? '') !== $SUPER_ADMIN_PWD) { echo json_encode(['status' => 'error', 'message' => '无权创建']); exit; }
+    if (!is_super_admin_authorized($req['super_pwd'] ?? '')) { echo json_encode(['status' => 'error', 'message' => '无权创建']); exit; }
     $code = $req['custom_code'] ?? 'PICKLE' . rand(1000, 9999);
     $stmt = $pdo->prepare("SELECT 1 FROM nhpa_store WHERE event_code = ? LIMIT 1"); $stmt->execute([$code]);
     if ($stmt->fetchColumn()) { echo json_encode(['status' => 'error', 'message' => "赛事码 {$code} 已存在"]); exit; }
@@ -247,7 +251,7 @@ switch ($action) {
 	
 	case 'update_event_config':
     // 验证超管密码
-    if (($req['super_pwd'] ?? '') !== $SUPER_ADMIN_PWD) {
+    if (!is_super_admin_authorized($req['super_pwd'] ?? '')) {
         echo json_encode(['status' => 'error', 'message' => '超管鉴权失败']);
         break;
     }
@@ -272,7 +276,7 @@ switch ($action) {
     break;
 	
 	case 'update_event_code':
-    if (($req['super_pwd'] ?? '') !== $SUPER_ADMIN_PWD) {
+    if (!is_super_admin_authorized($req['super_pwd'] ?? '')) {
         echo json_encode(['status' => 'error', 'message' => '超管鉴权失败']);
         break;
     }
@@ -391,7 +395,7 @@ switch ($action) {
         echo json_encode($res); break;
         
     case 'change_event_mode':
-        if (($req['super_pwd'] ?? '') !== $SUPER_ADMIN_PWD) { echo json_encode(['status' => 'error', 'message' => 'Auth Failed']); exit; }
+        if (!is_super_admin_authorized($req['super_pwd'] ?? '')) { echo json_encode(['status' => 'error', 'message' => 'Auth Failed']); exit; }
         $cfg = kv_get($event_code, 'config', []);
         if(!$cfg) { echo json_encode(['status' => 'error', 'message' => '赛事不存在']); exit; }
         $cfg['event_type'] = $req['new_mode'];
@@ -710,7 +714,7 @@ switch ($action) {
     case 'get_sys_data':
         $type = $req['type'] ?? $_GET['type']; echo json_encode(['status' => 'success', 'data' => kv_get('SYSTEM_GLOBAL', $type, [])]); break;
     case 'save_sys_data':
-        if (($req['pwd'] ?? '') !== $SUPER_ADMIN_PWD) { echo json_encode(['status' => 'error', 'message' => '鉴权失败']); exit; }
+        if (!is_super_admin_authorized($req['pwd'] ?? '')) { echo json_encode(['status' => 'error', 'message' => '鉴权失败']); exit; }
         $type = $req['type']; $list = kv_get('SYSTEM_GLOBAL', $type, []);
         if (isset($req['delete_id'])) { $list = array_filter($list, function($item) use ($req) { return $item['id'] !== $req['delete_id']; }); $list = array_values($list); } 
         else { $newItem = $req['item']; $newItem['id'] = uniqid('ID_'); $newItem['date'] = date('Y-m-d H:i'); array_unshift($list, $newItem); }

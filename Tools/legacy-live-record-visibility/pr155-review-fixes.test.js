@@ -26,7 +26,7 @@ function makePlayers() {
 }
 
 async function setupEvent() {
-  await post({ action: 'create_event', super_pwd: 'Wuxian666', custom_code: EVENT, event_name: 'PR155 Test', event_type: 'team', courts: ['1','2','3'], referee_password: '2508' });
+  await post({ action: 'create_event', super_pwd: process.env.SUPER_ADMIN_PWD, custom_code: EVENT, event_name: 'PR155 Test', event_type: 'team', courts: ['1','2','3'], referee_password: '2508' });
   await post({ action: 'set_players', event_code: EVENT, players: makePlayers() });
   const tasks = {};
   ['001-01','001-02','001-03'].forEach(id => {

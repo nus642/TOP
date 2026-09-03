@@ -5,6 +5,8 @@ services:
       - "8080:80"
     volumes:
       - ./:/var/www/html
+    environment:
+      SUPER_ADMIN_PWD: ${SUPER_ADMIN_PWD:-}
     depends_on:
       - mysql
 

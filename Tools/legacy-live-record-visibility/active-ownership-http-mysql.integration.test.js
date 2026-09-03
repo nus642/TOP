@@ -8,7 +8,7 @@ const assert = require('node:assert/strict');
 
 const BASE = (process.env.LEGACY_BASE_URL || 'http://localhost:8082').replace(/\/$/, '');
 const EVENT = `PR157-R1-${Date.now()}-${process.pid}`;
-const SUPER_PWD = 'Wuxian666';
+const SUPER_PWD = process.env.SUPER_ADMIN_PWD;
 const REF_PENDING = 'R1待开赛裁判';
 const REF_RUNNING = 'R1比赛中裁判';
 let created = false;

@@ -52,7 +52,7 @@ describe('PR#155 R8 整改验证', () => {
   before(async () => {
     // 创建测试赛事
     EVENT = `R8TEST-${Date.now().toString(36).toUpperCase()}`;
-    const res = await post({ action: 'create_event', super_pwd: 'Wuxian666', custom_code: EVENT, event_name: 'R8 测试赛事', event_type: 'team', courts: ['1','2','3'], referee_password: '2508' });
+    const res = await post({ action: 'create_event', super_pwd: process.env.SUPER_ADMIN_PWD, custom_code: EVENT, event_name: 'R8 测试赛事', event_type: 'team', courts: ['1','2','3'], referee_password: '2508' });
     assert.equal(res.status, 'success', `创建赛事成功: ${JSON.stringify(res)}`);
     createdEvents.push(EVENT);
   });
@@ -60,7 +60,7 @@ describe('PR#155 R8 整改验证', () => {
   after(async () => {
     // 清理测试赛事
     for (const ev of createdEvents) {
-      await post({ action: 'reset_event', event_code: ev, super_pwd: 'Wuxian666' });
+      await post({ action: 'reset_event', event_code: ev, super_pwd: process.env.SUPER_ADMIN_PWD });
     }
   });
 
