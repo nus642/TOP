@@ -14,7 +14,7 @@ const assert = require('node:assert/strict');
 
 const BASE_URL = (process.env.LEGACY_BASE_URL || 'http://localhost:8082').replace(/\/$/, '');
 const EVENT_CODE = `TEAM-LIVE-HOTFIX-${Date.now()}`;
-const SUPER_PWD = 'Wuxian666'; // data.php 内置超管口令（仅本地隔离环境）
+const SUPER_PWD = process.env.SUPER_ADMIN_PWD; // 与隔离 Legacy 服务的环境配置保持一致
 
 const REF_A = '测试裁判甲';
 const REF_B = '测试裁判乙';

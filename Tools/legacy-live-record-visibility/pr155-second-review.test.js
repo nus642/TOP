@@ -125,7 +125,7 @@ function makePlayers() {
 // 每个 describe 使用独立赛事，避免跨块状态污染
 async function newEvent(suffix, taskIds, courts) {
   const code = `PR155R2-${suffix}-${Date.now().toString(36)}`;
-  const create = await post({ action: 'create_event', super_pwd: 'Wuxian666', custom_code: code, event_name: `PR155R2 ${suffix}`, event_type: 'team', courts, referee_password: '2508' });
+  const create = await post({ action: 'create_event', super_pwd: process.env.SUPER_ADMIN_PWD, custom_code: code, event_name: `PR155R2 ${suffix}`, event_type: 'team', courts, referee_password: '2508' });
   assert.equal(create.status, 'success', `create_event 失败: ${JSON.stringify(create)}`);
   createdEvents.push(code);
   EVENT = code;
@@ -578,7 +578,7 @@ describe('R3-第三轮回归测试', () => {
   it('26. task.status=比赛中但投影缺失 → accept_task 拒绝且零变化', async () => {
     // 创建独立赛事，直接通过 set_bulk_tasks 写入 status=比赛中
     const code = `PR155R4-T26-${Date.now().toString(36)}`;
-    const create = await post({ action: 'create_event', super_pwd: 'Wuxian666', custom_code: code, event_name: 'PR155R4 T26', event_type: 'team', courts: ['1'], referee_password: '2508' });
+    const create = await post({ action: 'create_event', super_pwd: process.env.SUPER_ADMIN_PWD, custom_code: code, event_name: 'PR155R4 T26', event_type: 'team', courts: ['1'], referee_password: '2508' });
     assert.equal(create.status, 'success');
     createdEvents.push(code);
     const savedEvent = EVENT; EVENT = code;
@@ -614,7 +614,7 @@ describe('R3-第三轮回归测试', () => {
   it('27. task.status=比赛中但存在待开赛投影 → start_task 拒绝且零变化', async () => {
     // 创建独立赛事
     const code = `PR155R4-T27-${Date.now().toString(36)}`;
-    const create = await post({ action: 'create_event', super_pwd: 'Wuxian666', custom_code: code, event_name: 'PR155R4 T27', event_type: 'team', courts: ['1'], referee_password: '2508' });
+    const create = await post({ action: 'create_event', super_pwd: process.env.SUPER_ADMIN_PWD, custom_code: code, event_name: 'PR155R4 T27', event_type: 'team', courts: ['1'], referee_password: '2508' });
     assert.equal(create.status, 'success');
     createdEvents.push(code);
     const savedEvent = EVENT; EVENT = code;
@@ -655,7 +655,7 @@ describe('R3-第三轮回归测试', () => {
   it('28. save_score id/is_team 权威性：客户端伪造大小写+空白+is_team=false 不影响 record', async () => {
     // 创建独立赛事，使用大小写可区分的 key "MiX-01"
     const code = `PR155R4-T28-${Date.now().toString(36)}`;
-    const create = await post({ action: 'create_event', super_pwd: 'Wuxian666', custom_code: code, event_name: 'PR155R4 T28', event_type: 'team', courts: ['1'], referee_password: '2508' });
+    const create = await post({ action: 'create_event', super_pwd: process.env.SUPER_ADMIN_PWD, custom_code: code, event_name: 'PR155R4 T28', event_type: 'team', courts: ['1'], referee_password: '2508' });
     assert.equal(create.status, 'success');
     createdEvents.push(code);
     const savedEvent = EVENT; EVENT = code;
@@ -690,7 +690,7 @@ describe('R3-第三轮回归测试', () => {
   it('29. winner="" 或缺失 → error 且四类快照全等', async () => {
     // 创建独立赛事
     const code = `PR155R4-T29-${Date.now().toString(36)}`;
-    const create = await post({ action: 'create_event', super_pwd: 'Wuxian666', custom_code: code, event_name: 'PR155R4 T29', event_type: 'team', courts: ['1'], referee_password: '2508' });
+    const create = await post({ action: 'create_event', super_pwd: process.env.SUPER_ADMIN_PWD, custom_code: code, event_name: 'PR155R4 T29', event_type: 'team', courts: ['1'], referee_password: '2508' });
     assert.equal(create.status, 'success');
     createdEvents.push(code);
     const savedEvent = EVENT; EVENT = code;
@@ -728,7 +728,7 @@ describe('R3-第三轮回归测试', () => {
   it('30. winner 完整矩阵：第三方/error、t1/success、t2/success、伪造 t1/t2 不影响', async () => {
     // 创建独立赛事
     const code = `PR155R4-T30-${Date.now().toString(36)}`;
-    const create = await post({ action: 'create_event', super_pwd: 'Wuxian666', custom_code: code, event_name: 'PR155R4 T30', event_type: 'team', courts: ['1','2'], referee_password: '2508' });
+    const create = await post({ action: 'create_event', super_pwd: process.env.SUPER_ADMIN_PWD, custom_code: code, event_name: 'PR155R4 T30', event_type: 'team', courts: ['1','2'], referee_password: '2508' });
     assert.equal(create.status, 'success');
     createdEvents.push(code);
     const savedEvent = EVENT; EVENT = code;
@@ -1226,6 +1226,6 @@ describe('R7-save_score：幂等拒绝矩阵', () => {
 // ======================== 清理 ========================
 after(async () => {
   for (const code of createdEvents) {
-    await post({ action: 'super_admin_delete_event', super_pwd: 'Wuxian666', target_code: code });
+    await post({ action: 'super_admin_delete_event', super_pwd: process.env.SUPER_ADMIN_PWD, target_code: code });
   }
 });

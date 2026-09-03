@@ -3,7 +3,7 @@ const assert = require('node:assert/strict');
 
 const BASE = (process.env.LEGACY_BASE_URL || 'http://localhost:8082').replace(/\/$/, '');
 const EVENT = `ISSUE158-${Date.now()}-${process.pid}`;
-const SUPER_PWD = 'Wuxian666';
+const SUPER_PWD = process.env.SUPER_ADMIN_PWD;
 const EVENT_PWD = 'issue158-test';
 let created = false;
 
