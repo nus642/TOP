@@ -49,6 +49,7 @@
     const eventCode = (params.get('event_code') || params.get('code') || '').trim().toUpperCase();
     const showIdle = params.get('show_idle') === '1';
     const grid = document.getElementById('grid');
+    const { RUNNING, PENDING } = VenueProjection.statuses;
     let eventName = '赛事现场';
     let lastSignature = '';
 
@@ -61,7 +62,7 @@
     }
 
     function render(projection) {
-        const matches = VenueProjection.relevantMatches(projection, { showIdle });
+        const matches = VenueProjection.relevantMatches(projection, { showIdle, limit: 8 });
         const signature = JSON.stringify([projection.event, matches]);
         document.getElementById('updated').textContent = `更新 ${new Date(projection.updated_at).toLocaleTimeString('zh-CN', { hour12: false })}`;
         if (signature === lastSignature) return;
@@ -78,7 +79,7 @@
         }
         matches.forEach(match => {
             const card = document.createElement('article');
-            card.className = `card ${match.status === '比赛中' ? 'running' : match.status === '待开赛' ? 'pending' : 'idle'}`;
+            card.className = `card ${match.status === RUNNING ? 'running' : match.status === PENDING ? 'pending' : 'idle'}`;
             const top = document.createElement('div'); top.className = 'card-top';
             appendText(top, 'court', `COURT ${match.court}`);
             appendText(top, 'status', match.status);
@@ -88,7 +89,7 @@
             appendText(matchup, 'versus', 'VS');
             appendText(matchup, 'side', match.side_b || '待定');
             card.appendChild(matchup);
-            appendText(card, 'score', match.status === '比赛中' ? (match.score || '0 - 0') : match.status === '待开赛' ? '即将开赛' : '空闲');
+            appendText(card, 'score', match.status === RUNNING ? (match.score || '0 - 0') : match.status === PENDING ? '即将开赛' : '空闲');
             appendText(card, 'referee', match.referee ? `裁判 ${match.referee}` : '');
             grid.appendChild(card);
         });

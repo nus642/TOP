@@ -32,9 +32,15 @@ test('running precedes pending and idle is hidden by default', () => {
     assert.equal(projection.relevantMatches(view, { showIdle: true }).length, 3);
 });
 
-test('caps public display at eight relevant matches', () => {
+test('keeps every relevant match in the reusable projection by default', () => {
     const view = projection.fromLegacyDashboard(dashboard(10), {});
-    assert.equal(projection.relevantMatches(view).length, 8);
+    assert.equal(view.matches.length, 10);
+    assert.equal(projection.relevantMatches(view).length, 10);
+});
+
+test('applies the Venue Board consumer limit when explicitly requested', () => {
+    const view = projection.fromLegacyDashboard(dashboard(10), {});
+    assert.equal(projection.relevantMatches(view, { limit: 8 }).length, 8);
 });
 
 test('chooses adaptive representative layouts', () => {

@@ -70,7 +70,8 @@
     function relevantMatches(projection, options) {
         const all = projection && Array.isArray(projection.matches) ? projection.matches : [];
         const showIdle = options && options.showIdle;
-        return all.filter(match => showIdle || match.status !== IDLE).slice(0, 8);
+        const relevant = all.filter(match => showIdle || match.status !== IDLE);
+        return options && options.limit !== undefined ? relevant.slice(0, options.limit) : relevant;
     }
 
     function layoutFor(count) {
