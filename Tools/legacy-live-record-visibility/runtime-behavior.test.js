@@ -333,7 +333,11 @@ describe('进行中比赛返回流程：运行时行为（真实执行 resumeAct
       set matchPhase(v) { matchPhase = v; },
       get sysMode() { return sysMode; },
       set sysMode(v) { sysMode = v; },
-      BACKUP_KEY: 'pickle_referee_backup_v5',
+      BACKUP_KEY_PREFIX: 'pickle_referee_backup_v6',
+      recoveryIdentity: () => ({ eventId: 'EVENT', matchId: '001-01', refereeId: '裁判A', court: '1', lifecycle: matchPhase, participants: ['队A','队B','待定','待定','待定','待定'] }),
+      recoveryBackupKey: () => 'pickle_referee_backup_v6:EVENT',
+      validateAuthoritativeRecovery: (_data, dash) => dash.tasks?.['001-01']?.status === '比赛中' ? '' : '该任务已非比赛中',
+      recoveryConflict: (msg) => { calls.toasts.push({ msg, isError: true }); return false; },
       getCurrentStep: () => currentStep,
       $: () => ({ classList: { add() {}, remove() {}, contains() { return false; } } }),
       apiCall: async (action, params) => {
@@ -346,7 +350,7 @@ describe('进行中比赛返回流程：运行时行为（真实执行 resumeAct
       showToast: (msg, isError) => { calls.toasts.push({ msg, isError }); },
       updateRefereeStatus: async () => {},
       syncLiveScore: () => {},
-      clearBackup: () => { localStorage.removeItem('pickle_referee_backup_v5'); },
+      clearBackup: () => { localStorage.removeItem('pickle_referee_backup_v6:EVENT'); },
       console,
       Promise,
       Object,
@@ -408,7 +412,7 @@ describe('进行中比赛返回流程：运行时行为（真实执行 resumeAct
     assert.deepEqual(timeoutUsed, beforeTimeoutUsed, 'timeoutUsed 不得被修改');
     assert.deepEqual(currentMatch, beforeCurrentMatch, 'currentMatch 不得被修改');
     // 断言：设置页备份为 step=3 / in_progress
-    const backup = JSON.parse(localStorage.getItem('pickle_referee_backup_v5'));
+    const backup = JSON.parse(localStorage.getItem('pickle_referee_backup_v6:EVENT'));
     assert.equal(backup.step, 3, '备份 step 必须为 3');
     assert.equal(backup.matchPhase, 'in_progress', '备份 matchPhase 必须为 in_progress');
   });
@@ -441,7 +445,7 @@ describe('进行中比赛返回流程：运行时行为（真实执行 resumeAct
     sandbox.backupState();
 
     // 断言：Map-based localStorage 中的备份
-    const backup = JSON.parse(localStorage.getItem('pickle_referee_backup_v5'));
+    const backup = JSON.parse(localStorage.getItem('pickle_referee_backup_v6:EVENT'));
     assert.equal(backup.matchPhase, 'in_progress', '备份必须保存 matchPhase=in_progress');
     assert.equal(backup.step, 3, '进行中比赛备份 step 必须为 3');
   });
