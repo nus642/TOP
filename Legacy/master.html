@@ -378,7 +378,10 @@
                 <!-- 右侧边栏 -->
                 <div class="flex flex-col gap-6">
                     <div class="card border-blue-500/30">
-                        <h2 class="text-sm font-bold text-blue-400 mb-4 flex items-center gap-2"><span>📺</span> 大屏实况广播 (Dashboard)</h2>
+                        <div class="flex justify-between items-center gap-3 mb-4">
+                            <h2 class="text-sm font-bold text-blue-400 flex items-center gap-2"><span>📺</span> 大屏实况广播 (Dashboard)</h2>
+                            <button onclick="openVenueBoard()" class="bg-blue-900/40 hover:bg-blue-800 border border-blue-500/30 text-blue-300 px-3 py-1.5 rounded text-xs font-bold transition-colors shadow whitespace-nowrap">场地大屏 ↗</button>
+                        </div>
                         <div class="bg-blue-900/20 border border-blue-500/20 p-3 rounded-lg mb-3">
                             <div class="text-[10px] text-blue-300 mb-1">大屏幕滚动播报内容：</div>
                             <div id="currentDashboardDisplay" class="text-sm font-bold text-white break-words">无</div>
@@ -555,6 +558,15 @@
                 prompt('自动复制失败，请手动复制：', text);
             });
         }
+
+        window.openVenueBoard = function() {
+            if (!currentEventCode) {
+                showToast('⚠️ 当前赛事不可用，无法打开场地大屏', true);
+                return;
+            }
+            const url = `venue-board.html?event_code=${encodeURIComponent(currentEventCode)}`;
+            window.open(url, '_blank');
+        };
 
         // ======================== 初始化模式 ========================
         function initMode() {
