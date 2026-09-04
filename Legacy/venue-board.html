@@ -1,0 +1,127 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width,initial-scale=1">
+    <title>赛事现场大屏</title>
+    <style>
+        :root { color-scheme: dark; font-family: Inter, "Noto Sans SC", system-ui, sans-serif; }
+        * { box-sizing: border-box; }
+        body { margin: 0; min-height: 100vh; overflow: hidden; color: #f8fafc; background: radial-gradient(circle at 50% -20%, #1e3a5f 0, #08111f 42%, #020617 100%); }
+        .board { height: 100vh; display: grid; grid-template-rows: auto 1fr auto; gap: clamp(12px, 1.7vh, 24px); padding: clamp(18px, 2.4vw, 44px); }
+        header { display: flex; align-items: center; justify-content: space-between; gap: 2rem; border-bottom: 1px solid #29405f; padding-bottom: 1.5vh; }
+        h1 { margin: 0; font-size: clamp(27px, 3.1vw, 58px); letter-spacing: -.025em; }
+        .live { color: #5eead4; font-size: clamp(14px, 1.25vw, 24px); font-weight: 800; letter-spacing: .16em; white-space: nowrap; }
+        .live::before { content: ""; display: inline-block; width: .7em; height: .7em; margin-right: .55em; border-radius: 50%; background: #2dd4bf; box-shadow: 0 0 20px #2dd4bf; }
+        #grid { min-height: 0; display: grid; grid-template-columns: repeat(var(--columns), minmax(0, 1fr)); grid-auto-rows: minmax(0, 1fr); gap: clamp(12px, 1.35vw, 24px); }
+        .card { min-width: 0; display: grid; grid-template-rows: auto 1fr auto; padding: clamp(16px, 1.55vw, 30px); border: 2px solid #334155; border-radius: clamp(16px, 1.5vw, 28px); background: linear-gradient(145deg, rgba(30,41,59,.96), rgba(15,23,42,.96)); box-shadow: 0 16px 36px rgba(0,0,0,.3); }
+        .card.running { border-color: #14b8a6; box-shadow: 0 0 0 1px #14b8a633, 0 18px 45px #0008; }
+        .card.pending { border-color: #d97706; background: linear-gradient(145deg, #352812ee, #171c28f5); }
+        .card.idle { opacity: .7; }
+        .card-top { display: flex; justify-content: space-between; align-items: center; gap: 1rem; }
+        .court { font-size: clamp(23px, 2.15vw, 42px); font-weight: 950; color: #fff; }
+        .status { padding: .35em .7em; border-radius: 999px; font-size: clamp(13px, 1vw, 20px); font-weight: 850; background: #475569; white-space: nowrap; }
+        .running .status { background: #0f766e; color: #ccfbf1; }
+        .pending .status { background: #92400e; color: #fef3c7; }
+        .matchup { min-height: 0; display: grid; grid-template-columns: minmax(0,1fr) auto minmax(0,1fr); align-items: center; gap: clamp(10px, 1vw, 20px); margin: 1vh 0; }
+        .side { overflow: hidden; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; font-size: clamp(23px, 2.25vw, 44px); font-weight: 900; line-height: 1.15; text-align: center; overflow-wrap: anywhere; }
+        .versus { color: #64748b; font-size: clamp(14px, 1.1vw, 22px); font-weight: 900; }
+        .score { text-align: center; font: 950 clamp(31px, 3.6vw, 70px)/1 ui-monospace, monospace; color: #5eead4; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .pending .score { color: #fbbf24; font-family: inherit; font-size: clamp(19px, 1.6vw, 30px); }
+        .referee { min-height: 1.3em; margin-top: .8vh; color: #94a3b8; text-align: center; font-size: clamp(12px, .9vw, 18px); }
+        #empty { place-self: center; text-align: center; color: #94a3b8; font-size: clamp(22px, 2vw, 38px); }
+        footer { display: flex; justify-content: space-between; color: #64748b; font-size: clamp(11px, .85vw, 16px); }
+        body[data-density="compact"] .card { padding: clamp(12px, 1.1vw, 22px); }
+        body[data-density="compact"] .matchup { margin: .3vh 0; }
+        @media (max-aspect-ratio: 4/3) { body { overflow: auto; } .board { height: auto; min-height: 100vh; } #grid { grid-template-columns: repeat(min(var(--columns), 2), minmax(0,1fr)); grid-auto-rows: minmax(260px, 1fr); } }
+    </style>
+</head>
+<body>
+<main class="board">
+    <header><h1 id="eventName">赛事现场</h1><div class="live">LIVE VENUE BOARD</div></header>
+    <section id="grid" aria-live="polite"><div id="empty">正在连接赛事数据…</div></section>
+    <footer><span id="eventCode"></span><span id="updated"></span></footer>
+</main>
+<script src="venue-projection.js"></script>
+<script>
+    'use strict';
+    const params = new URLSearchParams(location.search);
+    const eventCode = (params.get('event_code') || params.get('code') || '').trim().toUpperCase();
+    const showIdle = params.get('show_idle') === '1';
+    const grid = document.getElementById('grid');
+    const { RUNNING, PENDING } = VenueProjection.statuses;
+    let eventName = '赛事现场';
+    let lastSignature = '';
+
+    function appendText(parent, className, value) {
+        const node = document.createElement('div');
+        node.className = className;
+        node.textContent = value;
+        parent.appendChild(node);
+        return node;
+    }
+
+    function render(projection) {
+        const matches = VenueProjection.relevantMatches(projection, { showIdle, limit: 8 });
+        const signature = JSON.stringify([projection.event, matches]);
+        document.getElementById('updated').textContent = `更新 ${new Date(projection.updated_at).toLocaleTimeString('zh-CN', { hour12: false })}`;
+        if (signature === lastSignature) return;
+        lastSignature = signature;
+        document.getElementById('eventName').textContent = projection.event.name;
+        document.getElementById('eventCode').textContent = projection.event.code ? `赛事码 ${projection.event.code}` : '';
+        const layout = VenueProjection.layoutFor(matches.length);
+        grid.style.setProperty('--columns', layout.columns);
+        document.body.dataset.density = layout.density;
+        grid.replaceChildren();
+        if (!matches.length) {
+            appendText(grid, 'empty', '暂无待开赛或正在进行的比赛').id = 'empty';
+            return;
+        }
+        matches.forEach(match => {
+            const card = document.createElement('article');
+            card.className = `card ${match.status === RUNNING ? 'running' : match.status === PENDING ? 'pending' : 'idle'}`;
+            const top = document.createElement('div'); top.className = 'card-top';
+            appendText(top, 'court', `COURT ${match.court}`);
+            appendText(top, 'status', match.status);
+            card.appendChild(top);
+            const matchup = document.createElement('div'); matchup.className = 'matchup';
+            appendText(matchup, 'side', match.side_a || '待定');
+            appendText(matchup, 'versus', 'VS');
+            appendText(matchup, 'side', match.side_b || '待定');
+            card.appendChild(matchup);
+            appendText(card, 'score', match.status === RUNNING ? (match.score || '0 - 0') : match.status === PENDING ? '即将开赛' : '空闲');
+            appendText(card, 'referee', match.referee ? `裁判 ${match.referee}` : '');
+            grid.appendChild(card);
+        });
+    }
+
+    async function poll() {
+        if (!eventCode) {
+            grid.replaceChildren(); appendText(grid, 'empty', '请在 URL 中提供 event_code').id = 'empty'; return;
+        }
+        try {
+            const response = await fetch(`/data.php?action=get_full_dashboard&event_code=${encodeURIComponent(eventCode)}&_t=${Date.now()}`, { cache: 'no-store' });
+            if (!response.ok) throw new Error(`HTTP ${response.status}`);
+            const dashboard = await response.json();
+            if (dashboard.status !== 'success') throw new Error(dashboard.message || '数据请求失败');
+            render(VenueProjection.fromLegacyDashboard(dashboard, { code: eventCode, name: eventName }));
+        } catch (error) {
+            document.getElementById('updated').textContent = '连接中断，正在重试';
+        }
+    }
+
+    async function start() {
+        if (eventCode) {
+            try {
+                const response = await fetch(`/data.php?action=get_event_config&event_code=${encodeURIComponent(eventCode)}`, { cache: 'no-store' });
+                const config = await response.json();
+                if (config.status === 'success' && config.data) eventName = config.data.event_name || eventName;
+            } catch (_) { /* Dashboard polling remains available if this optional title lookup fails. */ }
+        }
+        await poll();
+        setInterval(poll, 3000);
+    }
+    start();
+</script>
+</body>
+</html>
