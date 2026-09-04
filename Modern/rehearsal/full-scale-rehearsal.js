@@ -1,13 +1,13 @@
 /**
  * Full-scale rehearsal for the first event.
  *
- * Scale: 25 pairs (50 players), 60 matches, 6 courts, 6 referees.
+ * Scale: 25 pairs (50 players), 60 matches, 6 courts, 12 referees.
  *
- * Verifies the complete match-day chain:
+ * Verifies the complete match-day chain with TWO TURNOVER ROUNDS:
  *   create competition -> import arrangement -> roster -> lifecycle ->
- *   master bulk check-in -> 6 concurrent dispatches -> 6 concurrent
- *   accept/start -> score submission -> master confirmation ->
- *   withdraw + reassign of one waiting match.
+ *   master bulk check-in -> wave 1 (6 matches, full lifecycle) ->
+ *   wave 2 (6 matches on same courts, verifying court turnover) ->
+ *   public scoreboard projection -> withdraw + reassign of one waiting match.
  *
  * Usage (server must be running, e.g. `npm start`):
  *   node rehearsal/full-scale-rehearsal.js            # full rehearsal
@@ -21,12 +21,16 @@ const fs = require("node:fs");
 const path = require("node:path");
 const assert = require("node:assert/strict");
 const { randomUUID } = require("node:crypto");
+const { assertPublicScoreboardMatches } = require("./assertions");
 
 const BASE_URL = process.env.BASE_URL || "http://localhost:3000";
 const STATE_FILE = path.join(__dirname, ".rehearsal-state.json");
 
 const COURTS = ["C1", "C2", "C3", "C4", "C5", "C6"];
-const REFEREES = ["裁判甲", "裁判乙", "裁判丙", "裁判丁", "裁判戊", "裁判己"];
+const REFEREES = [
+  "裁判甲", "裁判乙", "裁判丙", "裁判丁", "裁判戊", "裁判己",
+  "裁判庚", "裁判辛", "裁判壬", "裁判癸", "裁判子", "裁判丑"
+];
 const PAIR_COUNT = 25;
 const MATCH_COUNT = 60;
 const MASTER_ID = "rehearsal-master";
@@ -111,6 +115,75 @@ async function overview(masterCookie, competitionId) {
   return json.matches;
 }
 
+// Execute one complete turnover wave: dispatch -> accept -> start -> score -> confirm.
+// Returns { dispatched: [...], confirmed: [...] } with the final match objects.
+async function runWave({ label, matchIds, refereeNames, masterCookie, competitionId }) {
+  step(`${label}. 并发派单 ${matchIds.length} 场`);
+  const allMatches = await overview(masterCookie, competitionId);
+  const waveMatches = matchIds.map((id) => allMatches.find((m) => m.matchId === id));
+  waveMatches.forEach((m, i) => assert.ok(m, `${label}: match ${matchIds[i]} not found`));
+
+  await Promise.all(waveMatches.map((match, i) =>
+    call("POST", `/api/master-workflow/${competitionId}/matches/${match.matchId}/dispatch`, {
+      cookie: masterCookie,
+      body: {
+        courtId: match.schedule.courtId,
+        refereeId: refereeNames[i],
+        expectedVersion: match.referee?.dispatchVersion ?? 0,
+        correlationId: randomUUID()
+      }
+    })
+  ));
+  console.log(`${label}: ${matchIds.length} 场派单全部成功`);
+
+  step(`${label}. 裁判并发接单`);
+  const refereeCookies = await Promise.all(refereeNames.map((name) => establish(name, "referee")));
+  let wave = (await overview(masterCookie, competitionId)).filter((m) => matchIds.includes(m.matchId));
+  assert.equal(wave.length, matchIds.length, `${label}: expected ${matchIds.length} dispatched matches in overview, got ${wave.length}`);
+  await Promise.all(wave.map((match, i) =>
+    call("POST", `/api/referee-workflow/${competitionId}/referees/${encodeURIComponent(refereeNames[i])}/matches/${match.matchId}/accept`, {
+      cookie: refereeCookies[i],
+      body: { expectedVersion: match.referee.dispatchVersion, correlationId: randomUUID() }
+    })
+  ));
+  console.log(`${label}: 接单全部成功`);
+
+  step(`${label}. 裁判并发开赛`);
+  await Promise.all(wave.map((match, i) =>
+    call("POST", `/api/referee-workflow/${competitionId}/referees/${encodeURIComponent(refereeNames[i])}/matches/${match.matchId}/start`, {
+      cookie: refereeCookies[i],
+      body: {}
+    })
+  ));
+  console.log(`${label}: 全部进入 playing`);
+
+  step(`${label}. 记分上报`);
+  await Promise.all(wave.map((match, i) =>
+    call("POST", `/api/referee-workflow/${competitionId}/referees/${encodeURIComponent(refereeNames[i])}/matches/${match.matchId}/score`, {
+      cookie: refereeCookies[i],
+      body: { score1: 11, score2: 7 }
+    })
+  ));
+  console.log(`${label}: 比分全部上报`);
+
+  step(`${label}. 主控确认赛果`);
+  const afterScore = await overview(masterCookie, competitionId);
+  const scored = afterScore.filter((m) => matchIds.includes(m.matchId));
+  await Promise.all(scored.map((match) =>
+    call("POST", `/api/master-workflow/${competitionId}/matches/${match.matchId}/confirm-result`, {
+      cookie: masterCookie,
+      body: {}
+    })
+  ));
+  const afterConfirm = await overview(masterCookie, competitionId);
+  const confirmed = afterConfirm.filter((m) => matchIds.includes(m.matchId));
+  assert.equal(confirmed.length, matchIds.length, `${label}: expected ${matchIds.length} confirmed matches, got ${confirmed.length}`);
+  confirmed.forEach((m) => assert.equal(dispatchStatusOf(m), "confirmed", `${label}: match ${m.matchId} should be confirmed`));
+  console.log(`${label}: ${matchIds.length} 场赛果全部确认`);
+
+  return { dispatched: waveMatches, confirmed };
+}
+
 // ---------------------------------------------------------------- phases
 
 async function runFullRehearsal() {
@@ -137,13 +210,13 @@ async function runFullRehearsal() {
   assert.equal(imported.summary.matches, MATCH_COUNT);
   console.log(`导入成功：${JSON.stringify(imported.summary)}`);
 
-  step("3. 登记 6 人裁判花名册");
+  step("3. 登记 12 人裁判花名册（两轮周转）");
   await call("POST", `/api/referee-coordination/${competitionId}/referees/roster`, {
     cookie: masterCookie,
     body: { refereeIds: REFEREES }
   });
   const { json: publicRoster } = await call("GET", `/api/public/competitions/${competitionId}/referee-roster`);
-  assert.equal(publicRoster.referees.length, 6);
+  assert.equal(publicRoster.referees.length, 12);
   console.log("花名册公开接口可见（裁判身份入口数据源）:", publicRoster.referees.join("、"));
 
   step("4. 生命周期推进 draft → registration_open → ready → running");
@@ -161,70 +234,48 @@ async function runFullRehearsal() {
   });
   assert.equal(checkin.checkedInCount, 50);
 
-  step("6. 并发派单：6 场比赛、6 位裁判各 1 场");
   const matches = await overview(masterCookie, competitionId);
   assert.equal(matches.length, MATCH_COUNT);
-  const firstWave = matches.slice(0, 6);
-  const dispatchResults = await Promise.all(firstWave.map((match, i) =>
-    call("POST", `/api/master-workflow/${competitionId}/matches/${match.matchId}/dispatch`, {
-      cookie: masterCookie,
-      body: {
-        courtId: match.schedule.courtId,
-        refereeId: REFEREES[i],
-        expectedVersion: match.referee?.dispatchVersion ?? 0,
-        correlationId: randomUUID()
-      }
-    })
-  ));
-  dispatchResults.forEach(({ json }) => assert.ok(json.reservation || json.match, "dispatch result expected"));
-  console.log("6 场派单全部成功");
 
-  step("7. 6 位裁判并发接单");
-  const refereeCookies = await Promise.all(REFEREES.map((name) => establish(name, "referee")));
-  const afterDispatch = await overview(masterCookie, competitionId);
-  const wave = afterDispatch.filter((m) => firstWave.some((f) => f.matchId === m.matchId));
-  await Promise.all(wave.map((match, i) =>
-    call("POST", `/api/referee-workflow/${competitionId}/referees/${encodeURIComponent(REFEREES[i])}/matches/${match.matchId}/accept`, {
-      cookie: refereeCookies[i],
-      body: { expectedVersion: match.referee.dispatchVersion, correlationId: randomUUID() }
-    })
-  ));
-  console.log("6 位裁判接单全部成功");
+  // Wave 1: first 6 matches, referees 0-5
+  const wave1MatchIds = matches.slice(0, 6).map((m) => m.matchId);
+  const wave1Referees = REFEREES.slice(0, 6);
+  const wave1 = await runWave({
+    label: "6a-Wave1",
+    matchIds: wave1MatchIds,
+    refereeNames: wave1Referees,
+    masterCookie,
+    competitionId
+  });
 
-  step("8. 6 位裁判并发开赛");
-  await Promise.all(wave.map((match, i) =>
-    call("POST", `/api/referee-workflow/${competitionId}/referees/${encodeURIComponent(REFEREES[i])}/matches/${match.matchId}/start`, {
-      cookie: refereeCookies[i],
-      body: {}
-    })
-  ));
-  console.log("6 场比赛全部进入 playing");
+  // Wave 2: next 6 matches, referees 6-11 (court turnover)
+  const wave2MatchIds = matches.slice(6, 12).map((m) => m.matchId);
+  const wave2Referees = REFEREES.slice(6, 12);
+  const wave2 = await runWave({
+    label: "6b-Wave2",
+    matchIds: wave2MatchIds,
+    refereeNames: wave2Referees,
+    masterCookie,
+    competitionId
+  });
 
-  step("9. 记分上报（让分后的最终比分）");
-  await Promise.all(wave.map((match, i) =>
-    call("POST", `/api/referee-workflow/${competitionId}/referees/${encodeURIComponent(REFEREES[i])}/matches/${match.matchId}/score`, {
-      cookie: refereeCookies[i],
-      body: { score1: 11, score2: 7 }
-    })
-  ));
-  console.log("6 场比分全部上报");
+  // Court reuse verification: wave 2 courts == wave 1 courts
+  step("6c. 场地周转验证（available → occupied → available → occupied → available）");
+  const wave1Courts = wave1.dispatched.map((m) => m.schedule.courtId).sort();
+  const wave2Courts = wave2.dispatched.map((m) => m.schedule.courtId).sort();
+  assert.deepEqual(wave2Courts, wave1Courts, "wave 2 must reuse wave 1 courts (turnover)");
+  console.log(`场地周转：${wave1Courts.join(", ")} 全部复用`);
 
-  step("10. 主控确认赛果");
-  const afterScore = await overview(masterCookie, competitionId);
-  const scored = afterScore.filter((m) => firstWave.some((f) => f.matchId === m.matchId));
-  await Promise.all(scored.map((match) =>
-    call("POST", `/api/master-workflow/${competitionId}/matches/${match.matchId}/confirm-result`, {
-      cookie: masterCookie,
-      body: {}
-    })
-  ));
-  const confirmed = await overview(masterCookie, competitionId);
-  const confirmedWave = confirmed.filter((m) => firstWave.some((f) => f.matchId === m.matchId));
-  confirmedWave.forEach((m) => assert.equal(dispatchStatusOf(m), "confirmed", `match ${m.matchId} should be confirmed`));
-  console.log("6 场赛果全部确认");
+  // Public scoreboard verification: both waves visible
+  step("6d. 公开记分屏验证（两轮赛果均进入公开投影）");
+  const { json: publicScoreboardJson } = await call("GET", `/api/public/competitions/${competitionId}/matches`);
+  const confirmedIds = [...wave1MatchIds, ...wave2MatchIds];
+  const publicConfirmed = assertPublicScoreboardMatches(publicScoreboardJson, confirmedIds, { label: "公开记分屏" });
+  console.log(`公开记分屏：${publicConfirmed.length} 场已确认赛果可见（status=confirmed, confirmed=true）`);
 
-  step("11. 中途撤回 + 换派（第二波第 1 场）");
-  const nextMatch = confirmed.find((m) => dispatchStatusOf(m) === "not_dispatched");
+  step("7. 中途撤回 + 换派（第三轮第 1 场）");
+  const allAfterWaves = await overview(masterCookie, competitionId);
+  const nextMatch = allAfterWaves.find((m) => dispatchStatusOf(m) === "not_dispatched");
   assert.ok(nextMatch, "a pending match for withdraw/reassign drill");
   const court = nextMatch.schedule.courtId;
   await call("POST", `/api/master-workflow/${competitionId}/matches/${nextMatch.matchId}/dispatch`, {
@@ -246,8 +297,13 @@ async function runFullRehearsal() {
   assert.equal(dispatchStatusOf(current), "waiting_acceptance", "reassigned match should await acceptance");
   console.log(`比赛 ${nextMatch.matchId} 撤回后已换派给 ${REFEREES[1]}`);
 
-  fs.writeFileSync(STATE_FILE, JSON.stringify({ competitionId, savedAt: new Date().toISOString() }, null, 2));
-  step("彩排全部通过 ✔");
+  fs.writeFileSync(STATE_FILE, JSON.stringify({
+    competitionId,
+    wave1MatchIds,
+    wave2MatchIds,
+    savedAt: new Date().toISOString()
+  }, null, 2));
+  step("彩排全部通过 ✔（两轮 turnover + 撤回换派）");
   console.log(`状态已写入 ${STATE_FILE}；可重启服务后运行 --verify 验证状态恢复。`);
 }
 
@@ -255,16 +311,20 @@ async function runPostRestartVerification() {
   if (!fs.existsSync(STATE_FILE)) {
     throw new Error(`缺少 ${STATE_FILE}，请先运行完整彩排。`);
   }
-  const { competitionId } = JSON.parse(fs.readFileSync(STATE_FILE, "utf8"));
+  const { competitionId, wave1MatchIds, wave2MatchIds } = JSON.parse(fs.readFileSync(STATE_FILE, "utf8"));
   step("重启后状态恢复验证");
   const masterCookie = await establish(MASTER_ID, "master");
   const matches = await overview(masterCookie, competitionId);
   assert.equal(matches.length, MATCH_COUNT, "all 60 matches survive restart");
   const confirmed = matches.filter((m) => dispatchStatusOf(m) === "confirmed");
-  assert.equal(confirmed.length, 6, "six confirmed results survive restart");
+  assert.equal(confirmed.length, 12, "twelve confirmed results (2 waves) survive restart");
+  const wave1Confirmed = confirmed.filter((m) => wave1MatchIds.includes(m.matchId));
+  const wave2Confirmed = confirmed.filter((m) => wave2MatchIds.includes(m.matchId));
+  assert.equal(wave1Confirmed.length, 6, "wave 1 confirmed survive restart");
+  assert.equal(wave2Confirmed.length, 6, "wave 2 confirmed survive restart");
   const reassigned = matches.find((m) => m.referee?.refereeId === REFEREES[1] && dispatchStatusOf(m) === "waiting_acceptance");
   assert.ok(reassigned, "reassigned dispatch survives restart");
-  console.log(`赛事 ${competitionId}：60 场在库、6 场已确认、换派场仍等待接单。状态恢复 ✔`);
+  console.log(`赛事 ${competitionId}：60 场在库、12 场已确认（两轮 turnover）、换派场仍等待接单。状态恢复 ✔`);
 }
 
 (process.argv.includes("--verify") ? runPostRestartVerification() : runFullRehearsal())
