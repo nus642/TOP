@@ -415,17 +415,31 @@ const normalizeMatchId = id => String(id ?? '').replace(/\s+/g, '').toUpperCase(
         const getRadio = function(n) { const el = document.querySelector(`input[name="${n}"]:checked`); return el ? el.value : ''; };
         function normalizeId(id) { return String(id).toUpperCase().replace(/\s+/g, '').replace(/VS/ig, 'VS'); }
 
-        async function apiCall(action, data = {}) {
-            if (sysMode === 'local') return { status: 'success' };
-            data.action = action; if (eventCode) data.event_code = eventCode;
-            try { const res = await fetch(API, { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(data) }); return res.json(); } catch(e) { return { status: 'error', message: '网络连接异常' }; }
+        async function apiCall(action, data = {}, requestedEventCode = null) {
+            if (sysMode === 'local' && !requestedEventCode) return { status: 'success' };
+            const requestEvent = recoveryText(requestedEventCode || eventCode).toUpperCase();
+            const payload = { ...data, action };
+            delete payload.event_code;
+            if (requestEvent) payload.event_code = requestEvent;
+            try { const res = await fetch(API, { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(payload) }); return res.json(); } catch(e) { return { status: 'error', message: '网络连接异常' }; }
         }
 
         async function apiGet(action, params = {}) {
             if (sysMode === 'local') return { status: 'success', data: [] };
-            let url = `${API}?action=${action}&event_code=${eventCode||''}&_t=${Date.now()}`;
-            for(let k in params) url += `&${k}=${encodeURIComponent(params[k])}`;
+            const query = new URLSearchParams({ action, event_code: recoveryText(eventCode).toUpperCase(), _t: Date.now() });
+            for (const [key, value] of Object.entries(params)) if (key !== 'event_code') query.set(key, value);
+            const url = `${API}?${query.toString()}`;
             try { const res = await fetch(url); return res.json(); } catch(e) { return { status: 'error', message: '网络连接异常' }; }
+        }
+
+        function resetVolatileMatchContext() {
+            currentMatch = {};
+            window.pendingTask = null;
+            matchState = { t1Score: 0, t2Score: 0, t1Wins: 0, t2Wins: 0, currentGame: 1, history: [], timeline: [], halfSwitched: false, over: false };
+            gameState = { viewBa: false, servTeam: 1, initServTeam: 1, servNum: 2, court: 'Right', t1: { r: '', l: '' }, t2: { r: '', l: '' }, initRightP1: '', initRightP2: '', servingPlayer: '' };
+            timeoutUsed = { t1: false, t2: false, medicalT1: false, medicalT2: false };
+            matchPhase = 'not_started';
+            recoveryBlocked = false;
         }
 
         const recoveryText = value => String(value ?? '').trim();
@@ -673,16 +687,26 @@ const normalizeMatchId = id => String(id ?? '').replace(/\s+/g, '').toUpperCase(
             btn.disabled = true;
 
             try {
-                const res = await apiCall('referee_login', { event_code: code, name, password: pwd });
+                // Login is the sole pre-auth request: bind it explicitly to the requested event,
+                // never to a stale eventCode left by the previous authenticated context.
+                const res = await apiCall('referee_login', { name, password: pwd }, code);
                 if (res.status === 'success') {
-                    const configRes = await apiGet('get_event_config', { event_code: code });
-                    if (configRes.status === 'success') sysMode = configRes.data.event_type || 'ind';
+                    eventCode = code;
+                    sysMode = 'ind'; // authenticated transition is connected until B's config resolves
+                    // Clear A's in-memory execution before making any authenticated B request.
+                    // A's event-scoped localStorage backup is intentionally preserved.
+                    resetVolatileMatchContext();
+                    const configRes = await apiGet('get_event_config');
+                    if (configRes.status !== 'success') {
+                        showToast('❌ 无法确认当前赛事上下文', true);
+                        return;
+                    }
+                    sysMode = configRes.data.event_type || 'ind';
 
                     sessionStorage.setItem('pickle_ref_code', code);
                     sessionStorage.setItem('pickle_ref_name', name);
                     sessionStorage.setItem('pickle_ref_pwd', pwd);
                     sessionStorage.setItem('pickle_ref_level', level);
-                    eventCode = code;
                     currentRefereeId = res.referee_id || name;
                     currentRefereeName = res.name || name;
                     currentRefLevel = level;

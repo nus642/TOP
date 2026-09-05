@@ -10,7 +10,8 @@ function functionSource(name) {
   let start = asyncStart >= 0 ? asyncStart : source.indexOf(`function ${marker}`);
   assert.ok(start >= 0, `missing ${name}`);
   let depth = 0;
-  for (let i = source.indexOf('{', start); i < source.length; i++) {
+  const bodyStart = source.indexOf(') {', start) + 2;
+  for (let i = bodyStart; i < source.length; i++) {
     if (source[i] === '{') depth++;
     if (source[i] === '}' && --depth === 0) return source.slice(start, i + 1);
   }
@@ -23,6 +24,7 @@ const recoverySource = [
   functionSource('validateAuthoritativeRecovery'),
   functionSource('checkAndRestoreBackup'),
 ].join('\n');
+const loginSource = source.slice(source.indexOf('window.handleLogin = async () => {'), source.indexOf('window.handleLogout ='));
 
 const participants = ['蓝队', '绿队', '蓝一', '蓝二', '绿一', '绿二'];
 function backup(eventId = 'EVENT-A') {
@@ -118,4 +120,68 @@ test('court, referee, and task lifecycle must all agree for Master-facing consis
   assert.match(context.validateAuthority(backup(), wrongCourt), /场地投影或裁判归属不一致/);
   const idleRef = dashboard(); idleRef.referees[0].status = '空闲';
   assert.match(context.validateAuthority(backup(), idleRef), /裁判执裁状态不一致/);
+});
+
+test('browser A to B login transition binds every request and recovery lookup to B', async () => {
+  const storage = new Map([['pickle_referee_backup_v6:EVENT-A', JSON.stringify(backup())]]);
+  const session = new Map();
+  const requests = [];
+  let confirms = 0;
+  const elements = new Map();
+  const element = id => {
+    if (!elements.has(id)) elements.set(id, {
+      value: '', innerText: '', innerHTML: '', disabled: false,
+      classList: { add() {}, remove() {}, contains() { return false; } },
+    });
+    return elements.get(id);
+  };
+  element('eventCode').value = 'EVENT-B';
+  element('refereeName').value = 'Ref B';
+  element('refereePwd').value = 'secret';
+  element('refLevel').value = 'L1';
+
+  const context = {
+    sysMode: 'team', eventCode: 'EVENT-A', currentRefereeId: 'Ref A', currentRefereeName: 'Ref A', currentRefLevel: 'L1',
+    currentMatch: { id: 'A-MATCH', court: '9', t1p1: 'Event A player' },
+    matchState: { t1Score: 3, t2Score: 2, over: false }, gameState: { servingPlayer: 'Event A player' }, timeoutUsed: { t1: true },
+    matchPhase: 'in_progress', recoveryBlocked: true, BACKUP_KEY_PREFIX: 'pickle_referee_backup_v6', LEGACY_BACKUP_KEY: 'pickle_referee_backup_v5', API: '/data.php',
+    window: null, $: element, URLSearchParams, Date, Object, Array, String, JSON, encodeURIComponent,
+    localStorage: { getItem: k => storage.get(k) ?? null, setItem: (k,v) => storage.set(k,v), removeItem: k => storage.delete(k) },
+    sessionStorage: { getItem: k => session.get(k) ?? null, setItem: (k,v) => session.set(k,v), removeItem: k => session.delete(k) },
+    fetch: async (url, options = {}) => {
+      const body = options.body ? JSON.parse(options.body) : null;
+      requests.push({ url, body });
+      if (body?.action === 'referee_login') return { json: async () => ({ status: 'success', referee_id: 'Ref B', name: 'Ref B' }) };
+      if (String(url).includes('action=get_event_config')) return { json: async () => ({ status: 'success', data: { event_type: 'team' } }) };
+      return { json: async () => ({ status: 'success' }) };
+    },
+    confirm: () => { confirms++; return true; }, showToast() {}, showStep() {}, renderGame() {},
+    loadPlayers() {}, loadTaskList() {}, updateRefereeStatus() {}, setInterval() {}, console,
+    history: null, document: { title: 'Referee' }, location: {},
+  };
+  context.window = context;
+  vm.createContext(context);
+  vm.runInContext([
+    helperSource, functionSource('apiCall'), functionSource('apiGet'), functionSource('resetVolatileMatchContext'),
+    functionSource('recoveryConflict'), functionSource('validateRecoveryPayload'), functionSource('validateAuthoritativeRecovery'),
+    functionSource('checkAndRestoreBackup'), loginSource,
+  ].join('\n'), context);
+
+  await context.handleLogin();
+
+  assert.equal(context.eventCode, 'EVENT-B');
+  assert.equal(Object.keys(context.currentMatch).length, 0);
+  assert.equal(context.matchState.t1Score, 0);
+  assert.equal(context.gameState.servingPlayer, '');
+  assert.equal(confirms, 0, 'Event A backup must never produce a prompt in Event B');
+  assert.ok(storage.has('pickle_referee_backup_v6:EVENT-A'), 'transition must preserve Event A backup');
+  assert.ok(!storage.has('pickle_referee_backup_v6:EVENT-B'));
+  assert.ok(requests.length >= 2);
+  for (const request of requests) {
+    if (request.body) assert.equal(request.body.event_code, 'EVENT-B');
+    else {
+      const values = new URL(request.url, 'http://test').searchParams.getAll('event_code');
+      assert.deepEqual(values, ['EVENT-B'], 'GET must contain exactly one authoritative event_code');
+    }
+  }
 });
