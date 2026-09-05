@@ -22,9 +22,18 @@ const recoverySource = [
   helperSource,
   functionSource('validateRecoveryPayload'),
   functionSource('validateAuthoritativeRecovery'),
+  functionSource('recoveryConflict'),
   functionSource('checkAndRestoreBackup'),
 ].join('\n');
 const loginSource = source.slice(source.indexOf('window.handleLogin = async () => {'), source.indexOf('window.handleLogout ='));
+const lifecycleSource = [
+  helperSource,
+  functionSource('backupState'),
+  functionSource('clearBackup'),
+  functionSource('getCurrentStep'),
+  functionSource('executeStartMatch'),
+].join('\n');
+const backToStep1Source = source.slice(source.indexOf('window.backToStep1'), source.indexOf('window.backToStep2'));
 
 const participants = ['蓝队', '绿队', '蓝一', '蓝二', '绿一', '绿二'];
 function backup(eventId = 'EVENT-A') {
@@ -36,6 +45,14 @@ function acceptedBackup(refereeName = 'REF-1') {
   data.identity.refereeId = refereeName.replace(/\s+/g, '').toUpperCase();
   data.identity.lifecycle = data.matchPhase = 'not_started';
   data.step = 2;
+  return data;
+}
+// UAT fingerprint: server already 比赛中 while the local snapshot is stuck at step 1 / not_started.
+function ghostBackup(step = 1) {
+  const data = backup();
+  data.identity.lifecycle = data.matchPhase = 'not_started';
+  data.step = step;
+  data.matchState = { t1Score: 0, t2Score: 0, over: false, timeline: [] };
   return data;
 }
 function dashboard(overrides = {}) {
@@ -191,4 +208,101 @@ test('browser A to B login transition binds every request and recovery lookup to
   await context.handleLogin();
   assert.equal(element('doLoginBtn').disabled, false, 'config failure must re-enable login');
   assert.equal(element('doLoginBtn').innerHTML, '建立通讯链路', 'config failure must restore login label');
+});
+
+test('start_task success upgrades stale not_started snapshot to in_progress/step3 before any DOM step can fail', async () => {
+  const stale = ghostBackup();
+  const storage = new Map([['pickle_referee_backup_v6:EVENT-A', JSON.stringify(stale)]]);
+  const calls = [];
+  const context = {
+    sysMode: 'team', eventCode: 'EVENT-A', currentRefereeId: 'REF-1',
+    currentMatch: stale.currentMatch, matchState: { ...stale.matchState }, matchPhase: 'not_started',
+    timeoutUsed: { t1: false, t2: false, medicalT1: false, medicalT2: false },
+    BACKUP_KEY_PREFIX: 'pickle_referee_backup_v6', LEGACY_BACKUP_KEY: 'pickle_referee_backup_v5',
+    normalizeMatchId: id => String(id ?? '').replace(/\s+/g, '').toUpperCase(),
+    apiCall: async action => { calls.push(action); return { status: 'success' }; },
+    showToast: msg => calls.push(msg), showStep: n => calls.push(`step:${n}`),
+    renderGame: () => { calls.push('render'); throw new Error('DOM failure after start'); },
+    syncLiveScore: () => calls.push('WRITE_SCORE'), updateRefereeStatus: () => calls.push('WRITE_REFEREE'),
+    stopPrepCounting: () => {}, getRadio: name => (name === 'serve' ? '1' : 'f'),
+    $: () => ({ classList: { add() {}, remove() {}, contains() { return false; } } }), document: { querySelector: () => null },
+    localStorage: { getItem: k => storage.get(k) ?? null, setItem: (k,v) => storage.set(k,v), removeItem: k => storage.delete(k) },
+    Object, Array, String, JSON, encodeURIComponent,
+  };
+  vm.createContext(context);
+  vm.runInContext(`${lifecycleSource}\nthis.executeStartMatch = executeStartMatch;`, context);
+
+  await assert.rejects(context.executeStartMatch(), /DOM failure after start/);
+  assert.equal(calls[0], 'start_task');
+  assert.equal(context.matchPhase, 'in_progress');
+  const saved = JSON.parse(storage.get('pickle_referee_backup_v6:EVENT-A'));
+  assert.equal(saved.matchPhase, 'in_progress');
+  assert.equal(saved.step, 3);
+  assert.equal(saved.identity.lifecycle, 'in_progress');
+  assert.equal(saved.identity.matchId, 'M-01');
+  assert.equal(saved.currentMatch.id, 'M-01');
+  assert.ok(!calls.includes('WRITE_SCORE') && !calls.includes('WRITE_REFEREE'), 'client snapshot upgrade must not write server state');
+});
+
+test('live in_progress snapshot restores the same match, players, court, and score after refresh', async () => {
+  const live = backup();
+  live.matchState = { t1Score: 4, t2Score: 1, over: false, timeline: [] };
+  const { context, calls } = sandbox(live, dashboard());
+  assert.equal(await context.restore(), true);
+  assert.ok(calls.indexOf('get_full_dashboard') < calls.indexOf('confirm'), 'server reconciliation must precede the recovery prompt');
+  assert.equal(context.currentMatch.id, 'M-01');
+  assert.equal(context.currentMatch.eventId, 'EVENT-A');
+  assert.equal(context.matchState.t1Score, 4);
+  assert.equal(context.matchState.t2Score, 1);
+  assert.equal(context.matchPhase, 'in_progress');
+  assert.ok(calls.includes('step:3'));
+  assert.ok(!calls.some(msg => typeof msg === 'string' && msg.includes('恢复冲突')));
+  assert.ok(!calls.includes('WRITE_REFEREE') && !calls.includes('WRITE_SCORE'));
+  assert.ok(!context.recoveryBlocked);
+});
+
+test('not_started snapshot against a server already 比赛中 is still rejected as authority conflict', async () => {
+  const { context, calls, storage } = sandbox(ghostBackup(), dashboard());
+  assert.match(context.validateAuthority(ghostBackup(), dashboard()), /任务生命周期或场地已变更/);
+  assert.equal(await context.restore(), false);
+  assert.ok(calls.some(msg => typeof msg === 'string' && msg.includes('恢复冲突') && msg.includes('任务生命周期或场地已变更')));
+  assert.ok(calls.indexOf('get_full_dashboard') < calls.findIndex(msg => typeof msg === 'string' && msg.includes('恢复冲突')));
+  assert.ok(!calls.includes('confirm'), 'authority rejection must never reach the restore prompt');
+  const preserved = JSON.parse(storage.get('pickle_referee_backup_v6:EVENT-A'));
+  assert.equal(preserved.identity.lifecycle, 'not_started', 'rejection keeps local evidence instead of destroying it');
+  assert.ok(!calls.includes('WRITE_REFEREE') && !calls.includes('WRITE_SCORE'));
+  assert.equal(context.recoveryBlocked, true);
+});
+
+test('abandoning a pending task clears the snapshot instead of rewriting a step1 ghost', async () => {
+  const storage = new Map([['pickle_referee_backup_v6:EVENT-A', JSON.stringify(ghostBackup())]]);
+  const calls = [];
+  const context = {
+    sysMode: 'team', eventCode: 'EVENT-A', currentRefereeId: 'REF-1',
+    currentMatch: ghostBackup().currentMatch, matchState: { over: false }, matchPhase: 'not_started',
+    timeoutUsed: {}, BACKUP_KEY_PREFIX: 'pickle_referee_backup_v6', LEGACY_BACKUP_KEY: 'pickle_referee_backup_v5',
+    normalizeMatchId: id => String(id ?? '').replace(/\s+/g, '').toUpperCase(),
+    apiGet: async action => { calls.push({ action }); return acceptedDashboard(); },
+    apiCall: async (action, params) => { calls.push({ action, params }); return { status: 'success' }; },
+    alert: msg => calls.push(`alert:${msg}`),
+    updateRefereeStatus: async (...args) => calls.push({ action: 'updateRefereeStatus', args }),
+    // real showStep (referee.html:877) unconditionally calls backupState; the mock must mirror
+    // that or the ghost rewrite could never be observed.
+    showStep: n => { calls.push(`step:${n}`); if (context.backupState) context.backupState(); },
+    $: () => ({ classList: { add() {}, remove() {}, contains() { return false; } } }),
+    localStorage: { getItem: k => storage.get(k) ?? null, setItem: (k,v) => storage.set(k,v), removeItem: k => storage.delete(k) },
+    Object, Array, String, JSON, encodeURIComponent,
+  };
+  context.window = context;
+  vm.createContext(context);
+  vm.runInContext(`${helperSource}\n${functionSource('backupState')}\n${functionSource('clearBackup')}\n${functionSource('getCurrentStep')}\n${backToStep1Source}\nthis.backupState = backupState;`, context);
+
+  await context.backToStep1();
+
+  assert.ok(calls.some(c => c.action === 'release_task_acceptance' && c.params.match_id === 'M-01'));
+  assert.deepEqual(calls.find(c => c.action === 'updateRefereeStatus')?.args, ['空闲', null]);
+  assert.equal(storage.has('pickle_referee_backup_v6:EVENT-A'), false, 'released projection must invalidate the snapshot');
+  assert.equal(Object.keys(context.currentMatch).length, 0, 'cleared currentMatch prevents any later ghost rewrite');
+  assert.ok(calls.includes('step:1'));
+  assert.equal(context.pendingTask, null);
 });

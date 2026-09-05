@@ -976,6 +976,10 @@ const normalizeMatchId = id => String(id ?? '').replace(/\s+/g, '').toUpperCase(
                 // 4. release 成功后才将裁判置为空闲（court 传 null：投影已由 release 删除，
                 // 避免 referee_update_status 的"空闲+场地"分支误删其他投影）
                 try { await updateRefereeStatus('空闲', null); } catch(e) {}
+                // [Snapshot Lifecycle] 投影已释放、比赛已放弃：作废本地快照并清空内存比赛，
+                // 防止 showStep(1) 触发的 backupState 将其改写为 step1/not_started 旧快照。
+                clearBackup();
+                currentMatch = {};
             }
             // 5. 最后清理本地状态与 UI（本地模式/无任务时直接回到步骤1）
             window.pendingTask = null;
@@ -1090,13 +1094,15 @@ const normalizeMatchId = id => String(id ?? '').replace(/\s+/g, '').toUpperCase(
             }
 
             // [PR#155 R8] 开赛成功后设置生命周期为 in_progress
+            // [Snapshot Lifecycle] 开赛成功立即升级快照（先于任何 DOM 操作写入 in_progress/step3），
+            // 防止中途异常/退出导致刷新后残留 not_started 旧快照而被权威校验拒绝。
             matchPhase = 'in_progress';
+            backupState();
 
             $('recoveryBadge').classList.add('hidden');
             renderGame();
             if (sysMode === 'local') syncLiveScore();
             showStep(3);
-            backupState();
         }
 
         // [PR#155 R9] 进行中比赛返回设置页后，直接返回计分页，不调用 start_task
