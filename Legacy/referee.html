@@ -743,9 +743,10 @@ const normalizeMatchId = id => String(id ?? '').replace(/\s+/g, '').toUpperCase(
             } catch (e) {
                 console.error(e);
                 showToast('❌ 后端连接异常', true);
+            } finally {
+                btn.innerHTML = "建立通讯链路";
+                btn.disabled = false;
             }
-            btn.innerHTML = "建立通讯链路";
-            btn.disabled = false;
         };
 
         window.handleLogout = () => {

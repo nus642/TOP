@@ -152,12 +152,13 @@ test('browser A to B login transition binds every request and recovery lookup to
       const body = options.body ? JSON.parse(options.body) : null;
       requests.push({ url, body });
       if (body?.action === 'referee_login') return { json: async () => ({ status: 'success', referee_id: 'Ref B', name: 'Ref B' }) };
-      if (String(url).includes('action=get_event_config')) return { json: async () => ({ status: 'success', data: { event_type: 'team' } }) };
+      if (String(url).includes('action=get_event_config')) return { json: async () => context.configResponse };
       return { json: async () => ({ status: 'success' }) };
     },
     confirm: () => { confirms++; return true; }, showToast() {}, showStep() {}, renderGame() {},
     loadPlayers() {}, loadTaskList() {}, updateRefereeStatus() {}, setInterval() {}, console,
     history: null, document: { title: 'Referee' }, location: {},
+    configResponse: { status: 'success', data: { event_type: 'team' } },
   };
   context.window = context;
   vm.createContext(context);
@@ -184,4 +185,10 @@ test('browser A to B login transition binds every request and recovery lookup to
       assert.deepEqual(values, ['EVENT-B'], 'GET must contain exactly one authoritative event_code');
     }
   }
+
+  context.configResponse = { status: 'error', message: 'unavailable' };
+  element('eventCode').value = 'EVENT-C';
+  await context.handleLogin();
+  assert.equal(element('doLoginBtn').disabled, false, 'config failure must re-enable login');
+  assert.equal(element('doLoginBtn').innerHTML, '建立通讯链路', 'config failure must restore login label');
 });
