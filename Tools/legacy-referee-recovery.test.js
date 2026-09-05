@@ -29,15 +29,29 @@ function backup(eventId = 'EVENT-A') {
   const currentMatch = { id: 'M-01', eventId, matchId: 'M-01', court: '2', t1Name: participants[0], t2Name: participants[1], t1p1: participants[2], t1p2: participants[3], t2p1: participants[4], t2p2: participants[5] };
   return { version: 6, identity: { eventId, matchId: 'M-01', refereeId: 'REF-1', court: '2', lifecycle: 'in_progress', participants }, step: 3, currentMatch, matchState: { t1Score: 8, t2Score: 6, over: false, timeline: [] }, gameState: {}, timeoutUsed: {}, matchPhase: 'in_progress' };
 }
+function acceptedBackup(refereeName = 'REF-1') {
+  const data = backup();
+  data.identity.refereeId = refereeName.replace(/\s+/g, '').toUpperCase();
+  data.identity.lifecycle = data.matchPhase = 'not_started';
+  data.step = 2;
+  return data;
+}
 function dashboard(overrides = {}) {
   return { status: 'success', tasks: { 'M-01': { id: 'M-01', court: '2', status: '比赛中', t1: participants[0], t2: participants[1], t1p1: participants[2], t1p2: participants[3], t2p1: participants[4], t2p2: participants[5] } }, courts: { '2': { status: '比赛中', match_id: 'M-01', referee: 'REF-1' } }, referees: [{ name: 'REF-1', status: '执裁中', current_court: '2' }], ...overrides };
 }
-function sandbox(data = backup(), server = dashboard()) {
+function acceptedDashboard(refereeName = 'REF-1') {
+  const data = dashboard();
+  delete data.tasks['M-01'].status;
+  data.courts['2'] = { status: '待开赛', match_id: 'M-01', referee: refereeName.replace(/\s+/g, '').toUpperCase() };
+  data.referees = [{ name: refereeName, status: '空闲', current_court: '' }];
+  return data;
+}
+function sandbox(data = backup(), server = dashboard(), refereeId = 'REF-1') {
   const key = 'pickle_referee_backup_v6:EVENT-A';
   const storage = new Map([[key, JSON.stringify(data)], ['pickle_referee_backup_v5', '{}']]);
   const calls = [];
   const context = {
-    sysMode: 'team', eventCode: 'EVENT-A', currentRefereeId: 'REF-1', currentMatch: {}, matchState: {}, gameState: {}, timeoutUsed: {}, matchPhase: 'not_started',
+    sysMode: 'team', eventCode: 'EVENT-A', currentRefereeId: refereeId, currentMatch: {}, matchState: {}, gameState: {}, timeoutUsed: {}, matchPhase: 'not_started',
     BACKUP_KEY_PREFIX: 'pickle_referee_backup_v6', LEGACY_BACKUP_KEY: 'pickle_referee_backup_v5',
     normalizeMatchId: id => String(id ?? '').replace(/\s+/g, '').toUpperCase(),
     localStorage: { getItem: k => storage.get(k) ?? null, setItem: (k,v) => storage.set(k,v), removeItem: k => storage.delete(k) },
@@ -77,6 +91,25 @@ test('reload recovery succeeds only after server reconciliation and never rewrit
   assert.equal(context.matchState.t1Score, 8);
   assert.ok(!calls.includes('WRITE_REFEREE') && !calls.includes('WRITE_SCORE'), 'recovery must not resurrect server state');
   assert.equal(storage.has('pickle_referee_backup_v5'), false, 'identity-free legacy backup is discarded');
+});
+
+test('accepted task with absent status recovers from authoritative pending projection without write-back', async () => {
+  const { context, calls } = sandbox(acceptedBackup(), acceptedDashboard());
+  assert.equal(await context.restore(), true);
+  assert.ok(calls.indexOf('get_full_dashboard') < calls.indexOf('confirm'));
+  assert.ok(calls.includes('step:2'));
+  assert.ok(!calls.includes('WRITE_REFEREE') && !calls.includes('WRITE_SCORE'));
+});
+
+test('accepted recovery normalizes referee names containing spaces without weakening ownership', async () => {
+  const refereeName = 'Referee One';
+  const { context, calls } = sandbox(acceptedBackup(refereeName), acceptedDashboard(refereeName), refereeName);
+  assert.equal(await context.restore(), true);
+  assert.ok(calls.includes('step:2'));
+  const wrongOwner = acceptedDashboard(refereeName);
+  wrongOwner.courts['2'].referee = 'REFEREE TWO';
+  assert.match(context.validateAuthority(acceptedBackup(refereeName), wrongOwner), /场地投影或裁判归属不一致/);
+  assert.ok(!calls.includes('WRITE_REFEREE') && !calls.includes('WRITE_SCORE'));
 });
 
 test('court, referee, and task lifecycle must all agree for Master-facing consistency', () => {

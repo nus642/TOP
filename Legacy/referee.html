@@ -430,12 +430,13 @@ const normalizeMatchId = id => String(id ?? '').replace(/\s+/g, '').toUpperCase(
 
         const recoveryText = value => String(value ?? '').trim();
         const recoveryParticipant = value => recoveryText(value) || '待定';
+        const recoveryRefereeId = value => normalizeMatchId(value);
         function recoveryEventId() { return sysMode === 'local' ? 'LOCAL' : recoveryText(eventCode).toUpperCase(); }
         function recoveryBackupKey() { return `${BACKUP_KEY_PREFIX}:${encodeURIComponent(recoveryEventId())}`; }
         function recoveryIdentity(match = currentMatch) {
             return {
                 eventId: recoveryEventId(), matchId: normalizeMatchId(match?.id),
-                refereeId: recoveryText(currentRefereeId).toUpperCase(), court: recoveryText(match?.court),
+                refereeId: recoveryRefereeId(currentRefereeId), court: recoveryText(match?.court),
                 lifecycle: matchPhase,
                 participants: ['t1Name','t2Name','t1p1','t1p2','t2p1','t2p2'].map(key => recoveryParticipant(match?.[key]))
             };
@@ -468,7 +469,7 @@ const normalizeMatchId = id => String(id ?? '').replace(/\s+/g, '').toUpperCase(
             if (identity.eventId !== expected.eventId || identity.eventId !== recoveryEventId()) return '赛事身份不匹配';
             if (normalizeMatchId(identity.matchId) !== expected.matchId) return '比赛身份不匹配';
             if (data.currentMatch.eventId !== identity.eventId || normalizeMatchId(data.currentMatch.matchId) !== identity.matchId) return '比赛载荷身份不匹配';
-            if (recoveryText(identity.refereeId).toUpperCase() !== expected.refereeId) return '裁判归属不匹配';
+            if (recoveryRefereeId(identity.refereeId) !== expected.refereeId) return '裁判归属不匹配';
             if (recoveryText(identity.court) !== expected.court) return '场地身份不匹配';
             if (identity.lifecycle !== data.matchPhase || !['not_started','in_progress'].includes(identity.lifecycle)) return '生命周期无效';
             if (!Array.isArray(identity.participants) || identity.participants.length !== 6 || identity.participants.some((value, index) => recoveryParticipant(value) !== expected.participants[index])) return '参赛者身份不匹配';
@@ -479,14 +480,17 @@ const normalizeMatchId = id => String(id ?? '').replace(/\s+/g, '').toUpperCase(
             const identity = data.identity;
             const task = Object.values(dashboard.tasks || {}).find(item => normalizeMatchId(item?.id) === identity.matchId);
             if (!task) return '服务端不存在对应活动比赛';
-            const expectedStatus = identity.lifecycle === 'in_progress' ? '比赛中' : '未开始';
             const expectedCourtStatus = identity.lifecycle === 'in_progress' ? '比赛中' : '待开赛';
-            if (task.status !== expectedStatus || recoveryText(task.court) !== identity.court) return '任务生命周期或场地已变更';
+            const taskStatus = recoveryText(task.status);
+            const lifecycleMatches = identity.lifecycle === 'in_progress'
+                ? taskStatus === '比赛中'
+                : taskStatus === '' || taskStatus === '未开始';
+            if (!lifecycleMatches || recoveryText(task.court) !== identity.court) return '任务生命周期或场地已变更';
             const authoritativeParticipants = ['t1','t2','t1p1','t1p2','t2p1','t2p2'].map(key => recoveryParticipant(task[key]));
             if (authoritativeParticipants.some((value, index) => value !== identity.participants[index])) return '任务队伍/参赛者与本地备份不一致';
             const court = dashboard.courts?.[identity.court];
-            if (!court || court.status !== expectedCourtStatus || normalizeMatchId(court.match_id) !== identity.matchId || recoveryText(court.referee).toUpperCase() !== identity.refereeId) return '场地投影或裁判归属不一致';
-            const referee = (dashboard.referees || []).find(item => recoveryText(item?.name).toUpperCase() === identity.refereeId);
+            if (!court || court.status !== expectedCourtStatus || normalizeMatchId(court.match_id) !== identity.matchId || recoveryRefereeId(court.referee) !== recoveryRefereeId(identity.refereeId)) return '场地投影或裁判归属不一致';
+            const referee = (dashboard.referees || []).find(item => recoveryRefereeId(item?.name) === recoveryRefereeId(identity.refereeId));
             if (!referee) return '服务端无当前裁判';
             if (identity.lifecycle === 'in_progress' && (referee.status !== '执裁中' || recoveryText(referee.current_court) !== identity.court)) return '裁判执裁状态不一致';
             return '';
