@@ -69,7 +69,7 @@ function acceptedDashboard(refereeName = 'REF-1') {
 function assignmentResponse(data = backup(), t1 = data.matchState.t1Score, t2 = data.matchState.t2Score) {
   return { status: 'success', kind: 'assignment', assignment: {
     lifecycle: data.identity.lifecycle, match_id: data.identity.matchId, court: data.identity.court,
-    task: { id: data.identity.matchId, court: data.identity.court, t1: participants[0], t2: participants[1], t1p1: participants[2], t1p2: participants[3], t2p1: participants[4], t2p2: participants[5] },
+    task: { id: data.identity.matchId, court: data.identity.court, target_score: 21, cap_score: 21, format: 1, meth: 'rally', t1: participants[0], t2: participants[1], t1p1: participants[2], t1p2: participants[3], t2p1: participants[4], t2p2: participants[5] },
     score: { text: `G1 ${t1}-${t2}`, t1, t2 },
   } };
 }
