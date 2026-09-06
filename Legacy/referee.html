@@ -384,7 +384,8 @@
 const normalizeMatchId = id => String(id ?? '').replace(/\s+/g, '').toUpperCase();
 
         const API = '/data.php';
-        const BACKUP_KEY = 'pickle_referee_backup_v5';
+        const BACKUP_KEY_PREFIX = 'pickle_referee_backup_v6';
+        const LEGACY_BACKUP_KEY = 'pickle_referee_backup_v5';
 
         const urlParams = new URLSearchParams(window.location.search);
         let sysMode = 'ind';
@@ -397,6 +398,7 @@ const normalizeMatchId = id => String(id ?? '').replace(/\s+/g, '').toUpperCase(
 
         // [PR#155 R8] 独立生命周期字段：not_started | in_progress | completed
         let matchPhase = 'not_started';
+        let recoveryBlocked = false;
 
         let timeoutUsed = { t1: false, t2: false, medicalT1: false, medicalT2: false };
 
@@ -413,17 +415,45 @@ const normalizeMatchId = id => String(id ?? '').replace(/\s+/g, '').toUpperCase(
         const getRadio = function(n) { const el = document.querySelector(`input[name="${n}"]:checked`); return el ? el.value : ''; };
         function normalizeId(id) { return String(id).toUpperCase().replace(/\s+/g, '').replace(/VS/ig, 'VS'); }
 
-        async function apiCall(action, data = {}) {
-            if (sysMode === 'local') return { status: 'success' };
-            data.action = action; if (eventCode) data.event_code = eventCode;
-            try { const res = await fetch(API, { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(data) }); return res.json(); } catch(e) { return { status: 'error', message: '网络连接异常' }; }
+        async function apiCall(action, data = {}, requestedEventCode = null) {
+            if (sysMode === 'local' && !requestedEventCode) return { status: 'success' };
+            const requestEvent = recoveryText(requestedEventCode || eventCode).toUpperCase();
+            const payload = { ...data, action };
+            delete payload.event_code;
+            if (requestEvent) payload.event_code = requestEvent;
+            try { const res = await fetch(API, { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(payload) }); return res.json(); } catch(e) { return { status: 'error', message: '网络连接异常' }; }
         }
 
         async function apiGet(action, params = {}) {
             if (sysMode === 'local') return { status: 'success', data: [] };
-            let url = `${API}?action=${action}&event_code=${eventCode||''}&_t=${Date.now()}`;
-            for(let k in params) url += `&${k}=${encodeURIComponent(params[k])}`;
+            const query = new URLSearchParams({ action, event_code: recoveryText(eventCode).toUpperCase(), _t: Date.now() });
+            for (const [key, value] of Object.entries(params)) if (key !== 'event_code') query.set(key, value);
+            const url = `${API}?${query.toString()}`;
             try { const res = await fetch(url); return res.json(); } catch(e) { return { status: 'error', message: '网络连接异常' }; }
+        }
+
+        function resetVolatileMatchContext() {
+            currentMatch = {};
+            window.pendingTask = null;
+            matchState = { t1Score: 0, t2Score: 0, t1Wins: 0, t2Wins: 0, currentGame: 1, history: [], timeline: [], halfSwitched: false, over: false };
+            gameState = { viewBa: false, servTeam: 1, initServTeam: 1, servNum: 2, court: 'Right', t1: { r: '', l: '' }, t2: { r: '', l: '' }, initRightP1: '', initRightP2: '', servingPlayer: '' };
+            timeoutUsed = { t1: false, t2: false, medicalT1: false, medicalT2: false };
+            matchPhase = 'not_started';
+            recoveryBlocked = false;
+        }
+
+        const recoveryText = value => String(value ?? '').trim();
+        const recoveryParticipant = value => recoveryText(value) || '待定';
+        const recoveryRefereeId = value => normalizeMatchId(value);
+        function recoveryEventId() { return sysMode === 'local' ? 'LOCAL' : recoveryText(eventCode).toUpperCase(); }
+        function recoveryBackupKey() { return `${BACKUP_KEY_PREFIX}:${encodeURIComponent(recoveryEventId())}`; }
+        function recoveryIdentity(match = currentMatch) {
+            return {
+                eventId: recoveryEventId(), matchId: normalizeMatchId(match?.id),
+                refereeId: recoveryRefereeId(currentRefereeId), court: recoveryText(match?.court),
+                lifecycle: matchPhase,
+                participants: ['t1Name','t2Name','t1p1','t1p2','t2p1','t2p2'].map(key => recoveryParticipant(match?.[key]))
+            };
         }
 
         function backupState() {
@@ -431,18 +461,71 @@ const normalizeMatchId = id => String(id ?? '').replace(/\s+/g, '').toUpperCase(
                 // [PR#155 R8] 进行中比赛即使暂时显示 step 2，备份仍必须保存 phase=in_progress，恢复目标必须是 step 3
                 let backupStep = getCurrentStep();
                 if (matchPhase === 'in_progress') backupStep = 3;
-                try { localStorage.setItem(BACKUP_KEY, JSON.stringify({ step: backupStep, currentMatch, matchState, gameState, timeoutUsed, matchPhase })); } catch(e) { }
+                const identity = recoveryIdentity();
+                try { localStorage.setItem(recoveryBackupKey(), JSON.stringify({ version: 6, identity, step: backupStep, currentMatch: {...currentMatch, eventId: identity.eventId, matchId: identity.matchId}, matchState, gameState, timeoutUsed, matchPhase })); } catch(e) { }
             }
         }
-        function clearBackup() { localStorage.removeItem(BACKUP_KEY); }
+        function clearBackup() { localStorage.removeItem(recoveryBackupKey()); }
         function getCurrentStep() { for(let i=1; i<=4; i++) if(!$(`step${i}`).classList.contains('hidden-section')) return i; return 1; }
 
-        function checkAndRestoreBackup() {
-            const backupStr = localStorage.getItem(BACKUP_KEY);
+        function recoveryConflict(message, clear = false) {
+            recoveryBlocked = true;
+            if (clear) clearBackup();
+            showToast(`❌ 恢复冲突：${message}。本地比分未恢复，请联系主控核对。`, true);
+            showStep(1);
+            return false;
+        }
+
+        function validateRecoveryPayload(data) {
+            if (!data || data.version !== 6 || !data.identity || !data.currentMatch || !data.matchState || data.matchState.over) return '备份格式无效';
+            const expected = recoveryIdentity(data.currentMatch);
+            const identity = data.identity;
+            if (identity.eventId !== expected.eventId || identity.eventId !== recoveryEventId()) return '赛事身份不匹配';
+            if (normalizeMatchId(identity.matchId) !== expected.matchId) return '比赛身份不匹配';
+            if (data.currentMatch.eventId !== identity.eventId || normalizeMatchId(data.currentMatch.matchId) !== identity.matchId) return '比赛载荷身份不匹配';
+            if (recoveryRefereeId(identity.refereeId) !== expected.refereeId) return '裁判归属不匹配';
+            if (recoveryText(identity.court) !== expected.court) return '场地身份不匹配';
+            if (identity.lifecycle !== data.matchPhase || !['not_started','in_progress'].includes(identity.lifecycle)) return '生命周期无效';
+            if (!Array.isArray(identity.participants) || identity.participants.length !== 6 || identity.participants.some((value, index) => recoveryParticipant(value) !== expected.participants[index])) return '参赛者身份不匹配';
+            return '';
+        }
+
+        function validateAuthoritativeRecovery(data, dashboard) {
+            const identity = data.identity;
+            const task = Object.values(dashboard.tasks || {}).find(item => normalizeMatchId(item?.id) === identity.matchId);
+            if (!task) return '服务端不存在对应活动比赛';
+            const expectedCourtStatus = identity.lifecycle === 'in_progress' ? '比赛中' : '待开赛';
+            const taskStatus = recoveryText(task.status);
+            const lifecycleMatches = identity.lifecycle === 'in_progress'
+                ? taskStatus === '比赛中'
+                : taskStatus === '' || taskStatus === '未开始';
+            if (!lifecycleMatches || recoveryText(task.court) !== identity.court) return '任务生命周期或场地已变更';
+            const authoritativeParticipants = ['t1','t2','t1p1','t1p2','t2p1','t2p2'].map(key => recoveryParticipant(task[key]));
+            if (authoritativeParticipants.some((value, index) => value !== identity.participants[index])) return '任务队伍/参赛者与本地备份不一致';
+            const court = dashboard.courts?.[identity.court];
+            if (!court || court.status !== expectedCourtStatus || normalizeMatchId(court.match_id) !== identity.matchId || recoveryRefereeId(court.referee) !== recoveryRefereeId(identity.refereeId)) return '场地投影或裁判归属不一致';
+            const referee = (dashboard.referees || []).find(item => recoveryRefereeId(item?.name) === recoveryRefereeId(identity.refereeId));
+            if (!referee) return '服务端无当前裁判';
+            if (identity.lifecycle === 'in_progress' && (referee.status !== '执裁中' || recoveryText(referee.current_court) !== identity.court)) return '裁判执裁状态不一致';
+            return '';
+        }
+
+        async function checkAndRestoreBackup() {
+            // v5 没有赛事/归属身份，永不能作为官方恢复依据。
+            localStorage.removeItem(LEGACY_BACKUP_KEY);
+            const backupStr = localStorage.getItem(recoveryBackupKey());
             if(backupStr) {
                 try {
                     const data = JSON.parse(backupStr);
-                    if(data && data.currentMatch && data.currentMatch.id && !data.matchState.over) {
+                    const payloadError = validateRecoveryPayload(data);
+                    if (payloadError) return recoveryConflict(payloadError, true);
+                    if (sysMode !== 'local') {
+                        const dashboard = await apiCall('get_full_dashboard', {});
+                        if (!dashboard || dashboard.status !== 'success') return recoveryConflict('无法连接服务端完成权威核对');
+                        const authorityError = validateAuthoritativeRecovery(data, dashboard);
+                        if (authorityError) return recoveryConflict(authorityError);
+                    }
+                    if(data.currentMatch.id) {
                         const m = data.currentMatch;
                         if(confirm(`🛡️ 【容灾恢复】\n检测到意外中断比赛：\n[${m.t1Name} VS ${m.t2Name}]\n是否恢复比分？`)) {
                             currentMatch = data.currentMatch; matchState = data.matchState;
@@ -459,9 +542,7 @@ const normalizeMatchId = id => String(id ?? '').replace(/\s+/g, '').toUpperCase(
                                 if(matchState.over) $('endGameBtn').classList.remove('hidden');
                             } else showStep(data.step);
 
-                            // [CORRECTIVE FIX] 只有恢复已开赛的比赛（step >= 3）才设置裁判为"执裁中"并同步比分。
-                            // step 2 备份表示比赛尚未开始，不得提前升级裁判状态或写入"比赛中"投影。
-                            if (data.step >= 3) { updateRefereeStatus('执裁中', currentMatch.court); syncLiveScore(); }
+                            // 恢复只读取已核对的本地执行状态，绝不写回/复活服务端生命周期。
                             return true;
                         } else clearBackup();
                     }
@@ -556,7 +637,7 @@ const normalizeMatchId = id => String(id ?? '').replace(/\s+/g, '').toUpperCase(
                 if(localStorage.getItem('pickle_def_format')) $('gameFormat').value = localStorage.getItem('pickle_def_format');
                 if(localStorage.getItem('pickle_def_meth')) $('scoreRule').value = localStorage.getItem('pickle_def_meth');
 
-                if(!checkAndRestoreBackup()) showStep(1);
+                if(!(await checkAndRestoreBackup())) showStep(1);
                 return;
             }
 
@@ -606,16 +687,26 @@ const normalizeMatchId = id => String(id ?? '').replace(/\s+/g, '').toUpperCase(
             btn.disabled = true;
 
             try {
-                const res = await apiCall('referee_login', { event_code: code, name, password: pwd });
+                // Login is the sole pre-auth request: bind it explicitly to the requested event,
+                // never to a stale eventCode left by the previous authenticated context.
+                const res = await apiCall('referee_login', { name, password: pwd }, code);
                 if (res.status === 'success') {
-                    const configRes = await apiGet('get_event_config', { event_code: code });
-                    if (configRes.status === 'success') sysMode = configRes.data.event_type || 'ind';
+                    eventCode = code;
+                    sysMode = 'ind'; // authenticated transition is connected until B's config resolves
+                    // Clear A's in-memory execution before making any authenticated B request.
+                    // A's event-scoped localStorage backup is intentionally preserved.
+                    resetVolatileMatchContext();
+                    const configRes = await apiGet('get_event_config');
+                    if (configRes.status !== 'success') {
+                        showToast('❌ 无法确认当前赛事上下文', true);
+                        return;
+                    }
+                    sysMode = configRes.data.event_type || 'ind';
 
                     sessionStorage.setItem('pickle_ref_code', code);
                     sessionStorage.setItem('pickle_ref_name', name);
                     sessionStorage.setItem('pickle_ref_pwd', pwd);
                     sessionStorage.setItem('pickle_ref_level', level);
-                    eventCode = code;
                     currentRefereeId = res.referee_id || name;
                     currentRefereeName = res.name || name;
                     currentRefLevel = level;
@@ -633,7 +724,7 @@ const normalizeMatchId = id => String(id ?? '').replace(/\s+/g, '').toUpperCase(
                     }
 
                     loadPlayers();
-                    if (!checkAndRestoreBackup()) {
+                    if (!(await checkAndRestoreBackup()) && !recoveryBlocked) {
                         // [PR#155 REVIEW FIX] 登录时使用 court=null，不携带默认场地值，避免任何残留的投影清理风险
                         updateRefereeStatus('空闲', null);
                         showStep(1);
@@ -652,9 +743,10 @@ const normalizeMatchId = id => String(id ?? '').replace(/\s+/g, '').toUpperCase(
             } catch (e) {
                 console.error(e);
                 showToast('❌ 后端连接异常', true);
+            } finally {
+                btn.innerHTML = "建立通讯链路";
+                btn.disabled = false;
             }
-            btn.innerHTML = "建立通讯链路";
-            btn.disabled = false;
         };
 
         window.handleLogout = () => {
@@ -829,7 +921,9 @@ const normalizeMatchId = id => String(id ?? '').replace(/\s+/g, '').toUpperCase(
             localStorage.setItem('pickle_def_court', $('courtNo').value); localStorage.setItem('pickle_def_target', $('targetScore').value); localStorage.setItem('pickle_def_cap', $('capScore').value); localStorage.setItem('pickle_def_format', $('gameFormat').value); localStorage.setItem('pickle_def_meth', $('scoreRule').value);
             currentMatch = {
                 id: $('matchIdInput2').value || `LOC-${Date.now().toString().slice(-4)}`, court: $('courtNo').value || '1',
-                t1Name: $('t1Name').value.trim()||'左方', t2Name: $('t2Name').value.trim()||'右方', t1p1: $('t1p1').value.trim()||'A', t1p2: $('t1p2').value.trim()||'B', t2p1: $('t2p1').value.trim()||'C', t2p2: $('t2p2').value.trim()||'D',
+                t1Name: $('t1Name').value.trim()||'左方', t2Name: $('t2Name').value.trim()||'右方',
+                t1p1: $('t1p1').value.trim()||(sysMode === 'local' ? 'A' : '待定'), t1p2: $('t1p2').value.trim()||(sysMode === 'local' ? 'B' : '待定'),
+                t2p1: $('t2p1').value.trim()||(sysMode === 'local' ? 'C' : '待定'), t2p2: $('t2p2').value.trim()||(sysMode === 'local' ? 'D' : '待定'),
                 format: parseInt($('gameFormat').value), meth: $('scoreRule').value, type: $('matchTypeSel').value, target: parseInt($('targetScore').value)||21, cap: parseInt($('capScore').value)||0, ref: `[${currentRefLevel}] ${currentRefereeName}`,
                 is_team: window.pendingTask ? (window.pendingTask.is_team || false) : (sysMode === 'team')
             };
@@ -882,12 +976,17 @@ const normalizeMatchId = id => String(id ?? '').replace(/\s+/g, '').toUpperCase(
                 // 4. release 成功后才将裁判置为空闲（court 传 null：投影已由 release 删除，
                 // 避免 referee_update_status 的"空闲+场地"分支误删其他投影）
                 try { await updateRefereeStatus('空闲', null); } catch(e) {}
+                // [Snapshot Lifecycle] 投影已释放、比赛已放弃：作废本地快照并清空内存比赛，
+                // 防止 showStep(1) 触发的 backupState 将其改写为 step1/not_started 旧快照。
+                clearBackup();
+                currentMatch = {};
             }
             // 5. 最后清理本地状态与 UI（本地模式/无任务时直接回到步骤1）
             window.pendingTask = null;
             showStep(1);
         };
-        window.backToStep2 = async () => { showStep(2); try { await updateRefereeStatus('执裁中', currentMatch.court); } catch(e){} };
+        // 纯导航：不释放、重新开赛或重写服务端归属。
+        window.backToStep2 = async () => { showStep(2); };
 
         function stopPrepCounting() { if(prepInterval){ clearInterval(prepInterval); prepInterval=null; } const btn = $('prepTimerBtn'); btn.innerText = "⏱️ 热身倒数"; btn.classList.remove('bg-red-700', 'border-red-500'); btn.classList.add('bg-indigo-600'); }
         window.togglePrepTimer = () => {
@@ -995,13 +1094,15 @@ const normalizeMatchId = id => String(id ?? '').replace(/\s+/g, '').toUpperCase(
             }
 
             // [PR#155 R8] 开赛成功后设置生命周期为 in_progress
+            // [Snapshot Lifecycle] 开赛成功立即升级快照（先于任何 DOM 操作写入 in_progress/step3），
+            // 防止中途异常/退出导致刷新后残留 not_started 旧快照而被权威校验拒绝。
             matchPhase = 'in_progress';
+            backupState();
 
             $('recoveryBadge').classList.add('hidden');
             renderGame();
             if (sysMode === 'local') syncLiveScore();
             showStep(3);
-            backupState();
         }
 
         // [PR#155 R9] 进行中比赛返回设置页后，直接返回计分页，不调用 start_task
@@ -1027,30 +1128,9 @@ const normalizeMatchId = id => String(id ?? '').replace(/\s+/g, '').toUpperCase(
                     return;
                 }
 
-                const matchId = normalizeMatchId(currentMatch.id);
-                const tasks = Object.values(dashRes.tasks || {});
-                const task = tasks.find(
-                    item => normalizeMatchId(item?.id) === matchId
-                );
-
-                if (!task || task.status !== '比赛中') {
-                    showToast('❗ 服务端状态不一致，该任务已非比赛中', true);
-                    return;
-                }
-
-                if (String(task.court ?? '') !== String(currentMatch.court ?? '')) {
-                    showToast('❗ 服务端任务场地与本地状态不一致', true);
-                    return;
-                }
-
-                const courtInfo = dashRes.courts?.[String(currentMatch.court)] ?? null;
-
-                if (
-                    !courtInfo ||
-                    courtInfo.status !== '比赛中' ||
-                    normalizeMatchId(courtInfo.match_id) !== matchId
-                ) {
-                    showToast('❗ 服务端场地投影不一致，已阻断返回', true);
+                const authorityError = validateAuthoritativeRecovery({ identity: recoveryIdentity() }, dashRes);
+                if (authorityError) {
+                    recoveryConflict(authorityError);
                     return;
                 }
 
