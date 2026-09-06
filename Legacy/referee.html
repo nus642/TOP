@@ -153,6 +153,11 @@
         </div>
 
         <div id="step1" class="hidden-section">
+            <div id="serverReentry" class="hidden section-card border border-blue-500/50 bg-blue-950/30">
+                <div id="serverReentryText" class="font-bold text-blue-200 mb-3"></div>
+                <button id="serverReentryBtn" onclick="continueServerAssignment()" class="w-full bg-blue-600 py-3 rounded-lg font-black btn-press">↩️ 继续执裁</button>
+            </div>
+
             <div id="cloudPullBlock" class="section-card border border-emerald-500/30 bg-emerald-900/10">
                 <div class="text-sm font-bold text-emerald-400 mb-3 flex justify-between items-center">
                     <span>📥 提取主控台下发任务</span>
@@ -399,6 +404,7 @@ const normalizeMatchId = id => String(id ?? '').replace(/\s+/g, '').toUpperCase(
         // [PR#155 R8] 独立生命周期字段：not_started | in_progress | completed
         let matchPhase = 'not_started';
         let recoveryBlocked = false;
+        let serverAssignment = null;
 
         let timeoutUsed = { t1: false, t2: false, medicalT1: false, medicalT2: false };
 
@@ -440,6 +446,7 @@ const normalizeMatchId = id => String(id ?? '').replace(/\s+/g, '').toUpperCase(
             timeoutUsed = { t1: false, t2: false, medicalT1: false, medicalT2: false };
             matchPhase = 'not_started';
             recoveryBlocked = false;
+            serverAssignment = null;
         }
 
         const recoveryText = value => String(value ?? '').trim();
@@ -549,6 +556,35 @@ const normalizeMatchId = id => String(id ?? '').replace(/\s+/g, '').toUpperCase(
                 } catch(e) { clearBackup(); }
             }
             return false;
+        }
+
+        function matchFromServerAssignment(assignment) {
+            const t = assignment.task || {};
+            return { id: t.id || assignment.match_id, court: assignment.court,
+                t1Name: t.t1 || '左方', t2Name: t.t2 || '右方', t1p1: t.t1p1 || '待定', t1p2: t.t1p2 || '', t2p1: t.t2p1 || '待定', t2p2: t.t2p2 || '',
+                format: Number(t.format || 1), meth: t.meth || 'rally', type: (t.t1p2 || t.t2p2) ? 'doubles' : 'singles', target: Number(t.target_score || 21), cap: Number(t.cap_score || 21), ref: `[${currentRefLevel}] ${currentRefereeName}`, is_team: !!t.is_team };
+        }
+        function prepareServerAssignment(assignment) {
+            serverAssignment = assignment;
+            const label = assignment.lifecycle === 'in_progress' ? '继续执裁' : '继续待开赛任务';
+            $('serverReentryText').innerText = `服务端确认：${assignment.match_id}（场地 ${assignment.court}）${label}`;
+            $('serverReentryBtn').innerText = assignment.lifecycle === 'in_progress' ? '↩️ 继续执裁' : '↩️ 继续待开赛任务';
+            $('serverReentry').classList.remove('hidden'); showStep(1);
+        }
+        window.continueServerAssignment = async () => {
+            if (!serverAssignment) return recoveryConflict('服务端活动比赛信息不存在');
+            currentMatch = matchFromServerAssignment(serverAssignment); window.pendingTask = serverAssignment.task; matchPhase = serverAssignment.lifecycle;
+            matchState = { t1Score: Number(serverAssignment.score?.t1 || 0), t2Score: Number(serverAssignment.score?.t2 || 0), t1Wins: 0, t2Wins: 0, currentGame: 1, history: [], timeline: [], halfSwitched: false, over: false };
+            gameState = { viewBa: false, servTeam: 1, initServTeam: 1, servNum: 1, court: 'Right', t1: { r: currentMatch.t1p1, l: currentMatch.t1p2 || currentMatch.t1p1 }, t2: { r: currentMatch.t2p1, l: currentMatch.t2p2 || currentMatch.t2p1 }, initRightP1: currentMatch.t1p1, initRightP2: currentMatch.t2p1, servingPlayer: currentMatch.t1p1 };
+            timeoutUsed = { t1:false, t2:false, medicalT1:false, medicalT2:false }; $('serverReentry').classList.add('hidden');
+            if (matchPhase === 'in_progress') { renderGame(); showStep(3); $('recoveryBadge').classList.remove('hidden'); }
+            else { $('matchIdInput2').value=currentMatch.id; $('courtNo').value=currentMatch.court; $('targetScore').value=currentMatch.target; $('capScore').value=currentMatch.cap; $('gameFormat').value=currentMatch.format; $('scoreRule').value=currentMatch.meth; $('t1Name').value=currentMatch.t1Name; $('t2Name').value=currentMatch.t2Name; $('t1p1').value=currentMatch.t1p1; $('t1p2').value=currentMatch.t1p2; $('t2p1').value=currentMatch.t2p1; $('t2p2').value=currentMatch.t2p2; showStep(1); showToast('✅ 已恢复待开赛任务；不会重复领取'); }
+        };
+        async function discoverServerAssignment(password) {
+            const res = await apiCall('get_referee_active_assignment', { referee_id: currentRefereeId, password });
+            if (!res || res.status !== 'success' || res.kind === 'blocked') { recoveryBlocked = true; showToast(`❌ ${res?.message || '无法确认活动比赛，请联系主控'}`, true); showStep(1); return false; }
+            if (res.kind === 'assignment') prepareServerAssignment(res.assignment);
+            return res.kind === 'assignment';
         }
 
         window.initSignatureBoard = function() {
@@ -724,10 +760,16 @@ const normalizeMatchId = id => String(id ?? '').replace(/\s+/g, '').toUpperCase(
                     }
 
                     loadPlayers();
-                    if (!(await checkAndRestoreBackup()) && !recoveryBlocked) {
-                        // [PR#155 REVIEW FIX] 登录时使用 court=null，不携带默认场地值，避免任何残留的投影清理风险
-                        updateRefereeStatus('空闲', null);
-                        showStep(1);
+                    const restoredLocal = await checkAndRestoreBackup();
+                    if (!restoredLocal) {
+                        // A stale/missing device snapshot never overrides server ownership.
+                        recoveryBlocked = false;
+                        const foundServerAssignment = await discoverServerAssignment(pwd);
+                        if (!foundServerAssignment && !recoveryBlocked) {
+                            // Only the authoritative "none" contract permits the ordinary idle flow.
+                            updateRefereeStatus('空闲', null);
+                            showStep(1);
+                        }
                     }
                     loadTaskList();
 
