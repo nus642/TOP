@@ -113,6 +113,47 @@ function recovery_find_state($tasks, $live, $refs, $records, $match_id) {
     return compact('task', 'task_key', 'court', 'projection', 'referee', 'matching_records', 'task_matches', 'projection_matches', 'referee_matches', 'conflicts') + ['corrupted'=>count($conflicts) > 0];
 }
 
+/**
+ * Read-only referee re-entry contract.  live_scores remains the ownership
+ * authority; tasks/referees/records are reconciled to it and any ambiguity is
+ * rejected rather than repaired.
+ */
+function referee_active_assignment($tasks, $live, $refs, $records, $referee_id) {
+    $owner = normalizeId($referee_id); $owned = []; $matching_refs = [];
+    foreach ($refs as $ref) if (normalizeId($ref['name'] ?? '') === $owner) $matching_refs[] = $ref;
+    if ($owner === '' || count($matching_refs) !== 1) return ['kind'=>'blocked', 'message'=>'裁判身份不存在或不唯一，请联系主控'];
+    foreach ($live as $court => $projection) {
+        if (is_ownership_projection($projection) && normalizeId($projection['referee'] ?? '') === $owner) {
+            $owned[] = ['court'=>(string)$court, 'projection'=>$projection];
+        }
+    }
+    if (count($owned) === 0) return ['kind'=>'none'];
+    if (count($owned) !== 1) return ['kind'=>'blocked', 'message'=>'检测到多条活动比赛归属，请联系主控'];
+
+    $match_id = normalizeId($owned[0]['projection']['match_id'] ?? '');
+    if ($match_id === '') return ['kind'=>'blocked', 'message'=>'活动比赛归属已损坏，请联系主控'];
+    $state = recovery_find_state($tasks, $live, $refs, $records, $match_id);
+    $projection = $state['projection']; $task = $state['task']; $ref = $state['referee'];
+    if ($state['corrupted'] || !$task || !$projection || !$ref || count($state['matching_records']) > 0) {
+        return ['kind'=>'blocked', 'message'=>'活动比赛状态不完整或有歧义，请联系主控'];
+    }
+    $status = $projection['status'] ?? ''; $task_status = $task['status'] ?? '';
+    $court = (string)$state['court'];
+    $pending = $status === '待开赛' && ($task_status === '' || $task_status === '未开始')
+        && ($ref['status'] ?? '') === '空闲' && trim((string)($ref['current_court'] ?? '')) === '';
+    $running = $status === '比赛中' && $task_status === '比赛中'
+        && ($ref['status'] ?? '') === '执裁中' && (string)($ref['current_court'] ?? '') === $court;
+    if (!$pending && !$running) return ['kind'=>'blocked', 'message'=>'活动比赛生命周期不一致，请联系主控'];
+    [$t1_score, $t2_score] = parse_live_score($projection['score'] ?? ($task['live_score'] ?? '0-0'));
+    return ['kind'=>'assignment', 'assignment'=>[
+        'lifecycle'=>$running ? 'in_progress' : 'not_started', 'match_id'=>$match_id,
+        'court'=>$court, 'task'=>$task, 'score'=>[
+            'text'=>$projection['score'] ?? ($task['live_score'] ?? '0-0'),
+            't1'=>$t1_score, 't2'=>$t2_score
+        ]
+    ]];
+}
+
 function recovery_summary($state) {
     return [
         'task' => $state['task'] === null ? null : [
@@ -496,6 +537,19 @@ switch ($action) {
         foreach ($refs as &$r) { if ($r['name'] === $name) { $r['last_login'] = date('Y-m-d H:i:s'); $found = true; break; } }
         if (!$found) $refs[] = ['name' => $name, 'status' => '空闲', 'current_court' => '', 'match_count' => 0, 'comment' => '', 'last_login' => date('Y-m-d H:i:s')];
         kv_set($event_code, 'referees', $refs); echo json_encode(['status' => 'success', 'referee_id' => $name, 'name' => $name]); break;
+
+    case 'get_referee_active_assignment':
+        // Read-only and event-scoped. Login password is required because this
+        // response contains the referee's operational assignment.
+        if (!check_referee_pwd($pdo, $event_code, $req['password'] ?? '')) {
+            echo json_encode(['status'=>'error', 'message'=>'授权失败']); break;
+        }
+        $contract = referee_active_assignment(
+            kv_get($event_code, 'tasks', []), kv_get($event_code, 'live_scores', []),
+            kv_get($event_code, 'referees', []), kv_get($event_code, 'records', []),
+            $req['referee_id'] ?? ''
+        );
+        echo json_encode(['status'=>'success'] + $contract, JSON_UNESCAPED_UNICODE); break;
 
     case 'get_full_dashboard':
         $res = ['status' => 'success', 'tasks' => kv_get($event_code, 'tasks', []), 'records' => array_reverse(kv_get($event_code, 'records', [])), 'team_lineups' => kv_get($event_code, 'team_lineups', []), 'team_event' => kv_get($event_code, 'team_event', []), 'courts' => []];
