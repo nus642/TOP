@@ -22,6 +22,7 @@ const recoverySource = [
   helperSource,
   functionSource('validateRecoveryPayload'),
   functionSource('validateAuthoritativeRecovery'),
+  functionSource('validateAssignmentRecovery'),
   functionSource('recoveryConflict'),
   functionSource('checkAndRestoreBackup'),
 ].join('\n');
@@ -65,7 +66,14 @@ function acceptedDashboard(refereeName = 'REF-1') {
   data.referees = [{ name: refereeName, status: '空闲', current_court: '' }];
   return data;
 }
-function sandbox(data = backup(), server = dashboard(), refereeId = 'REF-1') {
+function assignmentResponse(data = backup(), t1 = data.matchState.t1Score, t2 = data.matchState.t2Score) {
+  return { status: 'success', kind: 'assignment', assignment: {
+    lifecycle: data.identity.lifecycle, match_id: data.identity.matchId, court: data.identity.court,
+    task: { id: data.identity.matchId, court: data.identity.court, t1: participants[0], t2: participants[1], t1p1: participants[2], t1p2: participants[3], t2p1: participants[4], t2p2: participants[5] },
+    score: { text: `G1 ${t1}-${t2}`, t1, t2 },
+  } };
+}
+function sandbox(data = backup(), server = assignmentResponse(data), refereeId = 'REF-1') {
   const key = 'pickle_referee_backup_v6:EVENT-A';
   const storage = new Map([[key, JSON.stringify(data)], ['pickle_referee_backup_v5', '{}']]);
   const calls = [];
@@ -105,7 +113,7 @@ test('mixed current/stale participant identity cannot be reconstructed', () => {
 test('reload recovery succeeds only after server reconciliation and never rewrites lifecycle', async () => {
   const { context, calls, storage } = sandbox();
   assert.equal(await context.restore(), true);
-  assert.ok(calls.indexOf('get_full_dashboard') < calls.indexOf('confirm'), 'server reconciliation must precede recovery prompt');
+  assert.ok(calls.indexOf('get_referee_active_assignment') < calls.indexOf('confirm'), 'server reconciliation must precede recovery prompt');
   assert.ok(calls.includes('step:3'));
   assert.equal(context.matchState.t1Score, 8);
   assert.ok(!calls.includes('WRITE_REFEREE') && !calls.includes('WRITE_SCORE'), 'recovery must not resurrect server state');
@@ -113,16 +121,18 @@ test('reload recovery succeeds only after server reconciliation and never rewrit
 });
 
 test('accepted task with absent status recovers from authoritative pending projection without write-back', async () => {
-  const { context, calls } = sandbox(acceptedBackup(), acceptedDashboard());
+  const accepted = acceptedBackup();
+  const { context, calls } = sandbox(accepted, assignmentResponse(accepted));
   assert.equal(await context.restore(), true);
-  assert.ok(calls.indexOf('get_full_dashboard') < calls.indexOf('confirm'));
+  assert.ok(calls.indexOf('get_referee_active_assignment') < calls.indexOf('confirm'));
   assert.ok(calls.includes('step:2'));
   assert.ok(!calls.includes('WRITE_REFEREE') && !calls.includes('WRITE_SCORE'));
 });
 
 test('accepted recovery normalizes referee names containing spaces without weakening ownership', async () => {
   const refereeName = 'Referee One';
-  const { context, calls } = sandbox(acceptedBackup(refereeName), acceptedDashboard(refereeName), refereeName);
+  const accepted = acceptedBackup(refereeName);
+  const { context, calls } = sandbox(accepted, assignmentResponse(accepted), refereeName);
   assert.equal(await context.restore(), true);
   assert.ok(calls.includes('step:2'));
   const wrongOwner = acceptedDashboard(refereeName);
@@ -182,7 +192,8 @@ test('browser A to B login transition binds every request and recovery lookup to
   vm.runInContext([
     helperSource, functionSource('apiCall'), functionSource('apiGet'), functionSource('resetVolatileMatchContext'),
     functionSource('recoveryConflict'), functionSource('validateRecoveryPayload'), functionSource('validateAuthoritativeRecovery'),
-    functionSource('checkAndRestoreBackup'), loginSource,
+    functionSource('validateAssignmentRecovery'),
+    functionSource('checkAndRestoreBackup'), functionSource('discoverServerAssignment'), loginSource,
   ].join('\n'), context);
 
   await context.handleLogin();
@@ -247,9 +258,9 @@ test('start_task success upgrades stale not_started snapshot to in_progress/step
 test('live in_progress snapshot restores the same match, players, court, and score after refresh', async () => {
   const live = backup();
   live.matchState = { t1Score: 4, t2Score: 1, over: false, timeline: [] };
-  const { context, calls } = sandbox(live, dashboard());
+  const { context, calls } = sandbox(live, assignmentResponse(live));
   assert.equal(await context.restore(), true);
-  assert.ok(calls.indexOf('get_full_dashboard') < calls.indexOf('confirm'), 'server reconciliation must precede the recovery prompt');
+  assert.ok(calls.indexOf('get_referee_active_assignment') < calls.indexOf('confirm'), 'server reconciliation must precede the recovery prompt');
   assert.equal(context.currentMatch.id, 'M-01');
   assert.equal(context.currentMatch.eventId, 'EVENT-A');
   assert.equal(context.matchState.t1Score, 4);
@@ -261,12 +272,31 @@ test('live in_progress snapshot restores the same match, players, court, and sco
   assert.ok(!context.recoveryBlocked);
 });
 
+test('reload recovery replaces an old local score with the authoritative in-progress score', async () => {
+  const staleLocal = backup();
+  staleLocal.matchState = { t1Score: 5, t2Score: 3, over: false, timeline: ['local-history'] };
+  staleLocal.gameState = { servTeam: 2, servingPlayer: '绿二' };
+  staleLocal.timeoutUsed = { t1: true, t2: false, medicalT1: false, medicalT2: false };
+  const { context, calls } = sandbox(staleLocal, assignmentResponse(staleLocal, 7, 5));
+
+  assert.equal(await context.restore('secret'), true);
+  assert.equal(context.matchState.t1Score, 7);
+  assert.equal(context.matchState.t2Score, 5);
+  assert.deepEqual(Array.from(context.matchState.timeline), ['local-history']);
+  assert.equal(context.gameState.servTeam, 2);
+  assert.equal(context.gameState.servingPlayer, '绿二');
+  assert.equal(context.timeoutUsed.t1, true);
+  assert.ok(calls.indexOf('get_referee_active_assignment') < calls.indexOf('render'));
+  assert.ok(!calls.includes('WRITE_REFEREE') && !calls.includes('WRITE_SCORE'));
+});
+
 test('not_started snapshot against a server already 比赛中 is still rejected as authority conflict', async () => {
-  const { context, calls, storage } = sandbox(ghostBackup(), dashboard());
+  const ghost = ghostBackup();
+  const { context, calls, storage } = sandbox(ghost, assignmentResponse(backup()));
   assert.match(context.validateAuthority(ghostBackup(), dashboard()), /任务生命周期或场地已变更/);
   assert.equal(await context.restore(), false);
   assert.ok(calls.some(msg => typeof msg === 'string' && msg.includes('恢复冲突') && msg.includes('任务生命周期或场地已变更')));
-  assert.ok(calls.indexOf('get_full_dashboard') < calls.findIndex(msg => typeof msg === 'string' && msg.includes('恢复冲突')));
+  assert.ok(calls.indexOf('get_referee_active_assignment') < calls.findIndex(msg => typeof msg === 'string' && msg.includes('恢复冲突')));
   assert.ok(!calls.includes('confirm'), 'authority rejection must never reach the restore prompt');
   const preserved = JSON.parse(storage.get('pickle_referee_backup_v6:EVENT-A'));
   assert.equal(preserved.identity.lifecycle, 'not_started', 'rejection keeps local evidence instead of destroying it');
