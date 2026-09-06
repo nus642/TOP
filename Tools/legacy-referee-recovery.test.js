@@ -182,7 +182,7 @@ test('browser A to B login transition binds every request and recovery lookup to
   vm.runInContext([
     helperSource, functionSource('apiCall'), functionSource('apiGet'), functionSource('resetVolatileMatchContext'),
     functionSource('recoveryConflict'), functionSource('validateRecoveryPayload'), functionSource('validateAuthoritativeRecovery'),
-    functionSource('checkAndRestoreBackup'), loginSource,
+    functionSource('checkAndRestoreBackup'), functionSource('discoverServerAssignment'), loginSource,
   ].join('\n'), context);
 
   await context.handleLogin();
