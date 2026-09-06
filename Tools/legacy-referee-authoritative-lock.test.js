@@ -77,7 +77,7 @@ test('missing task details use placeholders and never authoritative defaults', (
   assert.match(pullBlock, /待确认/);
   assert.doesNotMatch(pullBlock, /\$\{data\.data\.(?:target_score|cap_score)\}/);
   assert.doesNotMatch(acceptBlock, /target_score[^;]*:\s*21|cap_score[^;]*:\s*21/);
-  assert.match(html, /主控任务缺少/);
+  assert.match(html, /权威比赛规则不完整/);
 });
 
 test('task detail wording describes pre-acceptance state without claiming ownership', () => {

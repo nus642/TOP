@@ -275,6 +275,12 @@
                         </div>
                         <div class="mt-4 border-t border-slate-700 pt-4">
                             <h3 class="text-xs font-bold text-slate-400 mb-2">⚡ 极速盲派下发 (支持前置自定义编号)</h3>
+                            <div class="grid grid-cols-2 md:grid-cols-4 gap-2 mb-2">
+                                <label class="text-[10px] text-slate-400">目标分<input type="number" id="manualTargetScore" min="1" step="1" value="21" class="input-base mt-1 text-center font-bold"></label>
+                                <label class="text-[10px] text-slate-400">封顶分<input type="number" id="manualCapScore" min="0" step="1" value="21" class="input-base mt-1 text-center font-bold"></label>
+                                <label class="text-[10px] text-slate-400">赛制<select id="manualGameFormat" class="input-base mt-1 text-xs font-bold"><option value="1">单局决胜制</option><option value="3">三局两胜制</option></select></label>
+                                <label class="text-[10px] text-slate-400">计分方式<select id="manualScoreRule" class="input-base mt-1 text-xs font-bold"><option value="rally">每球得分制</option><option value="sideout">发球得分制</option></select></label>
+                            </div>
                             <div class="flex gap-2">
                                 <input type="text" id="manualDispatchInput" placeholder="例: S-01 张三/李四 vs 王五/赵六" class="input-base text-xs font-black placeholder:font-normal">
                                 <button onclick="handleManualDispatch()" class="bg-blue-600 hover:bg-blue-500 text-white px-4 py-2 rounded-lg text-xs font-bold whitespace-nowrap active:scale-95 shadow-md">一键下发</button>
@@ -2210,6 +2216,14 @@ let teamCodeDisplay = displayCode ? `<span onclick="editTeamCode('${room}', '${t
         window.handleManualDispatch = async () => {
             let input = $('manualDispatchInput').value.trim();
             if (!input) return showToast('请输入对阵信息', true);
+            const targetScore = Number($('manualTargetScore').value);
+            const capScore = Number($('manualCapScore').value);
+            const format = Number($('manualGameFormat').value);
+            const meth = $('manualScoreRule').value;
+            if (!Number.isInteger(targetScore) || targetScore <= 0) return showToast('目标分必须为正整数', true);
+            if (!Number.isInteger(capScore) || capScore < 0 || (capScore > 0 && capScore < targetScore)) return showToast('封顶分必须为 0（不封顶）或不小于目标分的整数', true);
+            if (![1, 3].includes(format)) return showToast('赛制无效，请选择单局制或三局两胜制', true);
+            if (!['rally', 'sideout'].includes(meth)) return showToast('计分方式无效，请重新选择', true);
             let customId = '';
             let matchStr = input;
             let spaceIdx = input.indexOf(' ');
@@ -2247,7 +2261,7 @@ let teamCodeDisplay = displayCode ? `<span onclick="editTeamCode('${room}', '${t
             let t1Info = resolveSide(sides[0]);
             let t2Info = resolveSide(sides[1]);
             let isDbl = t1Info.names.length > 1 || t2Info.names.length > 1;
-            let newTask = { id: customId ? customId : `M-${Date.now().toString().slice(-4)}`, t1: t1Info.team, t1p1: t1Info.names[0] || '', t1p2: t1Info.names[1] || '', t2: t2Info.team, t2p1: t2Info.names[0] || '', t2p2: t2Info.names[1] || '', type: isDbl ? 'doubles' : 'singles', format: 1, meth: 'rally', is_team: false };
+            let newTask = { id: customId ? customId : `M-${Date.now().toString().slice(-4)}`, t1: t1Info.team, t1p1: t1Info.names[0] || '', t1p2: t1Info.names[1] || '', t2: t2Info.team, t2p1: t2Info.names[0] || '', t2p2: t2Info.names[1] || '', type: isDbl ? 'doubles' : 'singles', target_score: targetScore, cap_score: capScore, format, meth, is_team: false };
             const res = await apiPost('set_bulk_tasks', { tasks: [newTask] });
             if (res.status === 'success') { showToast('✅ 下发成功！已推送至裁判池');
                 $('manualDispatchInput').value = '';

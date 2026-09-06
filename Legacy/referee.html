@@ -464,6 +464,14 @@ const normalizeMatchId = id => String(id ?? '').replace(/\s+/g, '').toUpperCase(
         const recoveryText = value => String(value ?? '').trim();
         const recoveryParticipant = value => recoveryText(value) || '待定';
         const recoveryRefereeId = value => normalizeMatchId(value);
+        function validateAuthoritativeRules(task) {
+            const target = Number(task?.target_score), cap = Number(task?.cap_score), format = Number(task?.format), meth = task?.meth;
+            if (task?.target_score === '' || task?.target_score == null || !Number.isInteger(target) || target <= 0) return '目标分缺失或无效';
+            if (task?.cap_score === '' || task?.cap_score == null || !Number.isInteger(cap) || cap < 0 || (cap > 0 && cap < target)) return '封顶分缺失或无效';
+            if (![1, 3].includes(format)) return '赛制缺失或无效';
+            if (!['rally', 'sideout'].includes(meth)) return '计分方式缺失或无效';
+            return '';
+        }
         function recoveryEventId() { return sysMode === 'local' ? 'LOCAL' : recoveryText(eventCode).toUpperCase(); }
         function recoveryBackupKey() { return `${BACKUP_KEY_PREFIX}:${encodeURIComponent(recoveryEventId())}`; }
         function recoveryIdentity(match = currentMatch) {
@@ -534,6 +542,8 @@ const normalizeMatchId = id => String(id ?? '').replace(/\s+/g, '').toUpperCase(
             if (!assignment || normalizeMatchId(assignment.match_id) !== identity.matchId) return '服务端活动比赛与本地备份不匹配';
             if (recoveryText(assignment.court) !== identity.court || assignment.lifecycle !== identity.lifecycle) return '任务生命周期或场地已变更';
             const task = assignment.task || {};
+            const ruleError = validateAuthoritativeRules(task);
+            if (ruleError) return `服务端权威比赛规则不完整：${ruleError}`;
             const authoritativeParticipants = ['t1','t2','t1p1','t1p2','t2p1','t2p2'].map(key => recoveryParticipant(task[key]));
             if (authoritativeParticipants.some((value, index) => value !== identity.participants[index])) return '任务队伍/参赛者与本地备份不一致';
             return '';
@@ -601,6 +611,12 @@ const normalizeMatchId = id => String(id ?? '').replace(/\s+/g, '').toUpperCase(
         }
         window.continueServerAssignment = async () => {
             if (!serverAssignment) return recoveryConflict('服务端活动比赛信息不存在');
+            const ruleError = validateAuthoritativeRules(serverAssignment.task);
+            if (ruleError) {
+                showToast(`❌ 服务端权威比赛规则不完整（${ruleError}），请由主控修正任务后重试`, true);
+                showStep(1);
+                return false;
+            }
             currentMatch = matchFromServerAssignment(serverAssignment); window.pendingTask = serverAssignment.task; matchPhase = serverAssignment.lifecycle;
             matchState = { t1Score: Number(serverAssignment.score?.t1 || 0), t2Score: Number(serverAssignment.score?.t2 || 0), t1Wins: 0, t2Wins: 0, currentGame: 1, history: [], timeline: [], halfSwitched: false, over: false };
             gameState = { viewBa: false, servTeam: 1, initServTeam: 1, servNum: 1, court: 'Right', t1: { r: currentMatch.t1p1, l: currentMatch.t1p2 || currentMatch.t1p1 }, t2: { r: currentMatch.t2p1, l: currentMatch.t2p2 || currentMatch.t2p1 }, initRightP1: currentMatch.t1p1, initRightP2: currentMatch.t2p1, servingPlayer: currentMatch.t1p1 };
@@ -981,9 +997,9 @@ const normalizeMatchId = id => String(id ?? '').replace(/\s+/g, '').toUpperCase(
             // 个人模式（mode=local 或无 pendingTask）保留手工场地能力。
             const isTeamFlow = window.pendingTask !== null && window.pendingTask !== undefined;
             if (isTeamFlow) {
-                const missingRules = [['target_score','目标分'],['cap_score','封顶分'],['format','赛制'],['meth','计分方式']].filter(([key]) => window.pendingTask[key] === undefined || window.pendingTask[key] === null || window.pendingTask[key] === '').map(([,label]) => label);
-                if (missingRules.length) {
-                    alert(`🚨 无法开赛：主控任务缺少${missingRules.join('、')}。\n请由主控确认规则后重新提取任务。`);
+                const ruleError = validateAuthoritativeRules(window.pendingTask);
+                if (ruleError) {
+                    alert(`🚨 无法开赛：主控任务的权威比赛规则不完整（${ruleError}）。\n请由主控确认规则后重新提取任务。`);
                     return;
                 }
                 const assignedCourt = window.pendingTask.court ? String(window.pendingTask.court).trim() : '';
