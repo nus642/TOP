@@ -214,9 +214,9 @@ describe('PR#155 R8 整改验证', () => {
       assert.ok(!content.includes('text-[10px] text-slate-400 underline'), '不得包含旧样式');
     });
 
-    it('R9-4: 完赛后 matchPhase 设为 completed', () => {
+    it('R9-4: 服务端确收完赛后 matchPhase 设为 finalized', () => {
       const content = fs.readFileSync(REFEREE_HTML, 'utf8');
-      assert.ok(content.includes("matchPhase = 'completed'"), '完赛后必须设置 matchPhase=completed');
+      assert.ok(content.includes("matchPhase = 'finalized'"), '确收完赛后必须设置 matchPhase=finalized');
     });
 
     it('R8-15: master.html 任务池不显示实时比分', () => {
