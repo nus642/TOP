@@ -588,6 +588,7 @@ const normalizeMatchId = id => String(id ?? '').replace(/\s+/g, '').toUpperCase(
                         if (authority.assignment.lifecycle === 'in_progress') {
                             data.matchState.t1Score = Number(authority.assignment.score?.t1 || 0);
                             data.matchState.t2Score = Number(authority.assignment.score?.t2 || 0);
+                            if (typeof setLiveSyncStatus === 'function') setLiveSyncStatus('confirmed');
                         }
                     }
                     if(data.currentMatch.id) {
@@ -643,7 +644,7 @@ const normalizeMatchId = id => String(id ?? '').replace(/\s+/g, '').toUpperCase(
             matchState = { t1Score: Number(serverAssignment.score?.t1 || 0), t2Score: Number(serverAssignment.score?.t2 || 0), t1Wins: 0, t2Wins: 0, currentGame: 1, history: [], timeline: [], halfSwitched: false, over: false };
             gameState = { viewBa: false, servTeam: 1, initServTeam: 1, servNum: 1, court: 'Right', t1: { r: currentMatch.t1p1, l: currentMatch.t1p2 || currentMatch.t1p1 }, t2: { r: currentMatch.t2p1, l: currentMatch.t2p2 || currentMatch.t2p1 }, initRightP1: currentMatch.t1p1, initRightP2: currentMatch.t2p1, servingPlayer: currentMatch.t1p1 };
             timeoutUsed = { t1:false, t2:false, medicalT1:false, medicalT2:false }; $('serverReentry').classList.add('hidden');
-            if (matchPhase === 'in_progress') { reconcileGameCompletion(); renderGame(); showStep(3); $('recoveryBadge').classList.remove('hidden'); }
+            if (matchPhase === 'in_progress') { setLiveSyncStatus('confirmed'); reconcileGameCompletion(); renderGame(); showStep(3); $('recoveryBadge').classList.remove('hidden'); }
             else { $('matchIdInput2').value=currentMatch.id; $('courtNo').value=currentMatch.court; $('targetScore').value=currentMatch.target; $('capScore').value=currentMatch.cap; $('gameFormat').value=currentMatch.format; $('scoreRule').value=currentMatch.meth; $('matchTypeSel').value=currentMatch.type; $('t1Name').value=currentMatch.t1Name; $('t2Name').value=currentMatch.t2Name; $('t1p1').value=currentMatch.t1p1; $('t1p2').value=currentMatch.t1p2; $('t2p1').value=currentMatch.t2p1; $('t2p2').value=currentMatch.t2p2; setAuthoritativeFieldsLocked(true); window.syncInputs(); showStep(1); showToast('✅ 已恢复待开赛任务；不会重复领取'); }
         };
         async function discoverServerAssignment(password) {
@@ -1022,7 +1023,6 @@ const normalizeMatchId = id => String(id ?? '').replace(/\s+/g, '').toUpperCase(
             }
             if (step === 3) {
                 // [PR#155 R9] viewSettingsBtn 已在 HTML 中直接设置正确样式，无需运行时修改
-                if (sysMode !== 'local' && (matchPhase === 'in_progress' || matchPhase === 'game_complete_pending_settlement') && $('liveSyncBadge').classList.contains('hidden')) setLiveSyncStatus('unconfirmed');
             }
             backupState();
         }

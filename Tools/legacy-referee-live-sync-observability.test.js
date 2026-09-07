@@ -24,6 +24,14 @@ function deferred() {
   return { promise, resolve };
 }
 
+function windowFunctionSource(name, nextMarker) {
+  const start = html.indexOf(`window.${name} =`);
+  assert.ok(start >= 0, `missing window.${name}`);
+  const end = html.indexOf(nextMarker, start);
+  assert.ok(end > start, `missing marker after window.${name}`);
+  return html.slice(start, end);
+}
+
 function harness({ mode = 'ind', matchId = 'M-01', t1 = 8, t2 = 6, target = 15 } = {}) {
   const elements = new Map();
   const element = id => {
@@ -194,4 +202,75 @@ test('terminal scoring stays pending-settlement and keeps failed sync warning vi
   await flush();
   assert.match(badge.innerHTML, /云端未确认/);
   assert.equal(badge.className.includes('hidden'), false);
+});
+
+test('healthy fresh-device server re-entry marks the authoritative score confirmed without live-score sync', async () => {
+  const { context, requests, badge } = harness();
+  context.serverAssignment = {
+    lifecycle: 'in_progress', match_id: 'M-01', court: '2', score: { t1: 8, t2: 6 },
+    task: { id: 'M-01', court: '2', t1: 'A', t2: 'B', t1p1: 'A1', t2p1: 'B1', target_score: 15, cap_score: 0, format: 1, meth: 'rally' },
+  };
+  context.validateAuthoritativeRules = () => '';
+  context.matchFromServerAssignment = assignment => ({ ...context.currentMatch, id: assignment.match_id, court: assignment.court });
+  context.reconcileGameCompletion = () => {};
+  context.renderGame = () => {};
+  context.showStep = () => {};
+  vm.runInContext(windowFunctionSource('continueServerAssignment', 'async function discoverServerAssignment'), context);
+
+  await context.continueServerAssignment();
+
+  assert.match(badge.innerHTML, /云端已同步/);
+  assert.equal(context.matchState.t1Score, 8);
+  assert.equal(context.matchState.t2Score, 6);
+  assert.equal(requests.length, 0, 're-entry must not manufacture sync_live_score');
+});
+
+test('healthy connected recovery marks replaced authoritative score confirmed without live-score sync', async () => {
+  const { context, requests, badge } = harness({ t1: 11, t2: 7 });
+  const backup = {
+    currentMatch: context.currentMatch, matchState: context.matchState, gameState: context.gameState,
+    timeoutUsed: context.timeoutUsed, matchPhase: 'in_progress', step: 3,
+  };
+  context.localStorage = { getItem: () => JSON.stringify(backup), removeItem() {} };
+  context.LEGACY_BACKUP_KEY = 'legacy-backup';
+  context.recoveryBackupKey = () => 'backup';
+  context.validateRecoveryPayload = () => '';
+  context.validateAssignmentRecovery = () => '';
+  context.recoveryConflict = message => { throw new Error(message); };
+  context.apiCall = async action => {
+    requests.push({ action });
+    return { status: 'success', kind: 'assignment', assignment: { lifecycle: 'in_progress', score: { t1: 8, t2: 6 } } };
+  };
+  context.confirm = () => true;
+  context.setAuthoritativeFieldsLocked = () => {};
+  context.reconcileGameCompletion = () => {};
+  context.renderGame = () => {};
+  context.showStep = () => {};
+  vm.runInContext(`${functionSource('checkAndRestoreBackup')}\nthis.checkAndRestoreBackup = checkAndRestoreBackup;`, context);
+
+  assert.equal(await context.checkAndRestoreBackup('pwd'), true);
+  assert.equal(context.matchState.t1Score, 8, 'recovery must display authoritative server score');
+  assert.equal(context.matchState.t2Score, 6, 'recovery must display authoritative server score');
+  assert.match(badge.innerHTML, /云端已同步/);
+  assert.deepEqual(requests.map(request => request.action), ['get_referee_active_assignment']);
+  assert.ok(!requests.some(request => request.action === 'sync_live_score'), 'recovery must not manufacture sync_live_score');
+});
+
+for (const [name, phase, initialStatus] of [
+  ['Settings return preserves confirmed state', 'in_progress', 'confirmed'],
+  ['Settings return preserves unconfirmed state', 'in_progress', 'unconfirmed'],
+  ['pending-settlement return preserves prior sync state', 'game_complete_pending_settlement', 'unconfirmed'],
+]) test(name, () => {
+  const { context, badge } = harness();
+  context.matchPhase = phase;
+  context.setLiveSyncStatus(initialStatus);
+  const before = badge.innerHTML;
+  context.updateSetupAuthority = () => {};
+  context.getCurrentStep = () => 3;
+  for (let step = 1; step <= 4; step++) context.$(`step${step}`);
+  vm.runInContext(`${functionSource('showStep')}\nthis.showStep = showStep;`, context);
+
+  context.showStep(3);
+
+  assert.equal(badge.innerHTML, before);
 });
