@@ -63,6 +63,26 @@ Main Documents:
 - Design-Decisions.md
 - Coding-Standards.md (Future)
 
+
+## Engineering Documentation Map
+
+Use this map before adding or redesigning engineering process documentation.
+
+| Area | Authoritative location | Responsibility |
+|---|---|---|
+| Engineering principles and operating rules | `11_Engineering/Engineering-Playbook.md` | Project-wide engineering rules, repository source priority, explicit action reporting, analysis-before-implementation, and AI task protocol. |
+| Documentation lifecycle governance | `11_Engineering/Documentation-Governance.md` | Document versioning, status, category, and preservation rules. |
+| AI development workflow | `11_Engineering/ENG-035-AI-Development-Workflow.md` | High-level ChatGPT → task specification → Codex implementation → local review → Git workflow. |
+| AI task delivery workflow | `11_Engineering/ENG-036-AI-Task-Delivery-Workflow.md` | Reviewable delivery artifacts and local application flow for AI-produced changes. |
+| Earlier AI collaboration guidance | `11_Engineering/DEV-003-AI-Assisted-Development-Workflow.md` | Role split and patch-oriented AI collaboration guidance; read with ENG-035 and ENG-036 before changing AI workflow semantics. |
+| Developer setup and configuration | `11_Engineering/DEV-001-Node-Development-Environment.md`, `11_Engineering/DEV-002-Configuration-Management.md` | Local development environment and configuration practices. |
+| Architecture and migration context | `11_Engineering/Database-Architecture.md`, `11_Engineering/Legacy-Architecture.md`, `11_Engineering/Design-Decisions.md` | Database, legacy-system, migration, and decision-record context. |
+| Prompt artifacts | `11_Engineering/AI-Prompts/` | Task/prompt support artifacts; not authoritative governance by themselves. |
+| Task artifacts | `11_Engineering/Tasks/` and task-specific handoff packages when present | Task scope, execution, review, and status records. |
+
+When repository facts conflict with conversation memory, use the committed repository documentation first.
+
+
 ---
 
 ## Blueprint
