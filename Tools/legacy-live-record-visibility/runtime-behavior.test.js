@@ -138,7 +138,7 @@ describe('交换场区：运行时行为（真实执行 award 内 halfSwitch 块
     assert.ok(!stopFn.includes('matchState'), 'stopTimerManually 不得修改 matchState');
     assert.ok(!stopFn.includes('gameState'), 'stopTimerManually 不得修改 gameState');
     assert.ok(stopFn.includes('clearInterval'), '应清除定时器');
-    assert.ok(stopFn.includes("disabled = false"), '应恢复得分按钮');
+    assert.ok(stopFn.includes('updateScoringAuthority()'), '应按当前生命周期恢复得分权限');
   });
 
   it('R8: 常规球队暂停"球拍请放在场内"提示保留（不得误改）', () => {
