@@ -305,7 +305,8 @@
                                         <button onclick="window.open('players.html?code='+encodeURIComponent(currentEventCode))" class="tool-btn primary flex-1 min-w-[110px]">📂 运动员名单</button>
                                         <button onclick="openAddMemberModal()" class="tool-btn green flex-1 min-w-[110px]">➕ 补录队伍/队员</button>
                                     </div>
-                                    <button id="pushTeamMatchesBtn" onclick="handlePushTeamMatches()" class="w-full bg-gradient-to-r from-amber-600 to-orange-600 py-2.5 rounded-lg text-xs font-black shadow-lg hover:opacity-90 active:scale-95 transition-all text-white tracking-widest border border-amber-400/50 mt-1">⚡ 扫描核碰领队交卷，下发比赛至裁判池</button>
+                                    <button id="pushTeamMatchesBtn" onclick="handlePushTeamMatches()" class="w-full bg-gradient-to-r from-amber-600 to-orange-600 py-2.5 rounded-lg text-xs font-black shadow-lg hover:opacity-90 active:scale-95 transition-all text-white tracking-widest border border-amber-400/50 mt-1">🔍 扫描领队交卷并进入审核</button>
+                                    <div id="teamDispatchReview" class="hidden mt-3 rounded-xl border border-amber-500/40 bg-slate-950/90 p-3"></div>
                                 </div>
 
                                 <div class="md:col-span-1 bg-slate-900/50 p-2.5 rounded-lg border border-slate-700 flex flex-col">
@@ -1881,7 +1882,7 @@ let teamCodeDisplay = displayCode ? `<span onclick="editTeamCode('${room}', '${t
                             });
                             let actionArea = '';
                             if (submittedCount === 2 && roomData.status !== 'completed') {
-                                actionArea = `<button onclick="forceResolveSubMatches('${room}')" class="action-btn bg-gradient-to-r from-emerald-600 to-teal-500 border border-emerald-400 text-white font-black text-[11px] px-3 py-1.5 rounded animate-pulse shadow-md whitespace-nowrap active:scale-95 transition-transform">⚡ 解析并下发</button>`;
+                                actionArea = `<span class="text-emerald-400 text-[10px] font-bold">已交齐，请从上方进入审核</span>`;
                             } else if (roomData.status === 'completed') {
                                 actionArea = `<span class="text-slate-500 italic text-[11px] font-bold">矩阵已上链</span>`;
                             } else {
@@ -2269,70 +2270,79 @@ let teamCodeDisplay = displayCode ? `<span onclick="editTeamCode('${room}', '${t
         };
 
         // ======================== 团体房间解析与核碰 ========================
-        window.forceResolveSubMatches = async (room) => {
-            if (!globalDashboardData || !globalDashboardData.team_event || !globalDashboardData.team_event[room]) return;
-            let rData = globalDashboardData.team_event[room];
-            let t1Name = rData.teams[0].team_name;
-            let t2Name = rData.teams[1].team_name;
-            let tl1 = globalDashboardData.team_lineups ? globalDashboardData.team_lineups[`${room}_${t1Name}`] : null;
-            let tl2 = globalDashboardData.team_lineups ? globalDashboardData.team_lineups[`${room}_${t2Name}`] : null;
-            let newTasks = [];
-            if (tl1 && tl2 && tl1.matches && tl2.matches) {
-                let mCount = Math.min(tl1.matches.length, tl2.matches.length);
-                for (let i = 0; i < mCount; i++) {
-                    let m1 = tl1.matches[i];
-                    let m2 = tl2.matches[i];
-                    newTasks.push({ id: `${room}-${String(i+1).padStart(2,'0')}`, court: '', target_score: 21, cap_score: 21, format: m1.format || 1, meth: 'rally', t1: t1Name, t1p1: m1.players[0] || '', t1p2: m1.players[1] || '', t2: t2Name, t2p1: m2.players[0] || '', t2p2: m2.players[1] || '', type: (m1.players[1] || m2.players[1]) ? 'doubles' : 'singles', is_team: true });
-                }
-                await apiPost('import_team_event', { room_code: room, teams: rData.teams, status: 'completed' });
-                await apiPost('set_bulk_tasks', { tasks: newTasks });
-                showToast(`🎉 空间房间 ${room} 子比赛强制解算成功！下发 ${newTasks.length} 场对决！`);
-                loadDashboard();
+        const TEAM_TYPE_LABELS = { MD: '男双', WD: '女双', XD: '混双', MS: '男单', WS: '女单' };
+        const teamTypeLabel = type => TEAM_TYPE_LABELS[type] || type || '未知项目';
+        const escapeReviewHtml = value => String(value ?? '').replace(/[&<>"']/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
+
+        function reviewTeamLineup(room, roomData, template, players) {
+            const errors = [];
+            if (!Array.isArray(roomData.teams) || roomData.teams.length !== 2) {
+                return { room, errors: ['房间必须恰好包含两队'], rows: [], teams: [] };
             }
-        };
+            if (!Array.isArray(template) || template.length === 0) errors.push('当前未设置团体赛模板');
+            const teams = roomData.teams.map(team => team.team_name);
+            const lineups = teams.map(team => globalDashboardData.team_lineups?.[`${room}_${team}`]);
+            lineups.forEach((lineup, side) => {
+                if (!lineup || !Array.isArray(lineup.matches)) return errors.push(`${teams[side]} 未提交排阵`);
+                if (lineup.matches.length !== template.length) errors.push(`${teams[side]} 排阵盘数与当前模板不一致`);
+                const roster = new Set(players.filter(p => p.team === teams[side]).map(p => p.name));
+                const used = new Set();
+                template.forEach((slot, index) => {
+                    const match = lineup.matches[index];
+                    const needed = String(slot.type || '').includes('D') ? 2 : 1;
+                    if (!match || match.template_type !== slot.type || match.type !== (needed === 2 ? 'doubles' : 'singles')) errors.push(`${teams[side]} 第 ${index + 1} 盘与当前模板不一致`);
+                    const names = Array.isArray(match?.players) ? match.players.slice(0, needed) : [];
+                    if (names.length !== needed || names.some(name => !String(name || '').trim())) errors.push(`${teams[side]} 第 ${index + 1} 盘未排满`);
+                    names.filter(Boolean).forEach(name => {
+                        if (!roster.has(name)) errors.push(`${teams[side]} 第 ${index + 1} 盘包含非本队球员：${name}`);
+                        if (used.has(name)) errors.push(`${teams[side]} 球员重复上场：${name}`);
+                        used.add(name);
+                    });
+                });
+            });
+            const rows = template.map((slot, index) => ({
+                type: slot.type,
+                left: lineups[0]?.matches?.[index]?.players || [],
+                right: lineups[1]?.matches?.[index]?.players || []
+            }));
+            return { room, teams, rows, errors: [...new Set(errors)] };
+        }
 
         window.handlePushTeamMatches = async () => {
-            if (!globalDashboardData || !globalDashboardData.team_event) return showToast('暂无进行中的团队空间');
-            $('pushTeamMatchesBtn').innerText = '扫描核碰中...';
-            $('pushTeamMatchesBtn').disabled = true;
-            let newTasks = [];
-            let pushedRooms = 0;
-            for (let room in globalDashboardData.team_event) {
-                let rData = globalDashboardData.team_event[room];
-                if (rData.status === 'completed') continue;
-                let t1Name = rData.teams[0].team_name;
-                let t2Name = rData.teams[1].team_name;
-                let tl1 = globalDashboardData.team_lineups ? globalDashboardData.team_lineups[`${room}_${t1Name}`] : null;
-                let tl2 = globalDashboardData.team_lineups ? globalDashboardData.team_lineups[`${room}_${t2Name}`] : null;
-                if (tl1 && tl2 && tl1.matches && tl2.matches) {
-                    let mCount = Math.min(tl1.matches.length, tl2.matches.length);
-                    for (let i = 0; i < mCount; i++) {
-                        let m1 = tl1.matches[i];
-                        let m2 = tl2.matches[i];
-                        newTasks.push({ id: `${room}-${String(i+1).padStart(2,'0')}`, court: '', target_score: 21, cap_score: 21, format: m1.format || 1, meth: 'rally', t1: t1Name, t1p1: m1.players[0] || '', t1p2: m1.players[1] || '', t2: t2Name, t2p1: m2.players[0] || '', t2p2: m2.players[1] || '', type: (m1.players[1] || m2.players[1]) ? 'doubles' : 'singles', is_team: true });
-                    }
-                    await apiPost('import_team_event', { room_code: room, teams: rData.teams, status: 'completed' });
-                    pushedRooms++;
-                } else {
-                    if (confirm(`⚠️ 房间 ${room} (${t1Name} vs ${t2Name}) 尚未完成排阵！\n是否使用特权【强行下发空白对阵】？`)) {
-                        let pwd = prompt('请输入裁判长授权密码：');
-                        if (pwd === $('masterPwd').value) {
-                            for (let i = 0; i < 3; i++) { newTasks.push({ id: `${room}-${String(i+1).padStart(2,'0')}`, court: '', target_score: 21, cap_score: 21, format: 1, meth: 'rally', t1: t1Name, t1p1: '待定', t1p2: '待定', t2: t2Name, t2p1: '待定', t2p2: '待定', type: 'doubles', is_team: true }); }
-                            await apiPost('import_team_event', { room_code: room, teams: rData.teams, status: 'completed' });
-                            pushedRooms++;
-                        } else { showToast('密码错误，已取消强发', true); }
-                    }
-                }
-            }
-            if (newTasks.length > 0) {
-                await apiPost('set_bulk_tasks', { tasks: newTasks });
-                showToast(`🎉 匹配成功！核碰了 ${pushedRooms} 个房间，下发 ${newTasks.length} 场比赛！`);
-                loadDashboard();
+            if (!globalDashboardData?.team_event) return showToast('暂无进行中的团队空间');
+            const btn = $('pushTeamMatchesBtn');
+            btn.innerText = '扫描审核中...'; btn.disabled = true;
+            const playerResponse = await apiGet('get_players');
+            const players = playerResponse.status === 'success' ? playerResponse.data : [];
+            const reviews = Object.entries(globalDashboardData.team_event)
+                .filter(([, data]) => data.status !== 'completed')
+                .map(([room, data]) => reviewTeamLineup(room, data, teamTemplate, players));
+            const panel = $('teamDispatchReview');
+            panel.classList.remove('hidden');
+            if (!reviews.length) {
+                panel.innerHTML = '<div class="text-xs text-slate-400">暂无待审核房间。</div>';
             } else {
-                showToast('⏳ 扫描完成：暂无符合下发条件的房间');
+                panel.innerHTML = `<div class="mb-3"><div class="text-base font-black text-amber-300">下发前人工审核</div><div class="text-[10px] text-slate-400">请根据赛事规则人工核对男双、女双、混双资格；本页不修改领队原始排阵。</div></div>` + reviews.map(review => `
+                    <section class="mb-3 rounded-lg border ${review.errors.length ? 'border-red-500/50' : 'border-emerald-500/50'} bg-slate-900 p-3">
+                        <div class="font-mono text-sm font-black text-indigo-300">${escapeReviewHtml(review.room)}</div>
+                        <div class="mb-2 text-sm font-bold text-white">${escapeReviewHtml(review.teams[0] || '未知队伍')} <span class="text-slate-500">vs</span> ${escapeReviewHtml(review.teams[1] || '未知队伍')}</div>
+                        ${review.rows.map((row, index) => `<div class="mb-2 rounded bg-slate-800 p-2"><div class="text-lg font-black text-amber-300">${escapeReviewHtml(teamTypeLabel(row.type))}</div><div class="text-[10px] text-slate-500">第 ${index + 1} 盘</div><div class="mt-1 grid grid-cols-2 gap-2 text-xs"><div><b>${escapeReviewHtml(review.teams[0])}</b><br>${row.left.map(escapeReviewHtml).join(' / ') || '<span class="text-red-400">[空缺]</span>'}</div><div><b>${escapeReviewHtml(review.teams[1])}</b><br>${row.right.map(escapeReviewHtml).join(' / ') || '<span class="text-red-400">[空缺]</span>'}</div></div></div>`).join('')}
+                        ${review.errors.length ? `<div class="text-xs font-bold text-red-300">❌ ${review.errors.map(escapeReviewHtml).join('<br>❌ ')}</div>` : '<div class="text-xs font-bold text-emerald-300">✅ 完整性检查通过，待人工审核</div>'}
+                    </section>`).join('') + `<button onclick="confirmTeamDispatch()" ${reviews.some(r => r.errors.length) ? 'disabled' : ''} class="w-full rounded-lg bg-emerald-600 py-2.5 text-xs font-black text-white disabled:cursor-not-allowed disabled:bg-slate-700 disabled:text-slate-500">✅ 确认并下发</button>`;
+                window.pendingTeamDispatchRooms = reviews.filter(review => !review.errors.length).map(review => review.room);
             }
-            $('pushTeamMatchesBtn').innerText = '⚡ 扫描核碰双方盲排，并下发至裁判队列';
-            $('pushTeamMatchesBtn').disabled = false;
+            btn.innerText = '🔍 重新扫描领队交卷并进入审核'; btn.disabled = false;
+        };
+
+        window.confirmTeamDispatch = async () => {
+            const rooms = window.pendingTeamDispatchRooms || [];
+            if (!rooms.length) return showToast('没有可下发的完整排阵', true);
+            const res = await apiPost('dispatch_team_matches', { room_codes: rooms, password: $('masterPwd').value });
+            if (res.status !== 'success') return showToast(`下发失败：${res.message || '服务器拒绝请求'}`, true);
+            showToast(`🎉 已确认并一次性下发 ${res.task_count} 场比赛`);
+            $('teamDispatchReview').classList.add('hidden');
+            window.pendingTeamDispatchRooms = [];
+            loadDashboard();
         };
 
         // ======================== P1-3 赛果单详情 ========================
