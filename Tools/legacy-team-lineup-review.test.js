@@ -13,8 +13,8 @@ function reviewHarness(lineups) {
   assert.ok(start >= 0 && end > start, 'review helper source is present');
   const context = { globalDashboardData: { team_lineups: lineups } };
   vm.createContext(context);
-  vm.runInContext(`${master.slice(start, end)}; this.reviewTeamLineup = reviewTeamLineup`, context);
-  return context.reviewTeamLineup;
+  vm.runInContext(`${master.slice(start, end)}; this.reviewTeamLineup = reviewTeamLineup; this.selectDispatchableTeamRooms = selectDispatchableTeamRooms`, context);
+  return context;
 }
 
 const template = [{ type: 'MD' }, { type: 'WS' }];
@@ -43,7 +43,7 @@ test('Captain template cards preserve template authority and emphasize event ove
 });
 
 test('Master scan reviews a complete authoritative-template lineup without dispatching', () => {
-  const review = reviewHarness(valid)('T01', room, template, roster);
+  const review = reviewHarness(valid).reviewTeamLineup('T01', room, template, roster);
   assert.deepEqual([...review.errors], []);
   const scan = master.slice(master.indexOf('window.handlePushTeamMatches'), master.indexOf('window.confirmTeamDispatch'));
   assert.doesNotMatch(scan, /apiPost\('(?:set_bulk_tasks|dispatch_team_matches)'/);
@@ -58,8 +58,23 @@ test('Master review fails closed for incomplete, duplicate, foreign, and templat
     data => { data.T01_A.matches[0].players[1] = ''; }
   ]) {
     const lineups = structuredClone(valid); mutate(lineups);
-    assert.ok(reviewHarness(lineups)('T01', room, template, roster).errors.length > 0);
+    assert.ok(reviewHarness(lineups).reviewTeamLineup('T01', room, template, roster).errors.length > 0);
   }
+});
+
+test('a valid room remains dispatchable when another room is incomplete', () => {
+  const mixed = structuredClone(valid);
+  mixed.T02_A = structuredClone(mixed.T01_A);
+  const harness = reviewHarness(mixed);
+  const reviews = [
+    harness.reviewTeamLineup('T01', room, template, roster),
+    harness.reviewTeamLineup('T02', room, template, roster)
+  ];
+  assert.deepEqual([...harness.selectDispatchableTeamRooms(reviews)], ['T01']);
+  assert.equal(reviews[1].errors.some(error => error.includes('未提交排阵')), true);
+  assert.match(master, /已排除 · 不下发/);
+  assert.match(master, /pendingTeamDispatchRooms = dispatchableRooms/);
+  assert.doesNotMatch(master, /reviews\.some\(r => r\.errors\.length\) \? 'disabled'/);
 });
 
 test('normal Master UI has only explicit-confirm team dispatch and no placeholder force path', () => {

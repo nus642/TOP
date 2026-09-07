@@ -2308,6 +2308,10 @@ let teamCodeDisplay = displayCode ? `<span onclick="editTeamCode('${room}', '${t
             return { room, teams, rows, errors: [...new Set(errors)] };
         }
 
+        const selectDispatchableTeamRooms = reviews => reviews
+            .filter(review => review.errors.length === 0)
+            .map(review => review.room);
+
         window.handlePushTeamMatches = async () => {
             if (!globalDashboardData?.team_event) return showToast('暂无进行中的团队空间');
             const btn = $('pushTeamMatchesBtn');
@@ -2322,14 +2326,16 @@ let teamCodeDisplay = displayCode ? `<span onclick="editTeamCode('${room}', '${t
             if (!reviews.length) {
                 panel.innerHTML = '<div class="text-xs text-slate-400">暂无待审核房间。</div>';
             } else {
-                panel.innerHTML = `<div class="mb-3"><div class="text-base font-black text-amber-300">下发前人工审核</div><div class="text-[10px] text-slate-400">请根据赛事规则人工核对男双、女双、混双资格；本页不修改领队原始排阵。</div></div>` + reviews.map(review => `
+                const dispatchableRooms = selectDispatchableTeamRooms(reviews);
+                const excludedCount = reviews.length - dispatchableRooms.length;
+                panel.innerHTML = `<div class="mb-3"><div class="text-base font-black text-amber-300">下发前人工审核</div><div class="text-[10px] text-slate-400">请根据赛事规则人工核对男双、女双、混双资格；本页不修改领队原始排阵。</div><div class="mt-1 text-[10px] font-bold text-emerald-300">本次可下发 ${dispatchableRooms.length} 个房间${excludedCount ? `；${excludedCount} 个不完整/无效房间已排除` : ''}</div></div>` + reviews.map(review => `
                     <section class="mb-3 rounded-lg border ${review.errors.length ? 'border-red-500/50' : 'border-emerald-500/50'} bg-slate-900 p-3">
-                        <div class="font-mono text-sm font-black text-indigo-300">${escapeReviewHtml(review.room)}</div>
+                        <div class="flex items-center justify-between"><div class="font-mono text-sm font-black text-indigo-300">${escapeReviewHtml(review.room)}</div><span class="rounded px-2 py-0.5 text-[10px] font-black ${review.errors.length ? 'bg-red-900/50 text-red-300' : 'bg-emerald-900/50 text-emerald-300'}">${review.errors.length ? '已排除 · 不下发' : '将于确认后下发'}</span></div>
                         <div class="mb-2 text-sm font-bold text-white">${escapeReviewHtml(review.teams[0] || '未知队伍')} <span class="text-slate-500">vs</span> ${escapeReviewHtml(review.teams[1] || '未知队伍')}</div>
                         ${review.rows.map((row, index) => `<div class="mb-2 rounded bg-slate-800 p-2"><div class="text-lg font-black text-amber-300">${escapeReviewHtml(teamTypeLabel(row.type))}</div><div class="text-[10px] text-slate-500">第 ${index + 1} 盘</div><div class="mt-1 grid grid-cols-2 gap-2 text-xs"><div><b>${escapeReviewHtml(review.teams[0])}</b><br>${row.left.map(escapeReviewHtml).join(' / ') || '<span class="text-red-400">[空缺]</span>'}</div><div><b>${escapeReviewHtml(review.teams[1])}</b><br>${row.right.map(escapeReviewHtml).join(' / ') || '<span class="text-red-400">[空缺]</span>'}</div></div></div>`).join('')}
                         ${review.errors.length ? `<div class="text-xs font-bold text-red-300">❌ ${review.errors.map(escapeReviewHtml).join('<br>❌ ')}</div>` : '<div class="text-xs font-bold text-emerald-300">✅ 完整性检查通过，待人工审核</div>'}
-                    </section>`).join('') + `<button onclick="confirmTeamDispatch()" ${reviews.some(r => r.errors.length) ? 'disabled' : ''} class="w-full rounded-lg bg-emerald-600 py-2.5 text-xs font-black text-white disabled:cursor-not-allowed disabled:bg-slate-700 disabled:text-slate-500">✅ 确认并下发</button>`;
-                window.pendingTeamDispatchRooms = reviews.filter(review => !review.errors.length).map(review => review.room);
+                    </section>`).join('') + `<button onclick="confirmTeamDispatch()" ${dispatchableRooms.length ? '' : 'disabled'} class="w-full rounded-lg bg-emerald-600 py-2.5 text-xs font-black text-white disabled:cursor-not-allowed disabled:bg-slate-700 disabled:text-slate-500">✅ 确认并下发 ${dispatchableRooms.length} 个合法房间</button>`;
+                window.pendingTeamDispatchRooms = dispatchableRooms;
             }
             btn.innerText = '🔍 重新扫描领队交卷并进入审核'; btn.disabled = false;
         };
