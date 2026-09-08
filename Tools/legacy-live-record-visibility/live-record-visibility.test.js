@@ -185,17 +185,23 @@ describe('P1-3 签名赛果单安全规则', () => {
 
 // ======================== P2 房间卡显示 ========================
 
-describe('P2 团体房间卡显示 team_code', () => {
-  it('T15: 显示 team.team_code，不从第一名球员 id_code 推导', () => {
+describe('P2 团体房间卡显示 roster team_code', () => {
+  it('T15: 建房快照过期时显示当前 roster 的人工队伍编号', () => {
     const team = { team_name: '先锋预备队', team_code: 'T01', players: [] };
-    // 故意给出会误导旧实现的球员库（id_code 前缀不同）
-    const players = [{ name: '甲一', team: '先锋预备队', id_code: 'T09-01' }];
-    assert.equal(teamCodeDisplay(team, players), 'T01');
+    const players = [
+      { name: '甲一', team: '先锋预备队', team_code: '101', id_code: 'T01-01' },
+      { name: '甲二', team: '先锋预备队', team_code: '101', id_code: 'T01-02' }
+    ];
+    assert.equal(teamCodeDisplay(team, players), '101');
   });
 
-  it('T16: team_code 缺失 → 显示空，不猜测', () => {
+  it('T16: roster 缺失、不一致或仅有临时编号 → 显示空', () => {
     assert.equal(teamCodeDisplay({ team_name: 'X' }, []), '');
     assert.equal(teamCodeDisplay(null, []), '');
+    assert.equal(teamCodeDisplay({ team_name: 'X', team_code: 'T01' }, [
+      { team: 'X', team_code: '101' }, { team: 'X', team_code: '102' }
+    ]), '');
+    assert.equal(teamCodeDisplay({ team_name: 'X' }, [{ team: 'X', team_code: 'TMP-1234' }]), '');
   });
 });
 

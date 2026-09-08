@@ -102,10 +102,26 @@ test('server dispatch boundary validates all rooms before its atomic task and co
 
 test('event-day Master hides temporary codes and keeps roster management on Player page', () => {
   assert.doesNotMatch(master, /team[AB]Code\s*=\s*'TMP-/);
-  assert.match(master, /getAuthoritativeTeamCode/);
+  assert.match(master, /resolveRosterTeamCode/);
   assert.match(master, /\^TMP-/);
   assert.doesNotMatch(master, /id="addMemberModal"|openAddMemberModal|confirmAddMember/);
   assert.match(master, /players\.html\?code=/);
+});
+
+test('Master room display prefers a unique current roster number over a stale room code', () => {
+  const start = master.indexOf('const resolveRosterTeamCode');
+  const end = master.indexOf('function showToast', start);
+  const context = {};
+  vm.createContext(context);
+  vm.runInContext(`${master.slice(start, end)}; this.resolveRosterTeamCode = resolveRosterTeamCode`, context);
+  const roomTeam = { team_name: 'A队', team_code: 'T01' };
+  const currentRoster = [
+    { team: 'A队', team_code: '101' },
+    { team: 'A队', team_code: '101' }
+  ];
+  assert.equal(context.resolveRosterTeamCode(roomTeam, currentRoster), '101');
+  assert.equal(context.resolveRosterTeamCode(roomTeam, [{ team: 'A队', team_code: '101' }, { team: 'A队', team_code: '102' }]), '');
+  assert.match(master, /displayCode = resolveRosterTeamCode\(t, playersData\)/);
 });
 
 test('team submission polling is bounded, display-only, and preserves active review', () => {

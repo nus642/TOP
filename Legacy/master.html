@@ -506,6 +506,15 @@
 
         // ======================== 工具函数 ========================
         const normalizeId = id => String(id ?? '').replace(/\s+/g, '').toUpperCase();
+        const resolveRosterTeamCode = (team, players) => {
+            if (!team?.team_name || !Array.isArray(players)) return '';
+            const codes = players
+                .filter(player => player.team === team.team_name && (!team.group || player.group === team.group))
+                .map(player => String(player.team_code || '').trim())
+                .filter(code => code && !/^TMP-/i.test(code));
+            const uniqueCodes = [...new Set(codes)];
+            return uniqueCodes.length === 1 ? uniqueCodes[0] : '';
+        };
 
         function showToast(msg, isError = false) {
             const t = $('toast');
@@ -843,16 +852,10 @@
 const allPlayersRes = await apiGet('get_players');
 const allPlayers = allPlayersRes.status === 'success' ? allPlayersRes.data : [];
 
-function getAuthoritativeTeamCode(teamName) {
-    const player = allPlayers.find(p => p.team === teamName && p.team_code);
-    const code = String(player?.team_code || '').trim();
-    return /^TMP-/i.test(code) ? '' : code;
-}
-
 // A room without an authoritative roster team_code intentionally has no code.
 // Room/team identity remains authoritative; never manufacture an official-looking value.
-let teamACode = getAuthoritativeTeamCode(teamA);
-let teamBCode = getAuthoritativeTeamCode(teamB);
+let teamACode = resolveRosterTeamCode({ team_name: teamA }, allPlayers);
+let teamBCode = resolveRosterTeamCode({ team_name: teamB }, allPlayers);
 
 let payload = {
     room_code: roomCode,
@@ -1891,10 +1894,10 @@ for (let [key, info] of teamMap) {
                                 if (isTeamLineupSubmitted) submittedCount++;
                                 let statusText = roomData.status === 'completed' ? '对决已下发' : (isTeamLineupSubmitted ? '阵容已定' : `选手已到(${checked}/${total})`);
                                 let statusColor = roomData.status === 'completed' ? 'text-blue-400' : (isTeamLineupSubmitted ? 'text-emerald-400' : 'text-amber-400');
-// [P2] 团队房间卡直接显示 team.team_code（T01/T02）；
-// 禁止从第一名球员 id_code 推导（跨队宽松匹配曾导致错码）。
+// 房间中的 team_code 是建房快照，可能落后于运动员名单中的人工编号。
+// 只有当前 roster 对该队可解出唯一编号时才显示；否则仅显示队名。
 // 镜像测试：Tools/legacy-live-record-visibility/team-room-display-logic.js
-let displayCode = /^TMP-/i.test(String(t.team_code || '').trim()) ? '' : String(t.team_code || '').trim();
+let displayCode = resolveRosterTeamCode(t, playersData);
 let teamCodeDisplay = displayCode ? `<span onclick="editTeamCode('${room}', '${t.team_name}')" class="bg-slate-700 px-1.5 py-0.5 rounded cursor-pointer hover:bg-slate-600 border border-slate-500 text-[10px] text-white mr-1" title="点击修改队伍编号">${displayCode}</span>` : '';
                                 const lineupKey = encodeURIComponent(`${room}_${t.team_name}`);
                                 tHtml.push(`<div data-lineup-key="${lineupKey}" class="team-name text-xs font-bold ${statusColor} flex items-center">${teamCodeDisplay} <span onclick="editTeamName('${room}', '${t.team_name}')" class="cursor-pointer hover:text-amber-300">${t.team_name}</span> <span data-submission-badge class="bg-slate-900/80 px-1 rounded text-[10px] ml-1">[${statusText}]</span></div>`);
