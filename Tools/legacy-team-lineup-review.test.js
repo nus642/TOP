@@ -99,3 +99,56 @@ test('server dispatch boundary validates all rooms before its atomic task and co
   assert.ok(dispatch.indexOf('$pdo->commit()') > firstWrite);
   assert.match(dispatch, /rollBack\(\)/);
 });
+
+test('event-day Master hides temporary codes and keeps roster management on Player page', () => {
+  assert.doesNotMatch(master, /team[AB]Code\s*=\s*'TMP-/);
+  assert.match(master, /resolveRosterTeamCode/);
+  assert.match(master, /\^TMP-/);
+  assert.doesNotMatch(master, /id="addMemberModal"|openAddMemberModal|confirmAddMember/);
+  assert.match(master, /players\.html\?code=/);
+});
+
+test('Master room display prefers a unique current roster number over a stale room code', () => {
+  const start = master.indexOf('const resolveRosterTeamCode');
+  const end = master.indexOf('function showToast', start);
+  const context = {};
+  vm.createContext(context);
+  vm.runInContext(`${master.slice(start, end)}; this.resolveRosterTeamCode = resolveRosterTeamCode`, context);
+  const roomTeam = { team_name: 'A队', team_code: 'T01' };
+  const currentRoster = [
+    { team: 'A队', team_code: '101' },
+    { team: 'A队', team_code: '101' }
+  ];
+  assert.equal(context.resolveRosterTeamCode(roomTeam, currentRoster), '101');
+  assert.equal(context.resolveRosterTeamCode(roomTeam, [{ team: 'A队', team_code: '101' }, { team: 'A队', team_code: '102' }]), '');
+  assert.match(master, /displayCode = resolveRosterTeamCode\(t, playersData\)/);
+});
+
+test('team submission polling is bounded, display-only, and preserves active review', () => {
+  assert.match(master, /setInterval\(refreshTeamRoomStatus, 7000\)/);
+  const start = master.indexOf('async function refreshTeamRoomStatus');
+  const end = master.indexOf('async function loadDashboard', start);
+  const polling = master.slice(start, end);
+  assert.match(polling, /apiGet\('get_full_dashboard'\)/);
+  assert.doesNotMatch(polling, /apiPost|dispatch_team_matches|teamDispatchReview|pendingTeamDispatchRooms/);
+});
+
+test('four mixed rooms render as compact expandable summaries without weakening dispatch selection', () => {
+  assert.match(master, /<details class="mb-3 rounded-lg border/);
+  assert.match(master, /\u4ea4\u5377：\$\{review\.errors/);
+  assert.match(master, /\u76d8\u6570：\$\{review\.rows\.length\}/);
+  const mixedReviews = [
+    { room: 'T01', errors: [] }, { room: 'T02', errors: ['A 未提交排阵'] },
+    { room: 'T03', errors: [] }, { room: 'T04', errors: ['B 未提交排阵'] }
+  ];
+  const selected = reviewHarness(valid).selectDispatchableTeamRooms(mixedReviews);
+  assert.deepEqual([...selected], ['T01', 'T03']);
+  assert.match(master, /已排除 · 不下发/);
+  assert.match(master, /将于确认后下发/);
+});
+
+test('wholesale room clearing is tucked behind an admin recovery disclosure', () => {
+  assert.match(master, /<summary[^>]*>管理员恢复操作<\/summary>/);
+  assert.match(master, /if \(!confirm\('⚠️ 确定要清空所有团体房间吗/);
+  assert.match(master, /clear_all_team_rooms', \{ password: pwd \}/);
+});
