@@ -683,6 +683,80 @@ switch ($action) {
         echo json_encode(['status' => 'success']);
         break;
 
+    case 'dispatch_team_matches':
+        if (!check_referee_pwd($pdo, $event_code, $req['password'] ?? '')) {
+            echo json_encode(['status' => 'error', 'message' => '裁判长授权失败']); break;
+        }
+        try {
+            $pdo->beginTransaction();
+            if (!lock_event_for_update($pdo, $event_code)) throw new Exception('赛事不存在');
+            $requested_rooms = array_values(array_unique(array_map('normalizeId', $req['room_codes'] ?? [])));
+            if (count($requested_rooms) === 0) throw new Exception('未选择待下发房间');
+            $template = kv_get($event_code, 'team_template', []);
+            if (!is_array($template) || count($template) === 0) throw new Exception('当前未设置团体赛模板');
+            $team_event = kv_get($event_code, 'team_event', []);
+            $lineups = kv_get($event_code, 'team_lineups', []);
+            $players = kv_get($event_code, 'players', []);
+            $tasks = kv_get($event_code, 'tasks', []);
+            $new_tasks = [];
+
+            foreach ($requested_rooms as $room) {
+                if (!isset($team_event[$room])) throw new Exception("房间 {$room} 不存在");
+                $room_data = $team_event[$room];
+                if (($room_data['status'] ?? '') === 'completed') throw new Exception("房间 {$room} 已下发");
+                $teams = $room_data['teams'] ?? [];
+                if (count($teams) !== 2) throw new Exception("房间 {$room} 必须恰好包含两队");
+                $room_lineups = [];
+                foreach ($teams as $side => $team) {
+                    $team_name = $team['team_name'] ?? '';
+                    $key = "{$room}_{$team_name}";
+                    if (!isset($lineups[$key]) || !is_array($lineups[$key]['matches'] ?? null)) throw new Exception("房间 {$room}：{$team_name} 未提交排阵");
+                    $matches = $lineups[$key]['matches'];
+                    if (count($matches) !== count($template)) throw new Exception("房间 {$room}：{$team_name} 排阵盘数与当前模板不一致");
+                    $roster = [];
+                    foreach ($players as $player) if (($player['team'] ?? '') === $team_name && trim($player['name'] ?? '') !== '') $roster[trim($player['name'])] = true;
+                    $used = [];
+                    foreach ($template as $index => $slot) {
+                        $template_type = $slot['type'] ?? '';
+                        if (!in_array($template_type, ['MD', 'WD', 'XD', 'MS', 'WS'], true)) throw new Exception("当前模板第 " . ($index + 1) . " 盘项目类型无效");
+                        $needed = strpos($template_type, 'D') !== false ? 2 : 1;
+                        $match = $matches[$index] ?? [];
+                        $expected_match_type = $needed === 2 ? 'doubles' : 'singles';
+                        if (($match['template_type'] ?? '') !== $template_type || ($match['type'] ?? '') !== $expected_match_type) throw new Exception("房间 {$room}：{$team_name} 第 " . ($index + 1) . " 盘与当前模板不一致");
+                        $names = is_array($match['players'] ?? null) ? $match['players'] : [];
+                        for ($position = 0; $position < $needed; $position++) {
+                            $name = trim($names[$position] ?? '');
+                            if ($name === '') throw new Exception("房间 {$room}：{$team_name} 第 " . ($index + 1) . " 盘未排满");
+                            if ($name === '待定' || !isset($roster[$name])) throw new Exception("房间 {$room}：{$team_name} 包含非本队球员 {$name}");
+                            if (isset($used[$name])) throw new Exception("房间 {$room}：{$team_name} 球员 {$name} 重复上场");
+                            $used[$name] = true;
+                        }
+                        foreach (array_slice($names, $needed) as $extra) if (trim((string)$extra) !== '') throw new Exception("房间 {$room}：{$team_name} 第 " . ($index + 1) . " 盘包含额外球员");
+                    }
+                    $room_lineups[$side] = $matches;
+                }
+                foreach ($template as $index => $slot) {
+                    $left = $room_lineups[0][$index]; $right = $room_lineups[1][$index];
+                    $id = "{$room}-" . str_pad((string)($index + 1), 2, '0', STR_PAD_LEFT);
+                    $new_tasks[$id] = ['id' => $id, 'court' => '', 'target_score' => 21, 'cap_score' => 21,
+                        'format' => $left['format'] ?? 1, 'meth' => 'rally', 't1' => $teams[0]['team_name'],
+                        't1p1' => $left['players'][0], 't1p2' => $left['players'][1] ?? '', 't2' => $teams[1]['team_name'],
+                        't2p1' => $right['players'][0], 't2p2' => $right['players'][1] ?? '',
+                        'type' => strpos($slot['type'], 'D') !== false ? 'doubles' : 'singles', 'team_match_type' => $slot['type'], 'is_team' => true];
+                }
+            }
+            foreach ($new_tasks as $id => $task) $tasks[$id] = $task;
+            foreach ($requested_rooms as $room) $team_event[$room]['status'] = 'completed';
+            kv_set($event_code, 'tasks', $tasks);
+            kv_set($event_code, 'team_event', $team_event);
+            $pdo->commit();
+            echo json_encode(['status' => 'success', 'task_count' => count($new_tasks)]);
+        } catch (Exception $e) {
+            if ($pdo->inTransaction()) $pdo->rollBack();
+            echo json_encode(['status' => 'error', 'message' => $e->getMessage()]);
+        }
+        break;
+
     case 'set_bulk_tasks':
         try {
             $pdo->beginTransaction();
