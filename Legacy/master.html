@@ -2278,31 +2278,32 @@ let teamCodeDisplay = displayCode ? `<span onclick="editTeamCode('${room}', '${t
             } else {
                 const dispatchableRooms = selectDispatchableTeamRooms(reviews);
                 const excludedCount = reviews.length - dispatchableRooms.length;
-                panel.innerHTML = `<div class="mb-3"><div class="text-base font-black text-amber-300">下发前人工审核</div><div class="text-[10px] text-slate-400">请根据赛事规则人工核对男双、女双、混双资格；本页不修改领队原始排阵。</div><div class="mt-1 text-[10px] font-bold text-emerald-300">本次可下发 ${dispatchableRooms.length} 个房间${excludedCount ? `；${excludedCount} 个不完整/无效房间已排除` : ''}</div></div>` + reviews.map(review => `
+                panel.innerHTML = `<div class="mb-3"><div class="text-base font-black text-amber-300">下发前人工审核</div><div class="text-[10px] text-slate-400">请根据赛事规则人工核对男双、女双、混双资格；本页不修改领队原始排阵。</div><div class="mt-1 text-[10px] font-bold text-emerald-300">当前可逐房下发 ${dispatchableRooms.length} 个房间${excludedCount ? `；${excludedCount} 个不完整/无效房间已排除` : ''}</div></div>` + reviews.map(review => `
                     <details class="mb-3 rounded-lg border ${review.errors.length ? 'border-red-500/50' : 'border-emerald-500/50'} bg-slate-900 p-3">
                         <summary class="cursor-pointer list-none">
-                            <div class="flex flex-wrap items-center justify-between gap-2"><div><span class="font-mono text-sm font-black text-indigo-300">${escapeReviewHtml(review.room)}</span><span class="ml-2 text-sm font-bold text-white">${escapeReviewHtml(review.teams[0] || '未知队伍')} <span class="text-slate-500">vs</span> ${escapeReviewHtml(review.teams[1] || '未知队伍')}</span></div><span class="rounded px-2 py-0.5 text-[10px] font-black ${review.errors.length ? 'bg-red-900/50 text-red-300' : 'bg-emerald-900/50 text-emerald-300'}">${review.errors.length ? '已排除 · 不下发' : '将于确认后下发'}</span></div>
+                            <div class="flex flex-wrap items-center justify-between gap-2"><div><span class="font-mono text-sm font-black text-indigo-300">${escapeReviewHtml(review.room)}</span><span class="ml-2 text-sm font-bold text-white">${escapeReviewHtml(review.teams[0] || '未知队伍')} <span class="text-slate-500">vs</span> ${escapeReviewHtml(review.teams[1] || '未知队伍')}</span></div><span class="rounded px-2 py-0.5 text-[10px] font-black ${review.errors.length ? 'bg-red-900/50 text-red-300' : 'bg-emerald-900/50 text-emerald-300'}">${review.errors.length ? '已排除 · 不下发' : '审核通过 · 待单独下发'}</span></div>
                             <div class="mt-1 flex gap-3 text-[10px] text-slate-400"><span>交卷：${review.errors.some(error => error.includes('未提交排阵')) ? '未交齐' : '已交齐'}</span><span>盘数：${review.rows.length}</span><span>点击展开明细</span></div>
                         </summary>
                         <div class="mt-3 border-t border-slate-700 pt-3">
                         ${review.rows.map((row, index) => `<div class="mb-2 rounded bg-slate-800 p-2"><div class="text-lg font-black text-amber-300">${escapeReviewHtml(teamTypeLabel(row.type))}</div><div class="text-[10px] text-slate-500">第 ${index + 1} 盘</div><div class="mt-1 grid grid-cols-2 gap-2 text-xs"><div><b>${escapeReviewHtml(review.teams[0])}</b><br>${row.left.map(escapeReviewHtml).join(' / ') || '<span class="text-red-400">[空缺]</span>'}</div><div><b>${escapeReviewHtml(review.teams[1])}</b><br>${row.right.map(escapeReviewHtml).join(' / ') || '<span class="text-red-400">[空缺]</span>'}</div></div></div>`).join('')}
-                        ${review.errors.length ? `<div class="text-xs font-bold text-red-300">❌ ${review.errors.map(escapeReviewHtml).join('<br>❌ ')}</div>` : '<div class="text-xs font-bold text-emerald-300">✅ 完整性检查通过，待人工审核</div>'}
+                        ${review.errors.length ? `<div class="text-xs font-bold text-red-300">❌ ${review.errors.map(escapeReviewHtml).join('<br>❌ ')}</div>` : `<div class="flex flex-wrap items-center justify-between gap-2"><div class="text-xs font-bold text-emerald-300">✅ 完整性检查通过，待人工审核</div><button type="button" data-room="${escapeReviewHtml(encodeURIComponent(review.room))}" onclick="dispatchTeamRoom(decodeURIComponent(this.dataset.room), this)" class="rounded-lg bg-emerald-600 px-4 py-2 text-xs font-black text-white hover:bg-emerald-500 disabled:cursor-not-allowed disabled:bg-slate-700 disabled:text-slate-500">下发本房间</button></div>`}
                         </div>
-                    </details>`).join('') + `<button onclick="confirmTeamDispatch()" ${dispatchableRooms.length ? '' : 'disabled'} class="w-full rounded-lg bg-emerald-600 py-2.5 text-xs font-black text-white disabled:cursor-not-allowed disabled:bg-slate-700 disabled:text-slate-500">✅ 确认并下发 ${dispatchableRooms.length} 个合法房间</button>`;
-                window.pendingTeamDispatchRooms = dispatchableRooms;
+                    </details>`).join('');
             }
             btn.innerText = '🔍 重新扫描领队交卷并进入审核'; btn.disabled = false;
         };
 
-        window.confirmTeamDispatch = async () => {
-            const rooms = window.pendingTeamDispatchRooms || [];
-            if (!rooms.length) return showToast('没有可下发的完整排阵', true);
-            const res = await apiPost('dispatch_team_matches', { room_codes: rooms, password: $('masterPwd').value });
-            if (res.status !== 'success') return showToast(`下发失败：${res.message || '服务器拒绝请求'}`, true);
-            showToast(`🎉 已确认并一次性下发 ${res.task_count} 场比赛`);
-            $('teamDispatchReview').classList.add('hidden');
-            window.pendingTeamDispatchRooms = [];
-            loadDashboard();
+        window.dispatchTeamRoom = async (room, button) => {
+            if (!room) return showToast('没有可下发的完整排阵', true);
+            if (button) { button.disabled = true; button.innerText = '下发中...'; }
+            const res = await apiPost('dispatch_team_matches', { room_codes: [room], password: $('masterPwd').value });
+            if (res.status !== 'success') {
+                if (button) { button.disabled = false; button.innerText = '下发本房间'; }
+                return showToast(`下发失败：${res.message || '服务器拒绝请求'}`, true);
+            }
+            showToast(`🎉 房间 ${room} 已下发 ${res.task_count} 场比赛`);
+            await loadDashboard();
+            await window.handlePushTeamMatches();
         };
 
         // ======================== P1-3 赛果单详情 ========================
