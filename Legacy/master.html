@@ -186,20 +186,6 @@
         <button onclick="document.getElementById('superAdminPanel').classList.add('hidden-panel'); document.getElementById('loginPage').classList.remove('hidden-panel');" class="w-full bg-slate-700 py-3 rounded-lg text-white font-bold transition-colors hover:bg-slate-600">退出大盘返回首页</button>
     </div>
 
-    <!-- 手动新增队员弹窗 -->
-    <div id="addMemberModal" class="hidden-panel fixed inset-0 bg-black/80 z-[9999] flex items-center justify-center p-4">
-        <div class="bg-slate-800 p-6 rounded-xl w-full max-w-md border border-slate-600 shadow-2xl">
-            <h3 class="text-lg font-bold text-emerald-400 mb-4 text-center">➕ 手动新增队员 / 建立队伍</h3>
-            <select id="addMemberTeamSelect" class="input-base mb-3 font-bold text-emerald-300 appearance-none bg-slate-900" onchange="toggleNewTeamInput()"></select>
-            <input type="text" id="newTeamNameInput" class="input-base mb-3 hidden-panel border-amber-500/50" placeholder="✏️ 请输入新队伍的名称 (必填)">
-            <input type="text" id="addMemberName" class="input-base mb-4" placeholder="👤 队员姓名 (必填)">
-            <div class="flex gap-3">
-                <button onclick="document.getElementById('addMemberModal').classList.add('hidden-panel')" class="btn bg-slate-600 w-1/3">取消</button>
-                <button onclick="confirmAddMember()" id="addMemberConfirmBtn" class="btn bg-emerald-600 w-2/3">确认添加入库</button>
-            </div>
-        </div>
-    </div>
-
     <div id="teamSchedulePreviewModal" class="hidden-panel fixed inset-0 bg-black/90 z-[99999] flex items-center justify-center p-4">
         <div class="bg-slate-800 p-6 rounded-xl w-full max-w-4xl border border-blue-500/50 shadow-2xl flex flex-col max-h-[90vh]">
             <h3 class="text-xl font-bold text-blue-400 mb-2 flex items-center gap-2"><span>📋</span> 赛事日程解析核对 (团体对抗)</h3>
@@ -303,7 +289,6 @@
                                         <button onclick="document.getElementById('teamExcelFile').click()" id="importTeamBtn" class="tool-btn primary flex-1 min-w-[110px]">📊 2.日程建房</button>
                                         <a href="team_lineup.html" target="_blank" class="tool-btn primary flex-1 min-w-[110px]">📋 领队排阵界面</a>
                                         <button onclick="window.open('players.html?code='+encodeURIComponent(currentEventCode))" class="tool-btn primary flex-1 min-w-[110px]">📂 运动员名单</button>
-                                        <button onclick="openAddMemberModal()" class="tool-btn green flex-1 min-w-[110px]">➕ 补录队伍/队员</button>
                                     </div>
                                     <button id="pushTeamMatchesBtn" onclick="handlePushTeamMatches()" class="w-full bg-gradient-to-r from-amber-600 to-orange-600 py-2.5 rounded-lg text-xs font-black shadow-lg hover:opacity-90 active:scale-95 transition-all text-white tracking-widest border border-amber-400/50 mt-1">🔍 扫描领队交卷并进入审核</button>
                                     <div id="teamDispatchReview" class="hidden mt-3 rounded-xl border border-amber-500/40 bg-slate-950/90 p-3"></div>
@@ -340,7 +325,10 @@
                                     <span class="text-[10px] text-slate-400 font-bold">🔍 搜索房间</span>
                                     <input type="text" id="roomSearchInput" placeholder="输入队伍名称快速筛选..." class="input-base text-xs py-1.5 flex-1 min-w-[120px]" oninput="filterTeamRooms()">
                                 </div>
-                                <button onclick="clearAllTeamRooms()" class="bg-red-900/50 hover:bg-red-800 text-red-300 px-3 py-1.5 rounded text-xs font-bold transition-colors shadow-md border border-red-500/30">🗑️ 一键全清房间</button>
+                                <details class="text-right">
+                                    <summary class="cursor-pointer text-[10px] text-slate-600 hover:text-slate-400">管理员恢复操作</summary>
+                                    <button onclick="clearAllTeamRooms()" class="mt-2 rounded border border-red-900/50 bg-slate-950 px-2 py-1 text-[10px] text-red-700 hover:text-red-400">清空全部团体房间</button>
+                                </details>
                             </div>
 
                             <div id="teamRoomContainer" class="mt-3">
@@ -499,6 +487,7 @@
         let currentEventCode = null;
         let globalDashboardData = null;
         let dashInterval;
+        let teamStatusInterval;
         let noticeImageBase64 = '';
         let noticeArray = [];
         let teamTemplate = [];
@@ -642,6 +631,8 @@
                     dashInterval = setInterval(() => {
                         if (currentEventCode) { loadDashboard(); loadReferees(); }
                     }, 4000);
+                    if (teamStatusInterval) clearInterval(teamStatusInterval);
+                    if (sysMode === 'team') teamStatusInterval = setInterval(refreshTeamRoomStatus, 7000);
                     const noticeRes = await apiGet('get_event_notice');
                     if (noticeRes.status === 'success' && noticeRes.data) {
                         noticeArray = noticeRes.data || [];
@@ -852,26 +843,16 @@
 const allPlayersRes = await apiGet('get_players');
 const allPlayers = allPlayersRes.status === 'success' ? allPlayersRes.data : [];
 
-function getTeamCodeFromPlayers(teamName, group) {
-    const player = allPlayers.find(p => p.team === teamName && p.group === group);
-    if (player && player.id_code && player.id_code.includes('-')) {
-        const parts = player.id_code.split('-');
-        if (parts.length >= 2) {
-            return parts.slice(0, 2).join('-');
-        }
-    }
-    return '';
+function getAuthoritativeTeamCode(teamName) {
+    const player = allPlayers.find(p => p.team === teamName && p.team_code);
+    const code = String(player?.team_code || '').trim();
+    return /^TMP-/i.test(code) ? '' : code;
 }
 
-let teamACode = getTeamCodeFromPlayers(teamA, '公开组');
-if (!teamACode) {
-    // 简单生成一个临时编号，但最好按组别生成，这里简化
-    teamACode = 'TMP-' + String(Date.now()).slice(-4);
-}
-let teamBCode = getTeamCodeFromPlayers(teamB, '公开组');
-if (!teamBCode) {
-    teamBCode = 'TMP-' + String(Date.now()).slice(-4);
-}
+// A room without an authoritative roster team_code intentionally has no code.
+// Room/team identity remains authoritative; never manufacture an official-looking value.
+let teamACode = getAuthoritativeTeamCode(teamA);
+let teamBCode = getAuthoritativeTeamCode(teamB);
 
 let payload = {
     room_code: roomCode,
@@ -1716,6 +1697,43 @@ window.generateTeamCodesFromGroups = async () => {
         }
 
         // ======================== 数据加载 ========================
+        async function refreshTeamRoomStatus() {
+            if (!currentEventCode || sysMode !== 'team') return;
+            try {
+                const data = await apiGet('get_full_dashboard');
+                if (!data || data.status !== 'success') return;
+                // Polling is display-only: retain the open review DOM and its explicit
+                // confirmation selection, and never call a write/dispatch endpoint here.
+                globalDashboardData = { ...globalDashboardData, team_event: data.team_event || {}, team_lineups: data.team_lineups || {} };
+                document.querySelectorAll('[data-lineup-key]').forEach(row => {
+                    const key = decodeURIComponent(row.dataset.lineupKey);
+                    const separator = key.indexOf('_');
+                    const room = key.slice(0, separator);
+                    const roomData = data.team_event?.[room];
+                    const submitted = Boolean(data.team_lineups?.[key]);
+                    const badge = row.querySelector('[data-submission-badge]');
+                    if (!roomData || !badge) return;
+                    if (roomData.status === 'completed') {
+                        badge.textContent = '[对决已下发]';
+                    } else if (submitted) {
+                        badge.textContent = '[阵容已定]';
+                        row.classList.remove('text-amber-400');
+                        row.classList.add('text-emerald-400');
+                    }
+                });
+                document.querySelectorAll('[data-room-submission]').forEach(status => {
+                    const room = decodeURIComponent(status.dataset.roomSubmission);
+                    const roomData = data.team_event?.[room];
+                    if (!roomData) return;
+                    const submittedCount = (roomData.teams || []).filter(team => data.team_lineups?.[`${room}_${team.team_name}`]).length;
+                    status.textContent = roomData.status === 'completed' ? '矩阵已上链' : (submittedCount === 2 ? '已交齐，请从上方进入审核' : `等待交卷 (${submittedCount}/2)`);
+                    status.className = submittedCount === 2 && roomData.status !== 'completed' ? 'text-emerald-400 text-[10px] font-bold' : 'text-amber-400/70 text-[10px] italic';
+                });
+            } catch (e) {
+                console.warn('refreshTeamRoomStatus error', e);
+            }
+        }
+
         async function loadDashboard() {
             try {
                 const bRes = await apiGet('get_broadcast');
@@ -1876,9 +1894,10 @@ for (let [key, info] of teamMap) {
 // [P2] 团队房间卡直接显示 team.team_code（T01/T02）；
 // 禁止从第一名球员 id_code 推导（跨队宽松匹配曾导致错码）。
 // 镜像测试：Tools/legacy-live-record-visibility/team-room-display-logic.js
-let displayCode = t.team_code || '';
+let displayCode = /^TMP-/i.test(String(t.team_code || '').trim()) ? '' : String(t.team_code || '').trim();
 let teamCodeDisplay = displayCode ? `<span onclick="editTeamCode('${room}', '${t.team_name}')" class="bg-slate-700 px-1.5 py-0.5 rounded cursor-pointer hover:bg-slate-600 border border-slate-500 text-[10px] text-white mr-1" title="点击修改队伍编号">${displayCode}</span>` : '';
-                                tHtml.push(`<div class="team-name text-xs font-bold ${statusColor} flex items-center">${teamCodeDisplay} <span onclick="editTeamName('${room}', '${t.team_name}')" class="cursor-pointer hover:text-amber-300">${t.team_name}</span> <span class="bg-slate-900/80 px-1 rounded text-[10px] ml-1">[${statusText}]</span></div>`);
+                                const lineupKey = encodeURIComponent(`${room}_${t.team_name}`);
+                                tHtml.push(`<div data-lineup-key="${lineupKey}" class="team-name text-xs font-bold ${statusColor} flex items-center">${teamCodeDisplay} <span onclick="editTeamName('${room}', '${t.team_name}')" class="cursor-pointer hover:text-amber-300">${t.team_name}</span> <span data-submission-badge class="bg-slate-900/80 px-1 rounded text-[10px] ml-1">[${statusText}]</span></div>`);
                             });
                             let actionArea = '';
                             if (submittedCount === 2 && roomData.status !== 'completed') {
@@ -1888,7 +1907,7 @@ let teamCodeDisplay = displayCode ? `<span onclick="editTeamCode('${room}', '${t
                             } else {
                                 actionArea = `<span class="text-amber-400/70 text-[10px] italic">等待交卷...</span>`;
                             }
-                            lineupHtml += `<div class="radar-room-card"><div class="flex justify-between items-center border-b border-slate-800 pb-1.5 mb-1.5"><span class="room-title font-mono text-indigo-400 font-black text-sm bg-indigo-950/40 px-2.5 py-0.5 rounded border border-indigo-500/30">空间: ${room}</span><button onclick="event.stopPropagation(); window.delRoom('${room}')" class="text-red-500 text-xs font-bold hover:underline">✕ 解散</button></div><div class="space-y-0.5">${tHtml.join('')}</div><div class="flex justify-between items-center bg-black/20 p-1.5 rounded-lg mt-1 border border-slate-700/50"><span class="text-[10px] text-slate-400">核碰机:</span>${actionArea}</div></div>`;
+                            lineupHtml += `<div class="radar-room-card"><div class="flex justify-between items-center border-b border-slate-800 pb-1.5 mb-1.5"><span class="room-title font-mono text-indigo-400 font-black text-sm bg-indigo-950/40 px-2.5 py-0.5 rounded border border-indigo-500/30">空间: ${room}</span><button onclick="event.stopPropagation(); window.delRoom('${room}')" class="text-red-500 text-xs font-bold hover:underline">✕ 解散</button></div><div class="space-y-0.5">${tHtml.join('')}</div><div class="flex justify-between items-center bg-black/20 p-1.5 rounded-lg mt-1 border border-slate-700/50"><span class="text-[10px] text-slate-400">核碰机:</span><span data-room-submission="${encodeURIComponent(room)}">${actionArea}</span></div></div>`;
                         }
                     }
                     const radarContainer = $('roomRadarGrid');
@@ -2050,79 +2069,7 @@ let teamCodeDisplay = displayCode ? `<span onclick="editTeamCode('${room}', '${t
             }
         };
 
-        // ======================== 队员管理 ========================
-        window.openAddMemberModal = async () => {
-            const res = await apiGet('get_all_teams');
-            const select = $('addMemberTeamSelect');
-            select.innerHTML = '<option value="NEW">➕ 创建新队伍/独立选手</option>';
-            if (res.status === 'success' && res.data && res.data.length > 0) {
-                let seen = new Set();
-                res.data.forEach(team => {
-                    if (!seen.has(team.team_name)) {
-                        seen.add(team.team_name);
-                        const option = document.createElement('option');
-                        option.value = JSON.stringify({ room: team.room_code, name: team.team_name });
-                        option.textContent = `[${team.room_code}] ${team.team_name}`;
-                        select.appendChild(option);
-                    }
-                });
-            }
-            window.toggleNewTeamInput();
-            $('addMemberModal').classList.remove('hidden-panel');
-        };
-
-        window.toggleNewTeamInput = () => {
-            const val = $('addMemberTeamSelect').value;
-            const nameInput = $('newTeamNameInput');
-            if (val === 'NEW') { nameInput.classList.remove('hidden-panel'); } else { nameInput.classList.add('hidden-panel'); }
-        };
-
-        window.confirmAddMember = async () => {
-            const selectVal = $('addMemberTeamSelect').value;
-            let teamName = "";
-            let roomCode = "系统池";
-            if (selectVal === 'NEW') {
-                teamName = $('newTeamNameInput').value.trim();
-                if (!teamName) return showToast('请输入新队伍名称', true);
-            } else {
-                const parsed = JSON.parse(selectVal);
-                teamName = parsed.name;
-                roomCode = parsed.room || "系统池";
-            }
-            const playerName = $('addMemberName').value.trim();
-            if (!playerName) return showToast('请输入队员姓名', true);
-            const btn = $('addMemberConfirmBtn');
-            btn.innerText = '拉取存管中...';
-            btn.disabled = true;
-            try {
-                const pRes = await apiGet('get_players');
-                let dbPlayers = pRes.status === 'success' ? pRes.data : [];
-                let maxP = 0;
-                dbPlayers.forEach(p => { if (p.id_code && p.id_code.startsWith('P')) { let num = parseInt(p.id_code.substring(1)); if (!isNaN(num) && num > maxP) maxP = num; } });
-                maxP++;
-                let newIdCode = 'P' + String(maxP).padStart(3, '0');
-                if (dbPlayers.some(p => p.name === playerName && p.team === teamName)) {
-                    showToast('🚨 该队员已存在该队伍阵容中', true);
-                    btn.innerText = '确认添加入库';
-                    btn.disabled = false;
-                    return;
-                }
-                dbPlayers.push({ id_code: newIdCode, group: roomCode, position: dbPlayers.length + 1, name: playerName, team: teamName, checked_in: false });
-                const res = await apiPost('set_players', { players: dbPlayers });
-                if (res.status === 'success') {
-                    showToast(`✅ 队员 ${playerName} 注册成功！分配身份标识: ${newIdCode}`);
-                    $('addMemberModal').classList.add('hidden-panel');
-                    $('addMemberName').value = '';
-                    if ($('newTeamNameInput')) $('newTeamNameInput').value = '';
-                    loadDashboard();
-                } else { showToast('添加失败', true); }
-            } catch (e) {
-                showToast('网络错误', true);
-            } finally {
-                btn.innerText = '确认添加入库';
-                btn.disabled = false;
-            }
-        };
+        // Team/player roster CRUD belongs to players.html; Master only links to it.
 
         window.editTeamCode = async (room, teamName) => {
     const newCode = prompt(`为队伍「${teamName}」设置新的编号（如 T01）：`, '');
@@ -2329,12 +2276,16 @@ let teamCodeDisplay = displayCode ? `<span onclick="editTeamCode('${room}', '${t
                 const dispatchableRooms = selectDispatchableTeamRooms(reviews);
                 const excludedCount = reviews.length - dispatchableRooms.length;
                 panel.innerHTML = `<div class="mb-3"><div class="text-base font-black text-amber-300">下发前人工审核</div><div class="text-[10px] text-slate-400">请根据赛事规则人工核对男双、女双、混双资格；本页不修改领队原始排阵。</div><div class="mt-1 text-[10px] font-bold text-emerald-300">本次可下发 ${dispatchableRooms.length} 个房间${excludedCount ? `；${excludedCount} 个不完整/无效房间已排除` : ''}</div></div>` + reviews.map(review => `
-                    <section class="mb-3 rounded-lg border ${review.errors.length ? 'border-red-500/50' : 'border-emerald-500/50'} bg-slate-900 p-3">
-                        <div class="flex items-center justify-between"><div class="font-mono text-sm font-black text-indigo-300">${escapeReviewHtml(review.room)}</div><span class="rounded px-2 py-0.5 text-[10px] font-black ${review.errors.length ? 'bg-red-900/50 text-red-300' : 'bg-emerald-900/50 text-emerald-300'}">${review.errors.length ? '已排除 · 不下发' : '将于确认后下发'}</span></div>
-                        <div class="mb-2 text-sm font-bold text-white">${escapeReviewHtml(review.teams[0] || '未知队伍')} <span class="text-slate-500">vs</span> ${escapeReviewHtml(review.teams[1] || '未知队伍')}</div>
+                    <details class="mb-3 rounded-lg border ${review.errors.length ? 'border-red-500/50' : 'border-emerald-500/50'} bg-slate-900 p-3">
+                        <summary class="cursor-pointer list-none">
+                            <div class="flex flex-wrap items-center justify-between gap-2"><div><span class="font-mono text-sm font-black text-indigo-300">${escapeReviewHtml(review.room)}</span><span class="ml-2 text-sm font-bold text-white">${escapeReviewHtml(review.teams[0] || '未知队伍')} <span class="text-slate-500">vs</span> ${escapeReviewHtml(review.teams[1] || '未知队伍')}</span></div><span class="rounded px-2 py-0.5 text-[10px] font-black ${review.errors.length ? 'bg-red-900/50 text-red-300' : 'bg-emerald-900/50 text-emerald-300'}">${review.errors.length ? '已排除 · 不下发' : '将于确认后下发'}</span></div>
+                            <div class="mt-1 flex gap-3 text-[10px] text-slate-400"><span>交卷：${review.errors.some(error => error.includes('未提交排阵')) ? '未交齐' : '已交齐'}</span><span>盘数：${review.rows.length}</span><span>点击展开明细</span></div>
+                        </summary>
+                        <div class="mt-3 border-t border-slate-700 pt-3">
                         ${review.rows.map((row, index) => `<div class="mb-2 rounded bg-slate-800 p-2"><div class="text-lg font-black text-amber-300">${escapeReviewHtml(teamTypeLabel(row.type))}</div><div class="text-[10px] text-slate-500">第 ${index + 1} 盘</div><div class="mt-1 grid grid-cols-2 gap-2 text-xs"><div><b>${escapeReviewHtml(review.teams[0])}</b><br>${row.left.map(escapeReviewHtml).join(' / ') || '<span class="text-red-400">[空缺]</span>'}</div><div><b>${escapeReviewHtml(review.teams[1])}</b><br>${row.right.map(escapeReviewHtml).join(' / ') || '<span class="text-red-400">[空缺]</span>'}</div></div></div>`).join('')}
                         ${review.errors.length ? `<div class="text-xs font-bold text-red-300">❌ ${review.errors.map(escapeReviewHtml).join('<br>❌ ')}</div>` : '<div class="text-xs font-bold text-emerald-300">✅ 完整性检查通过，待人工审核</div>'}
-                    </section>`).join('') + `<button onclick="confirmTeamDispatch()" ${dispatchableRooms.length ? '' : 'disabled'} class="w-full rounded-lg bg-emerald-600 py-2.5 text-xs font-black text-white disabled:cursor-not-allowed disabled:bg-slate-700 disabled:text-slate-500">✅ 确认并下发 ${dispatchableRooms.length} 个合法房间</button>`;
+                        </div>
+                    </details>`).join('') + `<button onclick="confirmTeamDispatch()" ${dispatchableRooms.length ? '' : 'disabled'} class="w-full rounded-lg bg-emerald-600 py-2.5 text-xs font-black text-white disabled:cursor-not-allowed disabled:bg-slate-700 disabled:text-slate-500">✅ 确认并下发 ${dispatchableRooms.length} 个合法房间</button>`;
                 window.pendingTeamDispatchRooms = dispatchableRooms;
             }
             btn.innerText = '🔍 重新扫描领队交卷并进入审核'; btn.disabled = false;
