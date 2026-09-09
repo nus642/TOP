@@ -96,9 +96,13 @@ function recovery_find_state($tasks, $live, $refs, $records, $match_id) {
     $projection = count($projection_matches) === 1 ? $projection_matches[0]['value'] : null;
     $court = count($projection_matches) === 1 ? $projection_matches[0]['court'] : null;
     if ($court === null && $task !== null) $court = trim((string)($task['court'] ?? ''));
+    // Keep identities as list values: PHP coerces numeric-string associative keys to integers.
     $owners = [];
-    foreach ($projection_matches as $match) { $candidate_owner = normalizeId($match['value']['referee'] ?? ''); if ($candidate_owner !== '') $owners[$candidate_owner] = true; }
-    $owner = count($owners) === 1 ? array_key_first($owners) : '';
+    foreach ($projection_matches as $match) {
+        $candidate_owner = normalizeId($match['value']['referee'] ?? '');
+        if ($candidate_owner !== '' && !in_array($candidate_owner, $owners, true)) $owners[] = $candidate_owner;
+    }
+    $owner = count($owners) === 1 ? $owners[0] : '';
     foreach ($refs as $key => $candidate) if ($owner !== '' && normalizeId($candidate['name'] ?? '') === $owner) $referee_matches[] = ['key'=>$key, 'value'=>$candidate];
     if (count($owners) > 1) $conflicts[] = '实时投影对应多个 owner/referee';
     if ($projection !== null && $owner === '') $conflicts[] = '实时投影缺少 owner/referee';
