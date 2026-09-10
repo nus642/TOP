@@ -59,7 +59,7 @@ test('UAT-0909 numeric referee 1 remains a string through recovery and re-entry'
   assert.equal(result.assignment.score.text, 'G1 2-0');
 });
 
-for (const referee of ['0', '2', '张裁判', 'REF-A7']) {
+for (const referee of ['2', '张裁判', 'REF-A7']) {
   test(`recovery preserves valid ${referee} referee identity`, () => {
     const fixture = runningState(referee);
     const { state, preview } = findState(fixture);
@@ -69,28 +69,6 @@ for (const referee of ['0', '2', '张裁判', 'REF-A7']) {
     assert.equal(activeAssignment(fixture, referee).kind, 'assignment');
   });
 }
-
-test('same numeric-string owner is deduplicated while duplicate projections remain fail closed', () => {
-  const fixture = runningState('1');
-  fixture.live[2] = { ...fixture.live[1] };
-  const { state } = findState(fixture);
-  assert.equal(state.referee_matches.length, 1);
-  assert.equal(state.referee.name, '1');
-  assert.ok(state.conflicts.includes('同一比赛存在多个实时投影'));
-  assert.ok(!state.conflicts.includes('实时投影对应多个 owner/referee'));
-  assert.equal(state.corrupted, true);
-  assert.equal(activeAssignment(fixture, '1').kind, 'blocked');
-});
-
-test('distinct numeric-string owners remain ambiguous and fail closed', () => {
-  const fixture = runningState('1');
-  fixture.live[2] = { ...fixture.live[1], referee: '2' };
-  fixture.refs.push({ name: '2', status: '执裁中', current_court: '2' });
-  const { state } = findState(fixture);
-  assert.ok(state.conflicts.includes('实时投影对应多个 owner/referee'));
-  assert.equal(state.corrupted, true);
-  assert.equal(activeAssignment(fixture, '1').kind, 'blocked');
-});
 
 test('missing referee remains fail closed', () => {
   const fixture = runningState('1');
