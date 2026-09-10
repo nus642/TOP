@@ -82,6 +82,7 @@ function reentryHarness(task, score = { t1: 4, t2: 3 }) {
     currentRefLevel: 'L1', currentRefereeName: 'Ref', AUTHORITATIVE_FIELD_IDS: [], $: element,
     recoveryConflict: message => calls.push(`conflict:${message}`), showToast: message => calls.push(`toast:${message}`),
     showStep: step => calls.push(`step:${step}`), renderGame: () => calls.push('render'),
+    setLiveSyncStatus() {},
     Number, String, Array,
   };
   context.window = context;
