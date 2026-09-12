@@ -41,7 +41,7 @@ node data-operation.js restore backups/modern-field-test-v1-….sql
 unset TOP_FIELD_TEST_DESTRUCTIVE_ACKNOWLEDGEMENT
 ```
 
-Reset and restore reject a missing or inexact second acknowledgement before database access. Restore also rejects symlinks, empty/non-dump files, database-selection/creation/deletion statements, and references to Legacy/system schemas. Both validate the existing target before dropping tables and verify the target/schema afterward. A failed backup remains a `.partial` file and is never reported as complete.
+Reset and restore reject a missing or inexact second acknowledgement before database access. Restore also rejects symlinks, empty/non-dump files, database-selection/creation/deletion statements, and references to Legacy/system schemas. Before dropping tables, both require the database connection itself to report the exact dedicated database identity; this deliberately does not require a healthy schema, so either operation can recover missing tables. Afterward, both require the target identity and canonical schema tables to pass verification. A failed backup remains a `.partial` file and is never reported as complete.
 
 Do not print or render `.env`: Compose supplies credentials inside the `db` container and the scripts never include them in Docker/MySQL command arguments or artifact names. Only synthetic field-test data is permitted.
 

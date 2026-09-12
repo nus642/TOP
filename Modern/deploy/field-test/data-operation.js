@@ -36,10 +36,17 @@ function mysql(sql, input) {
   return runDocker(["sh", "-ceu", "export MYSQL_PWD=\"$MYSQL_PASSWORD\"; exec mysql --batch --skip-column-names -h 127.0.0.1 -u \"$MYSQL_USER\" \"$MYSQL_DATABASE\"", "field-test-mysql"], { input: input || sql });
 }
 
-function verify() {
-  const output = mysql("SELECT CONCAT(DATABASE(), ':', COUNT(*)) FROM information_schema.tables WHERE table_schema=DATABASE() AND table_name IN ('tournaments','players','matches','waivers');").trim();
-  if (output !== "modern_field_test_v1:4") fail("post-operation database identity/schema verification failed");
-  console.log("verified Modern Field Test database identity and canonical schema");
+function verifyTargetIdentity() {
+  const output = mysql("SELECT DATABASE();").trim();
+  if (output !== "modern_field_test_v1") fail("database connection resolved to an unsafe target");
+  console.log("verified Modern Field Test database identity");
+}
+
+function verifySchema() {
+  verifyTargetIdentity();
+  const output = mysql("SELECT COUNT(*) FROM information_schema.tables WHERE table_schema=DATABASE() AND table_name IN ('tournaments','players','matches','waivers');").trim();
+  if (output !== "4") fail("canonical schema verification failed");
+  console.log("verified canonical Modern schema");
 }
 
 function dropAllTables() {
@@ -68,9 +75,9 @@ if (prepareOnly) {
 }
 
 if (operation === "verify") {
-  verify();
+  verifySchema();
 } else if (operation === "backup") {
-  verify();
+  verifySchema();
   const backupDirectory = path.join(deployDirectory, "backups");
   fs.mkdirSync(backupDirectory, { recursive: true, mode: 0o700 });
   const stamp = new Date().toISOString().replace(/[:.]/g, "-");
@@ -83,10 +90,10 @@ if (operation === "verify") {
   fs.renameSync(temporaryPath, finalPath);
   console.log(`backup created: ${path.relative(modernDirectory, finalPath)}`);
 } else if (operation === "reset") {
-  verify();
+  verifyTargetIdentity();
   dropAllTables();
   mysql("", fs.readFileSync(path.join(modernDirectory, "db.sql"), "utf8"));
-  verify();
+  verifySchema();
 } else {
   const artifact = process.argv[3];
   if (!artifact) fail("restore requires one backup artifact path");
@@ -98,8 +105,8 @@ if (operation === "verify") {
   if (!sql.startsWith("-- TOP-DATABASE: modern_field_test_v1\n") || !sql.includes("MySQL dump") || /^\s*(?:USE|CREATE\s+DATABASE|DROP\s+DATABASE)\b/im.test(sql) || /`(?:mysql|nhpa)`\s*\./i.test(sql)) {
     fail("restore artifact contains an ambiguous or unsafe database target");
   }
-  verify();
+  verifyTargetIdentity();
   dropAllTables();
   mysql("", sql);
-  verify();
+  verifySchema();
 }

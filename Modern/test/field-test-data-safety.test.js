@@ -71,3 +71,11 @@ test("restore rejects an artifact that can select an unsafe target before Docker
   assert.match(result.stderr, /ambiguous or unsafe database target/);
   assert.doesNotMatch(result.stderr, /password|test-placeholder/i);
 });
+
+test("recovery operations separate pre-drop target identity from post-operation schema health", () => {
+  const source = fs.readFileSync(path.join(__dirname, "../deploy/field-test/data-operation.js"), "utf8");
+  assert.match(source, /function verifyTargetIdentity\(\)[\s\S]*SELECT DATABASE\(\)/);
+  assert.match(source, /function verifySchema\(\)[\s\S]*verifyTargetIdentity\(\)[\s\S]*information_schema\.tables/);
+  assert.match(source, /operation === "reset"\) \{\s*verifyTargetIdentity\(\);\s*dropAllTables\(\);[\s\S]*verifySchema\(\);/);
+  assert.match(source, /verifyTargetIdentity\(\);\s*dropAllTables\(\);\s*mysql\("", sql\);\s*verifySchema\(\);/);
+});
