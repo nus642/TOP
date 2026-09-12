@@ -19,8 +19,47 @@ test('normalizes Legacy internals into the minimal venue view model', () => {
     assert.deepEqual(view.event, { code: 'EVT', name: '测试赛' });
     assert.deepEqual(view.matches[0], {
         match_id: 'M-1', court: '1', status: '比赛中', side_a: '红队1', side_b: '蓝队1',
-        score: 'G1 1-2', referee: '裁判1', relevance: 0
+        side_a_team: '', side_b_team: '', score: 'G1 1-2', referee: '裁判1', relevance: 0
     });
+});
+
+test('uses authoritative player slots as primary display for team doubles', () => {
+    const raw = dashboard(1);
+    raw.tasks['M-1'] = {
+        id: 'M-1', t1: '红队', t1p1: '张三', t1p2: '李四',
+        t2: '蓝队', t2p1: '王五', t2p2: '赵六'
+    };
+    const match = projection.fromLegacyDashboard(raw, {}).matches[0];
+    assert.equal(match.side_a, '张三 / 李四');
+    assert.equal(match.side_b, '王五 / 赵六');
+    assert.equal(match.side_a_team, '红队');
+    assert.equal(match.side_b_team, '蓝队');
+});
+
+test('uses authoritative single-player slots when present', () => {
+    const raw = dashboard(1);
+    raw.tasks['M-1'] = {
+        id: 'M-1', t1: '红队', t1p1: '张三',
+        t2: '蓝队', t2p1: '王五'
+    };
+    const match = projection.fromLegacyDashboard(raw, {}).matches[0];
+    assert.equal(match.side_a, '张三');
+    assert.equal(match.side_b, '王五');
+    assert.equal(match.side_a_team, '红队');
+    assert.equal(match.side_b_team, '蓝队');
+});
+
+test('falls back to team names when player slots are absent or unresolved', () => {
+    const raw = dashboard(1);
+    raw.tasks['M-1'] = {
+        id: 'M-1', t1: '红队', t1p1: '待定', t1p2: '',
+        t2: '蓝队'
+    };
+    const match = projection.fromLegacyDashboard(raw, {}).matches[0];
+    assert.equal(match.side_a, '红队');
+    assert.equal(match.side_b, '蓝队');
+    assert.equal(match.side_a_team, '');
+    assert.equal(match.side_b_team, '');
 });
 
 test('running precedes pending and idle is hidden by default', () => {
