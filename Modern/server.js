@@ -1,6 +1,5 @@
 require("dotenv").config();
 const express = require('express');
-const db = require("./database/db");
 const cors = require('cors');
 const bodyParser = require('body-parser');
 const path = require('node:path');
@@ -22,6 +21,13 @@ const { createSessionRouter, requireActorSession } = require("./api/session");
 
 const competitionEngine = require('./engine/competition');
 const operationsEngine = require('./engine/operations');
+const { getRuntimeConfig, validateFieldTestEnvironment } = require("./runtime-config");
+
+const fieldTestProfile = process.env.TOP_DEPLOYMENT_PROFILE === "field-test" ||
+  process.env.TOP_ENVIRONMENT === "field-test";
+if (fieldTestProfile) validateFieldTestEnvironment();
+
+const db = require("./database/db");
 
 function createApp({ actorSessions = createActorSessionStore() } = {}) {
   const app = express();
@@ -63,11 +69,11 @@ function createApp({ actorSessions = createActorSessionStore() } = {}) {
 
 
 // 启动服务
-const PORT = 3000;
 if (require.main === module) db.initDB().then(() => {
+    const runtime = getRuntimeConfig();
     const app = createApp();
-    app.listen(PORT, '0.0.0.0', () => {
-    console.log(`Server running on http://0.0.0.0:${PORT}`);
+    app.listen(runtime.port, '0.0.0.0', () => {
+    console.log(`[runtime] environment=${runtime.environment} environmentId=${runtime.environmentId} build=${runtime.buildId} port=${runtime.port}`);
 });
 }).catch(err => {
     console.error('数据库初始化失败:', err);
