@@ -37,8 +37,10 @@ function createApp({ actorSessions = createActorSessionStore() } = {}) {
   app.use("/public", express.static(path.join(__dirname, "public"), uiOptions));
   app.use("/archive", express.static(path.join(__dirname, "archive"), uiOptions));
   app.use("/presentation", express.static(path.join(__dirname, "presentation"), uiOptions));
-// Local development tools only (e.g. dev-login.html); kept outside production assets.
-app.use("/dev", express.static(path.join(__dirname, "dev"), uiOptions));
+  // Local development tools only (e.g. dev-login.html); never exposed in production.
+  if (process.env.NODE_ENV !== "production") {
+    app.use("/dev", express.static(path.join(__dirname, "dev"), uiOptions));
+  }
 
   app.use("/api/competition", requireActorSession(actorSessions), scheduleImportRoutes);
   app.use("/api/competition", competitionRoutes);

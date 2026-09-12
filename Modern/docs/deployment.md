@@ -61,6 +61,12 @@ MYSQL_PASS=<强密码>
 MYSQL_DB=nhpa
 ```
 
+> **本节是 deployment configuration 的 authoritative reference。**
+> 变量名必须与 `Modern/database/db.js` 实际读取的完全一致：`MYSQL_PASS` / `MYSQL_DB`，
+> **不是** `MYSQL_PASSWORD` / `MYSQL_DATABASE`。写错的名字会被静默忽略，
+> 应用回落到代码内默认凭据（`root` / `123456`），数据库连接失败。
+> 其它文档（含 `docs/FIRST-EVENT-RUNBOOK.md`）如与本节不一致，以本节为准。
+
 ## 3. 数据库结构初始化
 
 `Modern/db.sql` 包含全部表与 `master_operational_match_overview` 视图，
@@ -100,7 +106,12 @@ cluster 模式或多实例会导致身份会话错乱。
 
 - 主控：`/operator/master.html`
 - 裁判：`/operator/`（身份入口：赛事编号 + 花名册选名）
-- 公开记分屏：`/presentation/`（如有）
+- 公开记分屏：`/public/`（`public/index.html`，按比赛编号查看赛程、比分与已确认赛果）
+
+> `/presentation/` **不是可浏览页面**：该目录只有共享模块
+> `competition-lifecycle-status.js`，由 `/public/` 与 `/archive/` 页面通过
+> `<script src="/presentation/competition-lifecycle-status.js">` 引用，没有 `index.html`。
+> 公开记分屏的入口是 `/public/`。
 
 可选（微信内置浏览器兼容性问题或需要 80 端口时再加）：
 
