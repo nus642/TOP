@@ -71,8 +71,8 @@ cat > .env << 'EOF'
 MYSQL_HOST=localhost
 MYSQL_PORT=3306
 MYSQL_USER=top
-MYSQL_PASSWORD=你的密码
-MYSQL_DATABASE=nhpa
+MYSQL_PASS=你的密码
+MYSQL_DB=nhpa
 PORT=3000
 TZ=Asia/Shanghai
 EOF
@@ -174,8 +174,8 @@ const mysql = require('mysql2/promise');
     host: process.env.MYSQL_HOST || 'localhost',
     port: process.env.MYSQL_PORT || 3306,
     user: process.env.MYSQL_USER || 'top',
-    password: process.env.MYSQL_PASSWORD,
-    database: process.env.MYSQL_DATABASE || 'nhpa'
+    password: process.env.MYSQL_PASS,
+    database: process.env.MYSQL_DB || 'nhpa'
   });
   const tables = ['referee_dispatch_reservations','match_schedules','matches','players',
     'team_members','teams','competition_referees','court_operating_conditions',
