@@ -66,13 +66,17 @@ sudo npm install --production
 
 ### 2.3 配置环境变量
 
+> **变量名以 `Modern/docs/deployment.md` §2 为准** —— 该文档是 deployment configuration 的 authoritative reference。
+> 应用实际读取的是 `MYSQL_PASS` / `MYSQL_DB`（见 `Modern/database/db.js`）；
+> 任何其它拼写都会被静默忽略并回落到代码内默认凭据，导致数据库连接失败。
+
 ```bash
 cat > .env << 'EOF'
 MYSQL_HOST=localhost
 MYSQL_PORT=3306
 MYSQL_USER=top
-MYSQL_PASSWORD=你的密码
-MYSQL_DATABASE=nhpa
+MYSQL_PASS=你的密码
+MYSQL_DB=nhpa
 PORT=3000
 TZ=Asia/Shanghai
 EOF
@@ -167,26 +171,32 @@ BASE_URL=http://localhost:3000 node rehearsal/full-scale-rehearsal.js --verify
 如需在正式赛事前清空彩排数据：
 
 ```bash
+cd /opt/TOP/Modern
 node -e "
+require('dotenv').config();
 const mysql = require('mysql2/promise');
 (async () => {
   const c = await mysql.createConnection({
     host: process.env.MYSQL_HOST || 'localhost',
     port: process.env.MYSQL_PORT || 3306,
     user: process.env.MYSQL_USER || 'top',
-    password: process.env.MYSQL_PASSWORD,
-    database: process.env.MYSQL_DATABASE || 'nhpa'
+    password: process.env.MYSQL_PASS,
+    database: process.env.MYSQL_DB || 'nhpa'
   });
   const tables = ['referee_dispatch_reservations','match_schedules','matches','players',
-    'team_members','teams','competition_referees','court_operating_conditions',
+    'team_members','team_rooms','teams','competition_referees','court_operating_conditions',
     'court_disruptions','tournament_coordination_chronology','match_official_records',
-    'competition_standings','pairings','player_check_ins','waivers','tournaments'];
+    'competition_standings','pairings','player_partners','player_opponents',
+    'player_check_ins','waivers','tournaments'];
   for (const t of tables) await c.query('DELETE FROM ' + t);
   console.log('OK - cleared', tables.length, 'tables');
   await c.end();
 })()
 "
 ```
+
+> 表清单必须与 `Modern/db.sql` 的 `CREATE TABLE` 保持一致（当前 19 张表）。
+> `player_partners` / `player_opponents` 未声明外键，不会被任何级联删除清理，必须显式列出。
 
 ---
 
@@ -303,7 +313,7 @@ pm2 restart top-modern
 | PM2 配置 | `Modern/ecosystem.config.js` | 进程管理 |
 | 备份脚本 | `Modern/scripts/backup-db.sh` | mysqldump |
 | 彩排脚本 | `Modern/rehearsal/full-scale-rehearsal.js` | 全流程验证 |
-| 部署指南 | `Modern/docs/deployment.md` | 详细技术文档 |
+| 部署指南 | `Modern/docs/deployment.md` | 详细技术文档；**deployment configuration 的 authoritative reference**（环境变量名以其 §2 为准） |
 
 ---
 
