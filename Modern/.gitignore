@@ -1,6 +1,7 @@
 node_modules/
 .env
 *.log
+deploy/field-test/backups/
 rehearsal/.rehearsal-state.json
 dev/*
 !dev/dev-login.html
