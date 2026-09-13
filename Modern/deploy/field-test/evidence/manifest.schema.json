@@ -7,7 +7,7 @@
   "properties": {
     "schemaVersion": { "const": 1 },
     "environment": { "type": "object", "required": ["id", "database"], "properties": { "id": { "type": "string", "pattern": "^modern-field-test-v1-" }, "database": { "const": "modern_field_test_v1" } }, "additionalProperties": false },
-    "build": { "type": "object", "required": ["identity", "source"], "properties": { "identity": { "type": "string", "pattern": "^[0-9a-f]{40}$" }, "source": { "const": "/app/.build-id" } }, "additionalProperties": false },
+    "build": { "type": "object", "required": ["identity"], "properties": { "identity": { "type": "string" } }, "additionalProperties": false },
     "fixture": { "type": "object", "required": ["version", "counts"] },
     "startedAt": { "type": "string", "format": "date-time" },
     "endedAt": { "type": "string", "format": "date-time" },

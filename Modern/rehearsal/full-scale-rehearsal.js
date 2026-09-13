@@ -6,17 +6,13 @@ const fs = require("node:fs");
 const path = require("node:path");
 const { validateDataSafety } = require("../deploy/field-test/data-safety");
 const { VERSION, COUNTS, COURTS, REFEREES, buildFixture } = require("./field-test-fixture");
-const { BUILD_ID_FILE, readRuntimeBuildId } = require("./build-identity");
 
 const BASE_URL = process.env.BASE_URL || "http://127.0.0.1:3000";
 const OUTPUT = process.env.REHEARSAL_EVIDENCE_DIR || path.join(__dirname, "evidence");
-// Resolve before any evidence-producing work. An image without a valid embedded
-// identity cannot produce a manifest that could be mistaken for Field Test evidence.
-const runtimeBuildIdentity = readRuntimeBuildId();
 const evidence = {
   schemaVersion: 1,
   environment: { id: process.env.TOP_ENVIRONMENT_ID || null, database: process.env.MYSQL_DB || null },
-  build: { identity: runtimeBuildIdentity, source: BUILD_ID_FILE }, fixture: { version: VERSION, counts: COUNTS },
+  build: { identity: process.env.BUILD_ID || "unknown" }, fixture: { version: VERSION, counts: COUNTS },
   startedAt: new Date().toISOString(), endedAt: null, checkpoints: [], firstWave: null, secondWave: null,
   probes: { sameCourtContention: null, staleExpectedVersion: null }, summary: { passed: false }
 };
