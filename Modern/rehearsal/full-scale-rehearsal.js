@@ -6,13 +6,14 @@ const fs = require("node:fs");
 const path = require("node:path");
 const { validateDataSafety } = require("../deploy/field-test/data-safety");
 const { VERSION, COUNTS, COURTS, REFEREES, buildFixture } = require("./field-test-fixture");
+const { readRuntimeBuildId, BUILD_ID_FILE } = require("./build-identity");
 
 const BASE_URL = process.env.BASE_URL || "http://127.0.0.1:3000";
 const OUTPUT = process.env.REHEARSAL_EVIDENCE_DIR || path.join(__dirname, "evidence");
 const evidence = {
   schemaVersion: 1,
   environment: { id: process.env.TOP_ENVIRONMENT_ID || null, database: process.env.MYSQL_DB || null },
-  build: { identity: process.env.BUILD_ID || "unknown" }, fixture: { version: VERSION, counts: COUNTS },
+  build: { identity: null, source: BUILD_ID_FILE }, fixture: { version: VERSION, counts: COUNTS },
   startedAt: new Date().toISOString(), endedAt: null, checkpoints: [], firstWave: null, secondWave: null,
   probes: { sameCourtContention: null, staleExpectedVersion: null }, summary: { passed: false }
 };
@@ -61,6 +62,7 @@ async function complete(cookie, refereeCookie, competitionId, matchId, referee, 
 }
 
 async function run() {
+  evidence.build.identity = readRuntimeBuildId();
   const safety = validateDataSafety(process.env); assert.equal(safety.database, "modern_field_test_v1"); checkpoint("safety-guards-accepted");
   const fixture = buildFixture(); const master = await establish("synthetic-master-01", "master");
   const existing = await call("GET", "/api/competition?tournamentId=1", { cookie: master });

@@ -10,11 +10,7 @@ const { validateDataSafety } = require("./data-safety");
 const directory = __dirname;
 const envPath = path.join(directory, ".env");
 const environment = { ...(fs.existsSync(envPath) ? dotenv.parse(fs.readFileSync(envPath)) : {}), ...process.env };
-if (!environment.BUILD_ID || environment.BUILD_ID === "local-field-test") {
-  const git = spawnSync("git", ["rev-parse", "HEAD"], { cwd: path.resolve(directory, "../../.."), encoding: "utf8" });
-  if (git.status !== 0 || !/^[0-9a-f]{40}\n?$/.test(git.stdout || "")) { console.error("field-test rehearsal rejected: a build/commit identity is required"); process.exit(1); }
-  environment.BUILD_ID = git.stdout.trim();
-}
+
 try { validateDataSafety(environment); } catch (error) { console.error(`field-test rehearsal rejected: ${error.message}`); process.exit(1); }
 if (process.argv.includes("--prepare-only")) { console.log(`rehearsal preparation allowed for ${environment.TOP_ENVIRONMENT_ID}`); process.exit(0); }
 fs.mkdirSync(path.join(directory, "evidence"), { recursive: true });
