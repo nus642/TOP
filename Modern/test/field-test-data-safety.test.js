@@ -75,5 +75,5 @@ test("recovery operations separate pre-drop target identity from post-operation 
   const operator = fs.readFileSync(path.join(__dirname, "../deploy/field-test/field-test"), "utf8");
   assert.match(source, /function verifyTargetIdentity\(connection\)[\s\S]*SELECT DATABASE\(\)/);
   assert.match(source, /function verifySchema\(connection\)[\s\S]*verifyTargetIdentity\(connection\)[\s\S]*information_schema\.tables/);
-  assert.match(operator, /preflight --destructive --emit-drop-sql[\s\S]*db_mysql <"\$drops"[\s\S]*postcheck --destructive/);
+  assert.match(operator, /preflight --destructive --emit-drop-sql[\s\S]*db_mysql_destructive <"\$drops"[\s\S]*postcheck --destructive/);
 });
