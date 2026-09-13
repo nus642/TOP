@@ -1,0 +1,21 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://top.invalid/modern-field-test/rehearsal-manifest.schema.json",
+  "title": "Modern Field Test deterministic rehearsal evidence",
+  "type": "object",
+  "required": ["schemaVersion", "environment", "build", "fixture", "startedAt", "endedAt", "checkpoints", "firstWave", "secondWave", "probes", "summary"],
+  "properties": {
+    "schemaVersion": { "const": 1 },
+    "environment": { "type": "object", "required": ["id", "database"], "properties": { "id": { "type": "string", "pattern": "^modern-field-test-v1-" }, "database": { "const": "modern_field_test_v1" } }, "additionalProperties": false },
+    "build": { "type": "object", "required": ["identity"], "properties": { "identity": { "type": "string" } }, "additionalProperties": false },
+    "fixture": { "type": "object", "required": ["version", "counts"] },
+    "startedAt": { "type": "string", "format": "date-time" },
+    "endedAt": { "type": "string", "format": "date-time" },
+    "checkpoints": { "type": "array", "items": { "type": "object", "required": ["name", "passed"] } },
+    "firstWave": { "type": ["object", "null"] },
+    "secondWave": { "type": ["object", "null"] },
+    "probes": { "type": "object", "required": ["sameCourtContention", "staleExpectedVersion"] },
+    "summary": { "type": "object", "required": ["passed"] }
+  },
+  "additionalProperties": false
+}

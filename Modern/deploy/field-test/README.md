@@ -45,4 +45,16 @@ Reset and restore reject a missing or inexact second acknowledgement before data
 
 Do not print or render `.env`: Compose supplies credentials inside the `db` container and the scripts never include them in Docker/MySQL command arguments or artifact names. Only synthetic field-test data is permitted.
 
-Fixture extraction, turnover waves, failure injection, device rehearsal, UI watermarking, and production eligibility remain explicitly deferred.
+## Deterministic rehearsal
+
+After an operator performs the separately acknowledged reset above, this single repository-defined command loads and verifies the canonical synthetic fixture and runs both live-operations waves and the conflict probes:
+
+```bash
+npm run field-test:rehearsal
+```
+
+The command reuses all Field Test identity checks, targets only the running app in this pinned Compose project, and **never resets data**. It fails closed if tournament 1 already exists. The fixture is `modern-field-test-rehearsal-v1`: one competition, 25 pairs/50 synthetic players, 60 matches in 10 rounds, six courts, and six synthetic referees. The first wave dispatches, accepts, starts, scores, and confirms six matches. Its released court/referee are then used by a real second match. Two matches concurrently contend for C1 (exactly one must succeed), and a stale `expectedVersion` dispatch must leave its match unchanged. These probes are real MySQL evidence only when this command completes against the isolated Compose stack; unit tests do not make that claim.
+
+Every attempt writes `deploy/field-test/evidence/latest.json` through the app's evidence-only bind mount. Generated manifests are ignored and mode 0600; the committed `evidence/manifest.schema.json` documents their sanitized shape. Evidence contains environment/build identity, fixture counts, timestamps, checkpoints, turnover/probe outcomes, and pass/fail only—never credentials, cookies, environment dumps, or participant inputs. Archive a reviewed manifest outside the working tree if retention is required. Reset and rerun to demonstrate equivalent fixture state; do not run a second rehearsal over existing data.
+
+Real-device/browser evidence, interruption and restart recovery, Lighthouse/Nginx/HTTPS deployment, UI watermarking, real participant data, production cutover, and production eligibility remain explicitly deferred.
