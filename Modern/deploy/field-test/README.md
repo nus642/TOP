@@ -22,4 +22,27 @@ docker compose config
 
 Before any future start, confirm the rendered configuration contains one app service, no database `ports`, an app binding beginning with `127.0.0.1`, and no unexpected credential values. Do not paste rendered environment values into logs, issues, or pull requests.
 
-Destructive reset, backup/restore automation, fixture extraction, turnover waves, failure injection, device rehearsal, UI watermarking, and production eligibility are explicitly deferred.
+## Repository-defined data safety operations
+
+These commands are pinned to this Compose file, project directory, and the `db` service. They validate the exact database, non-root user, Compose hostname, environment identity, and acknowledgement before invoking Docker. They neither require nor invoke a host MySQL client.
+
+```bash
+# Verify database identity and four canonical schema tables.
+node data-operation.js verify
+
+# Write a mode-0600, timestamped SQL artifact under ignored backups/.
+node data-operation.js backup
+
+# Reset from the repository-controlled ../../db.sql schema.
+# Restore from a single-database mysqldump artifact.
+export TOP_FIELD_TEST_DESTRUCTIVE_ACKNOWLEDGEMENT=DESTROY-MODERN-FIELD-TEST-V1-DATA
+node data-operation.js reset
+node data-operation.js restore backups/modern-field-test-v1-….sql
+unset TOP_FIELD_TEST_DESTRUCTIVE_ACKNOWLEDGEMENT
+```
+
+Reset and restore reject a missing or inexact second acknowledgement before database access. Restore also rejects symlinks, empty/non-dump files, database-selection/creation/deletion statements, and references to Legacy/system schemas. Before dropping tables, both require the database connection itself to report the exact dedicated database identity; this deliberately does not require a healthy schema, so either operation can recover missing tables. Afterward, both require the target identity and canonical schema tables to pass verification. A failed backup remains a `.partial` file and is never reported as complete.
+
+Do not print or render `.env`: Compose supplies credentials inside the `db` container and the scripts never include them in Docker/MySQL command arguments or artifact names. Only synthetic field-test data is permitted.
+
+Fixture extraction, turnover waves, failure injection, device rehearsal, UI watermarking, and production eligibility remain explicitly deferred.
