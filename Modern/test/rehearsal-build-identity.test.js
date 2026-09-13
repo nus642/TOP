@@ -51,9 +51,9 @@ test("Compose cannot override image identity at container runtime", () => {
   assert.doesNotMatch(runtimeEnvironment, /BUILD_ID/);
 });
 
-test("rehearsal wrapper never injects a host BUILD_ID with compose exec", () => {
-  const wrapper = fs.readFileSync(path.join(__dirname, "../deploy/field-test/rehearsal.js"), "utf8");
+test("field-test wrapper never injects a host BUILD_ID with compose exec", () => {
+  const wrapper = fs.readFileSync(path.join(__dirname, "../deploy/field-test/field-test"), "utf8");
   assert.doesNotMatch(wrapper, /rev-parse/);
-  assert.doesNotMatch(wrapper, /["']-e["']/);
-  assert.match(wrapper, /"exec", "-T", "app"/);
+  assert.doesNotMatch(wrapper, /BUILD_ID/);
+  assert.match(wrapper, /compose exec -T app node/);
 });

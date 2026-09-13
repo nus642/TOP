@@ -1,0 +1,95 @@
+#!/bin/sh
+set -eu
+
+directory=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
+compose_file=$directory/compose.yaml
+env_file=$directory/.env
+temporary_files=
+umask 077
+
+cleanup() {
+  for file in $temporary_files; do rm -f -- "$file"; done
+}
+trap cleanup EXIT HUP INT TERM
+
+die() { printf '%s\n' "field-test operation rejected: $*" >&2; exit 1; }
+
+if docker info >/dev/null 2>&1; then
+  use_sudo=false
+elif command -v sudo >/dev/null 2>&1 && sudo docker info >/dev/null 2>&1; then
+  use_sudo=true
+else
+  die "Docker is unavailable (including through sudo)"
+fi
+
+compose() {
+  if [ "$use_sudo" = true ]; then
+    sudo docker compose --project-directory "$directory" --env-file "$env_file" -f "$compose_file" "$@"
+  else
+    docker compose --project-directory "$directory" --env-file "$env_file" -f "$compose_file" "$@"
+  fi
+}
+
+app_node() { compose exec -T app node "$@"; }
+app_node_destructive() { compose exec -T -e "TOP_FIELD_TEST_DESTRUCTIVE_ACKNOWLEDGEMENT=${TOP_FIELD_TEST_DESTRUCTIVE_ACKNOWLEDGEMENT-}" app node "$@"; }
+db_mysql() { compose exec -T db sh -ceu 'export MYSQL_PWD="$MYSQL_PASSWORD"; exec mysql --batch --skip-column-names -h 127.0.0.1 -u "$MYSQL_USER" "$MYSQL_DATABASE"' field-test-mysql; }
+db_verify_target() {
+  target=$(printf 'SELECT DATABASE();\n' | db_mysql)
+  [ "$target" = modern_field_test_v1 ] || die "db mysql resolved to an unsafe destructive target"
+}
+db_mysql_destructive() {
+  db_verify_target
+  db_mysql
+}
+
+operation=${1:-}
+case "$operation" in
+  verify)
+    [ "$#" -eq 1 ] || die "usage: $0 verify"
+    app_node deploy/field-test/data-operation.js verify
+    ;;
+  backup)
+    [ "$#" -eq 1 ] || die "usage: $0 backup"
+    app_node deploy/field-test/data-operation.js preflight
+    mkdir -p -- "$directory/backups"
+    raw=$(mktemp "$directory/backups/.backup.XXXXXX")
+    staged=$(mktemp "$directory/backups/.backup.XXXXXX")
+    temporary_files="$raw $staged"
+    compose exec -T db sh -ceu 'export MYSQL_PWD="$MYSQL_PASSWORD"; exec mysqldump --single-transaction --routines --triggers --set-gtid-purged=OFF -h 127.0.0.1 -u "$MYSQL_USER" "$MYSQL_DATABASE"' field-test-backup >"$raw"
+    app_node deploy/field-test/data-operation.js validate-backup <"$raw" >"$staged"
+    stamp=$(date -u '+%Y-%m-%dT%H-%M-%SZ')
+    final=$directory/backups/modern-field-test-v1-$stamp.sql
+    mv -- "$staged" "$final"
+    temporary_files=$raw
+    printf 'backup created: %s\n' "$final"
+    ;;
+  reset|restore)
+    if [ "$operation" = reset ]; then
+      [ "$#" -eq 1 ] || die "usage: $0 reset"
+    else
+      [ "$#" -eq 2 ] || die "usage: $0 restore BACKUP.sql"
+      [ -f "$2" ] && [ ! -L "$2" ] || die "restore artifact must be a regular, non-symlink file"
+      staged=$(mktemp "$directory/.restore.XXXXXX")
+      temporary_files=$staged
+      app_node_destructive deploy/field-test/data-operation.js validate-restore --destructive <"$2" >"$staged"
+    fi
+    drops=$(mktemp "$directory/.drops.XXXXXX")
+    temporary_files="$temporary_files $drops"
+    app_node_destructive deploy/field-test/data-operation.js preflight --destructive --emit-drop-sql >"$drops"
+    db_mysql_destructive <"$drops"
+    if [ "$operation" = reset ]; then
+      db_verify_target
+      compose exec -T db sh -ceu 'export MYSQL_PWD="$MYSQL_PASSWORD"; exec mysql -h 127.0.0.1 -u "$MYSQL_USER" "$MYSQL_DATABASE" < /docker-entrypoint-initdb.d/001-schema.sql' field-test-reset
+    else
+      db_mysql_destructive <"$staged"
+    fi
+    app_node_destructive deploy/field-test/data-operation.js postcheck --destructive
+    ;;
+  rehearsal)
+    [ "$#" -eq 1 ] || die "usage: $0 rehearsal"
+    app_node deploy/field-test/data-operation.js preflight
+    compose exec -T --user root app sh -ceu 'chown node:node /app/rehearsal/evidence; chmod 0700 /app/rehearsal/evidence'
+    app_node rehearsal/full-scale-rehearsal.js
+    ;;
+  *) die "usage: $0 verify|backup|reset|restore BACKUP.sql|rehearsal" ;;
+esac
