@@ -30,6 +30,10 @@ async function establish(actorId, actorType) {
   assert.ok(result.cookie, "session cookie expected"); return result.cookie;
 }
 async function overview(cookie, competitionId) { return (await call("GET", `/api/master-operations/${competitionId}/matches`, { cookie })).json.matches; }
+async function courtState(cookie, competitionId, courtId) {
+  const live = await call("GET", `/api/master-workflow/${competitionId}/live-status`, { cookie });
+  return live.json.courts.find((court) => court.courtId === courtId);
+}
 function status(match) {
   if (["confirmed", "finished"].includes(match.operationStatus)) return "confirmed";
   if (["scored", "awaiting_confirmation"].includes(match.operationStatus)) return "scored";
@@ -82,9 +86,21 @@ async function run() {
   const winnerIndex = contention.findIndex((result) => result.ok); const loserIndex = 1 - winnerIndex;
   matches = await overview(master, competitionId); const winner = matches.find((m) => m.matchId === contenders[winnerIndex].matchId); const loser = matches.find((m) => m.matchId === contenders[loserIndex].matchId);
   assert.ok(winner.referee?.dispatchId); assert.equal(status(loser), "available"); evidence.probes.sameCourtContention = { passed: true, successes: 1, rejections: 1, loserUnchanged: true };
-  const stale = await dispatch(master, competitionId, loser, REFEREES[loserIndex], "stale-version", (loser.referee?.dispatchVersion ?? 0) + 1, true); assert.equal(stale.ok, false);
-  const loserAfter = (await overview(master, competitionId)).find((m) => m.matchId === loser.matchId); assert.equal(status(loserAfter), "available"); assert.equal(loserAfter.referee?.dispatchVersion ?? 0, loser.referee?.dispatchVersion ?? 0);
-  evidence.probes.staleExpectedVersion = { passed: true, rejected: true, stateUnchanged: true };
+  // Isolate optimistic-concurrency evidence from the C1 contention: C2 and referee 03 are free.
+  const staleTarget = matches[7]; const staleReferee = REFEREES[2]; const staleVersion = staleTarget.referee?.dispatchVersion ?? 0;
+  assert.equal(staleTarget.schedule.courtId, COURTS[1]); assert.equal(status(staleTarget), "available");
+  const courtBeforeStale = await courtState(master, competitionId, COURTS[1]); assert.equal(courtBeforeStale.condition, "available");
+  const stale = await dispatch(master, competitionId, staleTarget, staleReferee, "stale-version", staleVersion + 1, true);
+  assert.equal(stale.status, 409); assert.match(stale.json.error || "", /^STALE_DISPATCH_VERSION:/);
+  const staleTargetAfter = (await overview(master, competitionId)).find((m) => m.matchId === staleTarget.matchId);
+  const courtAfterStale = await courtState(master, competitionId, COURTS[1]);
+  assert.equal(status(staleTargetAfter), "available"); assert.equal(staleTargetAfter.referee?.refereeId, null); assert.equal(staleTargetAfter.referee?.dispatchId, null);
+  assert.equal(staleTargetAfter.referee?.dispatchVersion ?? 0, staleVersion); assert.deepEqual(courtAfterStale, courtBeforeStale);
+  // A valid control dispatch must succeed, proving the rejected transaction left no hidden reservation.
+  await dispatch(master, competitionId, staleTargetAfter, staleReferee, "stale-control", staleVersion);
+  const control = (await overview(master, competitionId)).find((m) => m.matchId === staleTarget.matchId);
+  await call("POST", `/api/master-workflow/${competitionId}/matches/${control.matchId}/withdraw`, { cookie: master, body: { reason: "synthetic stale-probe cleanup", expectedVersion: control.referee.dispatchVersion, correlationId: correlation("stale-control:withdraw") } });
+  evidence.probes.staleExpectedVersion = { passed: true, rejectionCode: "STALE_DISPATCH_VERSION", stateUnchanged: true, noAssignment: true, courtUnchanged: true, controlDispatchSucceeded: true };
   await complete(master, refereeCookies[winnerIndex], competitionId, winner.matchId, REFEREES[winnerIndex], "wave2");
   evidence.secondWave = { passed: true, completedMatches: 1, reusedCourt: COURTS[0], reusedReferee: REFEREES[winnerIndex], resourcesReleased: true }; checkpoint("second-turnover-wave-complete");
   evidence.summary = { passed: true, checkpointCount: evidence.checkpoints.length };

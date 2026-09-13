@@ -20,3 +20,12 @@ test("evidence schema is committed while generated evidence is ignored", () => {
   const schema = JSON.parse(fs.readFileSync(path.join(__dirname, "../deploy/field-test/evidence/manifest.schema.json"), "utf8"));
   assert.equal(schema.properties.environment.properties.database.const, "modern_field_test_v1"); assert.ok(schema.required.includes("probes")); assert.ok(schema.required.includes("secondWave"));
 });
+
+test("stale-version runtime probe is isolated and requires its exact rejection reason", () => {
+  const runner = fs.readFileSync(path.join(__dirname, "../rehearsal/full-scale-rehearsal.js"), "utf8");
+  assert.match(runner, /const staleTarget = matches\[7\].*REFEREES\[2\]/);
+  assert.match(runner, /assert\.equal\(stale\.status, 409\)/);
+  assert.match(runner, /assert\.match\(stale\.json\.error.*\^STALE_DISPATCH_VERSION:/);
+  assert.match(runner, /assert\.deepEqual\(courtAfterStale, courtBeforeStale\)/);
+  assert.match(runner, /controlDispatchSucceeded: true/);
+});
