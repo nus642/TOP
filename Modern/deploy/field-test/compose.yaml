@@ -6,13 +6,12 @@ services:
       context: ../..
       dockerfile: Dockerfile
       args:
-        BUILD_ID: ${BUILD_ID:-local-field-test}
+        BUILD_ID: ${BUILD_ID:?Set BUILD_ID to the exact 40-hex source commit being built}
     environment:
       NODE_ENV: production
       TOP_ENVIRONMENT: field-test
       TOP_ENVIRONMENT_ID: ${TOP_ENVIRONMENT_ID:?Set an explicit field-test environment ID}
       TOP_FIELD_TEST_ACKNOWLEDGEMENT: ${TOP_FIELD_TEST_ACKNOWLEDGEMENT:?Acknowledge MODERN-FIELD-TEST-V1}
-      BUILD_ID: ${BUILD_ID:-local-field-test}
       PORT: "3000"
       MYSQL_HOST: db
       MYSQL_PORT: "3306"

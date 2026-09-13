@@ -20,6 +20,23 @@ docker compose config --quiet
 docker compose config
 ```
 
+Build from a clean checkout and explicitly bind the image to that checkout's
+full commit identity:
+
+```bash
+test -z "$(git status --porcelain)"
+BUILD_ID="$(git rev-parse --verify HEAD^{commit})" docker compose build app
+```
+
+`BUILD_ID` is a build input only. The Dockerfile rejects anything other than a
+40-character lowercase commit SHA, stores it in the image label
+`org.opencontainers.image.revision`, and writes it to `/app/.build-id`. Compose
+does not set a runtime `BUILD_ID`, so an environment override cannot change the
+identity used by rehearsal evidence. After the app is running, execute the
+rehearsal with `node rehearsal.js`; that wrapper intentionally supplies no
+host-checkout identity to `docker compose exec`. The evidence manifest reads
+the identity from `/app/.build-id` inside the running container.
+
 Before any future start, confirm the rendered configuration contains one app service, no database `ports`, an app binding beginning with `127.0.0.1`, and no unexpected credential values. Do not paste rendered environment values into logs, issues, or pull requests.
 
 ## Repository-defined data safety operations

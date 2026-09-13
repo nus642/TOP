@@ -21,9 +21,11 @@ const fs = require("node:fs");
 const path = require("node:path");
 const assert = require("node:assert/strict");
 const { randomUUID } = require("node:crypto");
+const { readRuntimeBuildId } = require("./build-identity");
 
 const BASE_URL = process.env.BASE_URL || "http://localhost:3000";
 const STATE_FILE = path.join(__dirname, ".rehearsal-state.json");
+const MANIFEST_FILE = path.join(__dirname, ".rehearsal-evidence-manifest.json");
 
 const COURTS = ["C1", "C2", "C3", "C4", "C5", "C6"];
 const REFEREES = ["裁判甲", "裁判乙", "裁判丙", "裁判丁", "裁判戊", "裁判己"];
@@ -114,6 +116,8 @@ async function overview(masterCookie, competitionId) {
 // ---------------------------------------------------------------- phases
 
 async function runFullRehearsal() {
+  const buildId = readRuntimeBuildId();
+  console.log(`Runtime artifact BUILD_ID = ${buildId}`);
   step("0. 主控身份建立");
   const masterCookie = await establish(MASTER_ID, "master");
 
@@ -246,12 +250,22 @@ async function runFullRehearsal() {
   assert.equal(dispatchStatusOf(current), "waiting_acceptance", "reassigned match should await acceptance");
   console.log(`比赛 ${nextMatch.matchId} 撤回后已换派给 ${REFEREES[1]}`);
 
-  fs.writeFileSync(STATE_FILE, JSON.stringify({ competitionId, savedAt: new Date().toISOString() }, null, 2));
+  const savedAt = new Date().toISOString();
+  fs.writeFileSync(STATE_FILE, JSON.stringify({ competitionId, savedAt }, null, 2));
+  fs.writeFileSync(MANIFEST_FILE, JSON.stringify({
+    evidenceType: "modern-field-test-rehearsal",
+    buildId,
+    buildIdentitySource: "/app/.build-id",
+    competitionId,
+    completedAt: savedAt
+  }, null, 2));
   step("彩排全部通过 ✔");
   console.log(`状态已写入 ${STATE_FILE}；可重启服务后运行 --verify 验证状态恢复。`);
 }
 
 async function runPostRestartVerification() {
+  const buildId = readRuntimeBuildId();
+  console.log(`Runtime artifact BUILD_ID = ${buildId}`);
   if (!fs.existsSync(STATE_FILE)) {
     throw new Error(`缺少 ${STATE_FILE}，请先运行完整彩排。`);
   }
@@ -264,6 +278,13 @@ async function runPostRestartVerification() {
   assert.equal(confirmed.length, 6, "six confirmed results survive restart");
   const reassigned = matches.find((m) => m.referee?.refereeId === REFEREES[1] && dispatchStatusOf(m) === "waiting_acceptance");
   assert.ok(reassigned, "reassigned dispatch survives restart");
+  fs.writeFileSync(MANIFEST_FILE, JSON.stringify({
+    evidenceType: "modern-field-test-rehearsal-restart-verification",
+    buildId,
+    buildIdentitySource: "/app/.build-id",
+    competitionId,
+    completedAt: new Date().toISOString()
+  }, null, 2));
   console.log(`赛事 ${competitionId}：60 场在库、6 场已确认、换派场仍等待接单。状态恢复 ✔`);
 }
 
