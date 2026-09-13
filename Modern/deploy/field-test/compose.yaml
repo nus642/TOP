@@ -20,6 +20,8 @@ services:
       MYSQL_PASS: ${MYSQL_PASS:?Set a unique field-test database password}
     ports:
       - "127.0.0.1:${APP_HOST_PORT:-3000}:3000"
+    volumes:
+      - ./evidence:/app/rehearsal/evidence
     depends_on:
       db:
         condition: service_healthy
