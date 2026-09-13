@@ -3,6 +3,7 @@
 const FIELD_TEST_ACKNOWLEDGEMENT = "MODERN-FIELD-TEST-V1";
 const DESTRUCTIVE_ACKNOWLEDGEMENT = "DESTROY-MODERN-FIELD-TEST-V1-DATA";
 const DATABASE = "modern_field_test_v1";
+const BACKUP_HEADER = `-- TOP-DATABASE: ${DATABASE}\n`;
 const ENVIRONMENT_ID_PATTERN = /^modern-field-test-v1-[a-z0-9][a-z0-9-]*$/;
 
 function required(environment, name) {
@@ -11,6 +12,26 @@ function required(environment, name) {
     throw new Error(`Field-test data operation requires ${name}`);
   }
   return value.trim();
+}
+
+function artifactText(artifact) {
+  if (!Buffer.isBuffer(artifact) || artifact.length < 100) {
+    throw new Error("artifact must contain a non-empty MySQL dump");
+  }
+  return artifact.toString("utf8");
+}
+
+function validateBackupDump(artifact) {
+  const text = artifactText(artifact);
+  if (!text.includes("MySQL dump")) throw new Error("backup artifact usability check failed");
+  return Buffer.concat([Buffer.from(BACKUP_HEADER), artifact]);
+}
+
+function validateRestoreArtifact(artifact) {
+  const text = artifactText(artifact);
+  if (!text.startsWith(BACKUP_HEADER) || !text.includes("MySQL dump") || /^\s*(?:USE|CREATE\s+DATABASE|DROP\s+DATABASE)\b/im.test(text) || /`(?:mysql|nhpa)`\s*\./i.test(text)) {
+    throw new Error("restore artifact contains an ambiguous or unsafe database target");
+  }
 }
 
 function validateDataSafety(environment, { destructive = false } = {}) {
@@ -44,5 +65,7 @@ function validateDataSafety(environment, { destructive = false } = {}) {
 module.exports = {
   DATABASE,
   DESTRUCTIVE_ACKNOWLEDGEMENT,
-  validateDataSafety
+  validateBackupDump,
+  validateDataSafety,
+  validateRestoreArtifact
 };

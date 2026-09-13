@@ -1,7 +1,6 @@
 const test = require("node:test");
 const assert = require("node:assert/strict");
 const fs = require("node:fs");
-const os = require("node:os");
 const path = require("node:path");
 const { spawnSync } = require("node:child_process");
 
@@ -59,12 +58,11 @@ test("destructive operations require their separate exact acknowledgement", () =
   assert.doesNotThrow(() => validateDataSafety({ ...validEnvironment(), TOP_FIELD_TEST_DESTRUCTIVE_ACKNOWLEDGEMENT: DESTRUCTIVE_ACKNOWLEDGEMENT }, { destructive: true }));
 });
 
-test("restore rejects an artifact that can select an unsafe target before Docker runs", () => {
-  const directory = fs.mkdtempSync(path.join(os.tmpdir(), "field-test-restore-"));
-  const artifact = path.join(directory, "unsafe.sql");
-  fs.writeFileSync(artifact, `-- MySQL dump\nUSE nhpa;\n${"-".repeat(120)}\n`);
-  const result = spawnSync(process.execPath, [path.join(__dirname, "../deploy/field-test/data-operation.js"), "restore", artifact], {
+test("restore rejects an artifact that can select an unsafe target before database access", () => {
+  const artifact = `-- TOP-DATABASE: modern_field_test_v1\n-- MySQL dump\nUSE nhpa;\n${"-".repeat(120)}\n`;
+  const result = spawnSync(process.execPath, [path.join(__dirname, "../deploy/field-test/data-operation.js"), "validate-restore", "--destructive"], {
     encoding: "utf8",
+    input: artifact,
     env: { ...process.env, ...validEnvironment(), TOP_FIELD_TEST_DESTRUCTIVE_ACKNOWLEDGEMENT: DESTRUCTIVE_ACKNOWLEDGEMENT }
   });
   assert.notEqual(result.status, 0);
@@ -74,8 +72,8 @@ test("restore rejects an artifact that can select an unsafe target before Docker
 
 test("recovery operations separate pre-drop target identity from post-operation schema health", () => {
   const source = fs.readFileSync(path.join(__dirname, "../deploy/field-test/data-operation.js"), "utf8");
-  assert.match(source, /function verifyTargetIdentity\(\)[\s\S]*SELECT DATABASE\(\)/);
-  assert.match(source, /function verifySchema\(\)[\s\S]*verifyTargetIdentity\(\)[\s\S]*information_schema\.tables/);
-  assert.match(source, /operation === "reset"\) \{\s*verifyTargetIdentity\(\);\s*dropAllTables\(\);[\s\S]*verifySchema\(\);/);
-  assert.match(source, /verifyTargetIdentity\(\);\s*dropAllTables\(\);\s*mysql\("", sql\);\s*verifySchema\(\);/);
+  const operator = fs.readFileSync(path.join(__dirname, "../deploy/field-test/field-test"), "utf8");
+  assert.match(source, /function verifyTargetIdentity\(connection\)[\s\S]*SELECT DATABASE\(\)/);
+  assert.match(source, /function verifySchema\(connection\)[\s\S]*verifyTargetIdentity\(connection\)[\s\S]*information_schema\.tables/);
+  assert.match(operator, /preflight --destructive --emit-drop-sql[\s\S]*db_mysql <"\$drops"[\s\S]*postcheck --destructive/);
 });

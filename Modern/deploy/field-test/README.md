@@ -33,7 +33,7 @@ BUILD_ID="$(git rev-parse --verify HEAD^{commit})" docker compose build app
 `org.opencontainers.image.revision`, and writes it to `/app/.build-id`. Compose
 does not set a runtime `BUILD_ID`, so an environment override cannot change the
 identity used by rehearsal evidence. After the app is running, execute the
-rehearsal with `node rehearsal.js`; that wrapper intentionally supplies no
+rehearsal with `./field-test rehearsal`; that wrapper intentionally supplies no
 host-checkout identity to `docker compose exec`. The evidence manifest reads
 the identity from `/app/.build-id` inside the running container.
 
@@ -41,20 +41,20 @@ Before any future start, confirm the rendered configuration contains one app ser
 
 ## Repository-defined data safety operations
 
-These commands are pinned to this Compose file, project directory, and the `db` service. They validate the exact database, non-root user, Compose hostname, environment identity, and acknowledgement before invoking Docker. They neither require nor invoke a host MySQL client.
+These commands are pinned to this Compose file and project directory. The host wrapper only orchestrates Docker: Node validation runs in `app`, while `mysql` and `mysqldump` run in `db`. They require neither host Node/npm nor a host MySQL client. When Docker requires elevation, the wrapper uses `sudo docker`.
 
 ```bash
 # Verify database identity and four canonical schema tables.
-node data-operation.js verify
+./field-test verify
 
 # Write a mode-0600, timestamped SQL artifact under ignored backups/.
-node data-operation.js backup
+./field-test backup
 
 # Reset from the repository-controlled ../../db.sql schema.
 # Restore from a single-database mysqldump artifact.
 export TOP_FIELD_TEST_DESTRUCTIVE_ACKNOWLEDGEMENT=DESTROY-MODERN-FIELD-TEST-V1-DATA
-node data-operation.js reset
-node data-operation.js restore backups/modern-field-test-v1-….sql
+./field-test reset
+./field-test restore backups/modern-field-test-v1-….sql
 unset TOP_FIELD_TEST_DESTRUCTIVE_ACKNOWLEDGEMENT
 ```
 
@@ -67,7 +67,7 @@ Do not print or render `.env`: Compose supplies credentials inside the `db` cont
 After an operator performs the separately acknowledged reset above, this single repository-defined command loads and verifies the canonical synthetic fixture and runs both live-operations waves and the conflict probes:
 
 ```bash
-npm run field-test:rehearsal
+./field-test rehearsal
 ```
 
 The command reuses all Field Test identity checks, targets only the running app in this pinned Compose project, and **never resets data**. It fails closed if tournament 1 already exists. The fixture is `modern-field-test-rehearsal-v1`: one competition, 25 pairs/50 synthetic players, 60 matches in 10 rounds, six courts, and six synthetic referees. The first wave dispatches, accepts, starts, scores, and confirms six matches. Its released court/referee are then used by a real second match. Two matches concurrently contend for C1 (exactly one must succeed). The stale-version probe independently uses otherwise-free C2 and referee 03, requires the exact `STALE_DISPATCH_VERSION` rejection, compares match assignment/version and full Court state, and follows with a valid control dispatch to prove no hidden reservation was left. These probes are real MySQL evidence only when this command completes against the isolated Compose stack; unit tests do not make that claim.

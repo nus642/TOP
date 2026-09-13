@@ -1,112 +1,93 @@
 #!/usr/bin/env node
 "use strict";
 
-const fs = require("node:fs");
-const path = require("node:path");
-const { spawnSync } = require("node:child_process");
-const dotenv = require("dotenv");
-const { validateDataSafety } = require("./data-safety");
+const mysql = require("mysql2/promise");
+const {
+  validateBackupDump,
+  validateDataSafety,
+  validateRestoreArtifact
+} = require("./data-safety");
 
-const deployDirectory = __dirname;
-const modernDirectory = path.resolve(deployDirectory, "../..");
-const composeArguments = ["compose", "--project-directory", deployDirectory, "--env-file", path.join(deployDirectory, ".env"), "-f", path.join(deployDirectory, "compose.yaml")];
-const operation = process.argv[2];
-const prepareOnly = process.argv.includes("--prepare-only");
-const destructive = operation === "reset" || operation === "restore";
+const action = process.argv[2];
+const destructive = process.argv.includes("--destructive");
 
 function fail(message) {
   console.error(`field-test data operation rejected: ${message}`);
   process.exit(1);
 }
 
-function runDocker(args, options = {}) {
-  const result = spawnSync("docker", [...composeArguments, "exec", "-T", "db", ...args], {
-    cwd: deployDirectory,
-    encoding: options.encoding === undefined ? "utf8" : options.encoding,
-    input: options.input,
-    maxBuffer: 64 * 1024 * 1024
+async function connectionFor(environment) {
+  return mysql.createConnection({
+    host: environment.MYSQL_HOST,
+    port: Number(environment.MYSQL_PORT),
+    database: environment.MYSQL_DB,
+    user: environment.MYSQL_USER,
+    password: environment.MYSQL_PASS
   });
-  if (result.error || result.status !== 0) {
-    fail(result.error ? "Docker Compose is unavailable" : "the isolated db service rejected the operation");
+}
+
+async function verifyTargetIdentity(connection) {
+  const [rows] = await connection.query("SELECT DATABASE() AS database_name");
+  if (rows.length !== 1 || rows[0].database_name !== "modern_field_test_v1") {
+    throw new Error("database connection resolved to an unsafe target");
   }
-  return result.stdout;
 }
 
-function mysql(sql, input) {
-  return runDocker(["sh", "-ceu", "export MYSQL_PWD=\"$MYSQL_PASSWORD\"; exec mysql --batch --skip-column-names -h 127.0.0.1 -u \"$MYSQL_USER\" \"$MYSQL_DATABASE\"", "field-test-mysql"], { input: input || sql });
+async function verifySchema(connection) {
+  await verifyTargetIdentity(connection);
+  const [rows] = await connection.query("SELECT COUNT(*) AS table_count FROM information_schema.tables WHERE table_schema=DATABASE() AND table_name IN ('tournaments','players','matches','waivers')");
+  if (Number(rows[0]?.table_count) !== 4) throw new Error("canonical schema verification failed");
 }
 
-function verifyTargetIdentity() {
-  const output = mysql("SELECT DATABASE();").trim();
-  if (output !== "modern_field_test_v1") fail("database connection resolved to an unsafe target");
-  console.log("verified Modern Field Test database identity");
-}
-
-function verifySchema() {
-  verifyTargetIdentity();
-  const output = mysql("SELECT COUNT(*) FROM information_schema.tables WHERE table_schema=DATABASE() AND table_name IN ('tournaments','players','matches','waivers');").trim();
-  if (output !== "4") fail("canonical schema verification failed");
-  console.log("verified canonical Modern schema");
-}
-
-function dropAllTables() {
-  const names = mysql("SELECT table_name FROM information_schema.tables WHERE table_schema=DATABASE() ORDER BY table_name;").trim().split("\n").filter(Boolean);
-  if (names.some((name) => !/^[A-Za-z0-9_]+$/.test(name))) fail("database returned an unsafe table identifier");
-  if (names.length) mysql(`SET FOREIGN_KEY_CHECKS=0; ${names.map((name) => `DROP TABLE IF EXISTS \`${name}\``).join("; ")}; SET FOREIGN_KEY_CHECKS=1;`);
-}
-
-if (!["backup", "reset", "restore", "verify"].includes(operation)) {
-  fail("usage: data-operation.js backup|reset|restore|verify [backup.sql] [--prepare-only]");
-}
-
-const envFile = path.join(deployDirectory, ".env");
-let fileEnvironment = {};
-if (fs.existsSync(envFile)) fileEnvironment = dotenv.parse(fs.readFileSync(envFile));
-const environment = { ...fileEnvironment, ...process.env };
-let safety;
-try {
-  safety = validateDataSafety(environment, { destructive });
-} catch (error) {
-  fail(error.message);
-}
-if (prepareOnly) {
-  console.log(`${operation} preparation allowed for ${safety.environmentId}`);
-  process.exit(0);
-}
-
-if (operation === "verify") {
-  verifySchema();
-} else if (operation === "backup") {
-  verifySchema();
-  const backupDirectory = path.join(deployDirectory, "backups");
-  fs.mkdirSync(backupDirectory, { recursive: true, mode: 0o700 });
-  const stamp = new Date().toISOString().replace(/[:.]/g, "-");
-  const finalPath = path.join(backupDirectory, `${safety.environmentId}-${stamp}.sql`);
-  const temporaryPath = `${finalPath}.partial`;
-  const rawDump = runDocker(["sh", "-ceu", "export MYSQL_PWD=\"$MYSQL_PASSWORD\"; exec mysqldump --single-transaction --routines --triggers --set-gtid-purged=OFF -h 127.0.0.1 -u \"$MYSQL_USER\" \"$MYSQL_DATABASE\"", "field-test-backup"]);
-  const dump = `-- TOP-DATABASE: modern_field_test_v1\n${rawDump}`;
-  fs.writeFileSync(temporaryPath, dump, { mode: 0o600 });
-  if (fs.statSync(temporaryPath).size < 100 || !dump.includes("MySQL dump")) fail("backup artifact usability check failed");
-  fs.renameSync(temporaryPath, finalPath);
-  console.log(`backup created: ${path.relative(modernDirectory, finalPath)}`);
-} else if (operation === "reset") {
-  verifyTargetIdentity();
-  dropAllTables();
-  mysql("", fs.readFileSync(path.join(modernDirectory, "db.sql"), "utf8"));
-  verifySchema();
-} else {
-  const artifact = process.argv[3];
-  if (!artifact) fail("restore requires one backup artifact path");
-  const resolved = path.resolve(artifact);
-  let stat;
-  try { stat = fs.lstatSync(resolved); } catch { fail("restore artifact does not exist"); }
-  if (!stat.isFile() || stat.isSymbolicLink() || stat.size < 100) fail("restore artifact must be a non-empty regular file");
-  const sql = fs.readFileSync(resolved, "utf8");
-  if (!sql.startsWith("-- TOP-DATABASE: modern_field_test_v1\n") || !sql.includes("MySQL dump") || /^\s*(?:USE|CREATE\s+DATABASE|DROP\s+DATABASE)\b/im.test(sql) || /`(?:mysql|nhpa)`\s*\./i.test(sql)) {
-    fail("restore artifact contains an ambiguous or unsafe database target");
+async function safeDropStatements(connection) {
+  const [rows] = await connection.query("SELECT table_name FROM information_schema.tables WHERE table_schema=DATABASE() ORDER BY table_name");
+  const names = rows.map((row) => row.TABLE_NAME || row.table_name);
+  if (names.some((name) => typeof name !== "string" || !/^[A-Za-z0-9_]+$/.test(name))) {
+    throw new Error("database returned an unsafe table identifier");
   }
-  verifyTargetIdentity();
-  dropAllTables();
-  mysql("", sql);
-  verifySchema();
+  if (!names.length) return "SELECT 1;\n";
+  return `SET FOREIGN_KEY_CHECKS=0;\n${names.map((name) => `DROP TABLE IF EXISTS \`${name}\`;`).join("\n")}\nSET FOREIGN_KEY_CHECKS=1;\n`;
 }
+
+async function readStdin() {
+  const chunks = [];
+  for await (const chunk of process.stdin) chunks.push(chunk);
+  return Buffer.concat(chunks);
+}
+
+async function main() {
+  if (!action || !["verify", "preflight", "postcheck", "validate-backup", "validate-restore"].includes(action)) {
+    fail("usage: data-operation.js verify|preflight|postcheck|validate-backup|validate-restore [--destructive] [--emit-drop-sql]");
+  }
+
+  const environment = process.env;
+  validateDataSafety(environment, { destructive });
+
+  if (action === "validate-backup") {
+    process.stdout.write(validateBackupDump(await readStdin()));
+    return;
+  }
+  if (action === "validate-restore") {
+    const artifact = await readStdin();
+    validateRestoreArtifact(artifact);
+    process.stdout.write(artifact);
+    return;
+  }
+
+  const connection = await connectionFor(environment);
+  try {
+    if (action === "verify" || action === "postcheck") {
+      await verifySchema(connection);
+      console.error("verified Modern Field Test database identity and canonical schema");
+      return;
+    }
+    await verifyTargetIdentity(connection);
+    if (!destructive) await verifySchema(connection);
+    if (process.argv.includes("--emit-drop-sql")) process.stdout.write(await safeDropStatements(connection));
+    console.error(`field-test ${destructive ? "destructive " : ""}preflight passed`);
+  } finally {
+    await connection.end();
+  }
+}
+
+main().catch((error) => fail(error.message));
