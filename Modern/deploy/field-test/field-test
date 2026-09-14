@@ -29,6 +29,7 @@ compose() {
     docker compose --project-directory "$directory" --env-file "$env_file" -f "$compose_file" "$@"
   fi
 }
+docker_command() { if [ "$use_sudo" = true ]; then sudo docker "$@"; else docker "$@"; fi; }
 
 app_node() { compose exec -T app node "$@"; }
 app_node_destructive() { compose exec -T -e "TOP_FIELD_TEST_DESTRUCTIVE_ACKNOWLEDGEMENT=${TOP_FIELD_TEST_DESTRUCTIVE_ACKNOWLEDGEMENT-}" app node "$@"; }
@@ -99,5 +100,48 @@ case "$operation" in
     compose exec -T --user root app sh -ceu 'chown node:node /app/rehearsal/evidence; chmod 0700 /app/rehearsal/evidence'
     app_node rehearsal/event-scale-rehearsal.js
     ;;
-  *) die "usage: $0 verify|backup|reset|restore BACKUP.sql|rehearsal|event-scale-rehearsal" ;;
+  app-restart-continuity)
+    [ "$#" -eq 1 ] || die "usage: $0 app-restart-continuity"
+    app_node deploy/field-test/data-operation.js preflight
+    services=$(compose config --services)
+    [ "$(printf '%s\n' "$services" | wc -l)" -eq 2 ] &&
+      printf '%s\n' "$services" | grep -qx app && printf '%s\n' "$services" | grep -qx db ||
+      die "expected exactly the pinned app and db services"
+    db_before=$(compose ps -q db)
+    app_before=$(compose ps -q app)
+    [ -n "$db_before" ] && [ -n "$app_before" ] || die "app and db must already be running"
+    app_image=$(docker_command inspect --format '{{.Image}}' "$app_before")
+    app_revision=$(docker_command inspect --format '{{index .Config.Labels "org.opencontainers.image.revision"}}' "$app_before")
+    db_started=$(docker_command inspect --format '{{.State.StartedAt}}' "$db_before")
+    [ -n "$app_image" ] && [ -n "$app_revision" ] && [ -n "$db_started" ] || die "runtime identity inspection failed"
+    state_sql='SELECT id,status,COALESCE(referee_id,""),COALESCE(dispatch_id,""),COALESCE(dispatch_version,0),COALESCE(score1,""),COALESCE(score2,"") FROM matches ORDER BY id; SELECT tournament_id,court_id,condition_name,version FROM court_operating_conditions ORDER BY tournament_id,court_id; SELECT competition_id,match_id,dispatch_id,referee_id,court_id,expected_version,correlation_id,accepted_at,rejected_at,rejected_reason FROM referee_dispatch_reservations ORDER BY competition_id,match_id,dispatch_id; SELECT tournament_id,match_id,referee_id,score1,score2 FROM match_official_records ORDER BY tournament_id,match_id;'
+    published=$(compose port app 3000 | sed 's/.*://')
+    command -v curl >/dev/null 2>&1 && [ -n "$published" ] || die "curl and the published app port are required"
+    compose exec -T --user root app sh -ceu 'chown node:node /app/rehearsal/evidence; chmod 0700 /app/rehearsal/evidence'
+    app_node rehearsal/app-restart-continuity.js before
+    durable_before=$(printf '%s\n' "$state_sql" | db_mysql)
+    compose stop app
+    [ "$(docker_command inspect --format '{{.State.Status}}' "$app_before")" = exited ] || die "app did not reach stopped state"
+    if curl --silent --show-error --fail --max-time 2 "http://127.0.0.1:$published/api/session/me" >/dev/null 2>&1; then die "app HTTP remained available during failure"; fi
+    [ "$(compose ps -q db)" = "$db_before" ] || die "db container identity changed during app failure"
+    [ "$(docker_command inspect --format '{{.State.StartedAt}}' "$db_before")" = "$db_started" ] || die "db StartedAt changed during app failure"
+    [ "$(docker_command inspect --format '{{.State.Status}}' "$db_before")" = running ] || die "db was not running during app failure"
+    [ "$(docker_command inspect --format '{{if .State.Health}}{{.State.Health.Status}}{{end}}' "$db_before")" = healthy ] || die "db was not healthy during app failure"
+    durable_during=$(printf '%s\n' "$state_sql" | db_mysql)
+    [ "$durable_during" = "$durable_before" ] || die "authoritative database state changed during app failure"
+    compose start app
+    [ "$(compose ps -q db)" = "$db_before" ] || die "db container identity changed; continuity evidence is invalid"
+    [ "$(compose ps -q app)" = "$app_before" ] || die "app container was recreated; expected stop/start only"
+    [ "$(docker_command inspect --format '{{.Image}}' "$app_before")" = "$app_image" ] || die "app image identity changed"
+    [ "$(docker_command inspect --format '{{index .Config.Labels "org.opencontainers.image.revision"}}' "$app_before")" = "$app_revision" ] || die "app OCI revision changed"
+    compose exec -T \
+      -e "RESTART_APP_CONTAINER_ID=$app_before" -e RESTART_APP_STOPPED=true -e RESTART_HTTP_UNAVAILABLE=true \
+      -e "RESTART_APP_IMAGE_ID=$app_image" -e "RESTART_OCI_REVISION=$app_revision" \
+      -e "RESTART_DB_CONTAINER_ID=$db_before" -e "RESTART_DB_STARTED_AT=$db_started" \
+      -e RESTART_DB_SAME_CONTAINER=true -e RESTART_DB_SAME_STARTED_AT=true \
+      -e RESTART_DB_RUNNING=true -e RESTART_DB_HEALTHY=true \
+      -e RESTART_DB_READ_ONLY_QUERY_SUCCEEDED=true -e RESTART_DB_STATE_UNCHANGED=true \
+      app node rehearsal/app-restart-continuity.js after
+    ;;
+  *) die "usage: $0 verify|backup|reset|restore BACKUP.sql|rehearsal|event-scale-rehearsal|app-restart-continuity" ;;
 esac

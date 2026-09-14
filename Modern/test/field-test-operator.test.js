@@ -16,10 +16,21 @@ function harness({ failPreflight = false, failDump = false, failNormalization = 
   for (const command of ["node", "npm"]) {
     fs.writeFileSync(path.join(directory, command), `#!/bin/sh\necho host-${command} >>"$TRACE"\nexit 99\n`, { mode: 0o755 });
   }
+  fs.writeFileSync(path.join(directory, "curl"), "#!/bin/sh\nexit 7\n", { mode: 0o755 });
   fs.writeFileSync(path.join(directory, "docker"), `#!/bin/sh
 echo "$*" >>"$TRACE"
 [ "$1" = info ] && exit 0
 case "$*" in
+  *"compose.yaml config --services"*) printf 'app\ndb\n' ;;
+  *"compose.yaml ps -q db"*) printf 'db-container-id\n' ;;
+  *"compose.yaml ps -q app"*) printf 'app-container-id\n' ;;
+  *"compose.yaml port app 3000"*) printf '127.0.0.1:3000\n' ;;
+  *"inspect --format {{.Image}} app-container-id"*) printf 'sha256:image-id\n' ;;
+  *"inspect --format {{index .Config.Labels"*) printf '0123456789abcdef0123456789abcdef01234567\n' ;;
+  *"inspect --format {{.State.StartedAt}} db-container-id"*) printf '2026-09-14T00:00:00Z\n' ;;
+  *"inspect --format {{.State.Status}} app-container-id"*) printf 'exited\n' ;;
+  *"inspect --format {{.State.Status}} db-container-id"*) printf 'running\n' ;;
+  *"inspect --format {{if .State.Health}}"*) printf 'healthy\n' ;;
   *"db sh"*"mysqldump"*)
     printf '%s\n' '-- partial MySQL dump'
     ${failDump ? "exit 29" : "exit 0"} ;;
@@ -66,6 +77,39 @@ test("canonical host verify and rehearsal paths invoke Node only through app", (
   assert.doesNotMatch(trace, /host-(?:node|npm)/);
   assert.match(trace, /exec -T app node deploy\/field-test\/data-operation\.js verify/);
   assert.match(trace, /exec -T app node rehearsal\/full-scale-rehearsal\.js/);
+});
+
+test("app restart continuity stops and starts only app while preserving container identities", () => {
+  const fixture = harness();
+  assert.equal(run(["app-restart-continuity"], fixture).status, 0);
+  const trace = fs.readFileSync(fixture.log, "utf8");
+  assert.match(trace, /exec -T app node rehearsal\/app-restart-continuity\.js before/);
+  assert.match(trace, /compose\.yaml stop app/);
+  assert.match(trace, /compose\.yaml start app/);
+  assert.match(trace, /app node rehearsal\/app-restart-continuity\.js after/);
+  assert.match(trace, /RESTART_APP_STOPPED=true/);
+  assert.match(trace, /RESTART_HTTP_UNAVAILABLE=true/);
+  assert.match(trace, /RESTART_DB_SAME_CONTAINER=true/);
+  assert.match(trace, /RESTART_DB_SAME_STARTED_AT=true/);
+  assert.match(trace, /RESTART_DB_RUNNING=true/);
+  assert.match(trace, /RESTART_DB_HEALTHY=true/);
+  assert.match(trace, /RESTART_DB_READ_ONLY_QUERY_SUCCEEDED=true/);
+  assert.match(trace, /RESTART_DB_STATE_UNCHANGED=true/);
+  assert.doesNotMatch(trace, /(?:stop|start|restart|rm) db/);
+  assert.doesNotMatch(trace, /(?:down|up|create|recreate)/);
+});
+
+test("restart continuity reservation projection uses only canonical schema columns", () => {
+  const source = fs.readFileSync(operator, "utf8");
+  const schema = fs.readFileSync(path.join(modern, "db.sql"), "utf8");
+  const projection = source.match(/SELECT ([^;]+) FROM referee_dispatch_reservations ORDER BY ([^;]+);/);
+  assert.ok(projection, "reservation continuity projection expected");
+  assert.equal(projection[1], "competition_id,match_id,dispatch_id,referee_id,court_id,expected_version,correlation_id,accepted_at,rejected_at,rejected_reason");
+  assert.equal(projection[2], "competition_id,match_id,dispatch_id");
+  const table = schema.match(/CREATE TABLE IF NOT EXISTS referee_dispatch_reservations \(([\s\S]*?)\n\)/)?.[1];
+  assert.ok(table, "canonical reservation schema expected");
+  for (const column of projection[1].split(",")) assert.match(table, new RegExp(`\\n\\s*${column}\\s`), `${column} must exist in canonical schema`);
+  assert.doesNotMatch(projection[1], /(?:^|,)tournament_id(?:,|$)|(?:^|,)status(?:,|$)/);
 });
 
 test("failed destructive preflight cannot reach a db command", () => {
