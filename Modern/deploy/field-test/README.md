@@ -119,3 +119,11 @@ The separate manual Lighthouse prerequisite is intentionally two-session and mus
 Neither watchdog-only command creates a backup, restores data, or issues a competition mutation. Evidence is run-specific under `evidence/db-recovery/RUN_ID/` with private file modes.
 
 The host controller pins one Docker access mode before arming: direct `docker`, or non-interactive `sudo -n docker`. In sudo mode it proves password-cache-independent foreground and detached-session access before pause; the watchdog receives only that validated mode plus the immutable container ID and can still perform only the exact-ID `unpause` action.
+
+Before authorizing the Lighthouse DB recovery run, execute the disposable MySQL 8.4 JSON dump/restore proof from the repository's `Modern` directory:
+
+```sh
+TOP_MYSQL_84_JSON_STABILITY=1 node --test --test-name-pattern='MySQL 8.4 JSON byte stability' test/db-recovery-continuity.test.js
+```
+
+The opt-in test starts an isolated `mysql:8.4` container with no published ports, fails unless the server reports MySQL 8.4, inserts the reviewed JSON value matrix, captures `HEX(CAST(payload AS BINARY))`, dumps with the Field Test backup options, restores into a second disposable database, and requires exact byte equality. It removes only the exact disposable container ID it created and never addresses a Field Test or Legacy database.
