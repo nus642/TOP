@@ -6,7 +6,7 @@ const path = require("node:path");
 const test = require("node:test");
 const fieldTest = require("../rehearsal/field-test-fixture");
 const { VERSION, COUNTS, COURTS, REFEREES, buildFixture } = require("../rehearsal/event-scale-fixture");
-const { assertNoConcurrentResources, buildUsageEvidence } = require("../rehearsal/event-scale-accounting");
+const { assertNoConcurrentResources, buildUsageEvidence, waveEntryName } = require("../rehearsal/event-scale-accounting");
 const { validateImportData } = require("../services/schedule-import.service");
 
 test("event-scale fixture has exact deterministic full-event shape", () => {
@@ -54,10 +54,19 @@ test("concurrent-resource integrity check rejects duplicate courts and referees"
   ]), /referee has multiple concurrent/);
 });
 
+test("matches in one wave receive distinct deterministic accept correlation identities", () => {
+  const matchIds = [101, 102, 103, 104, 105, 106, 107, 108];
+  const first = matchIds.map((matchId, index) => `${VERSION}:${waveEntryName(4, index, matchId)}:accept`);
+  const second = matchIds.map((matchId, index) => `${VERSION}:${waveEntryName(4, index, matchId)}:accept`);
+  assert.deepEqual(first, second);
+  assert.equal(new Set(first).size, matchIds.length);
+});
+
 test("event-scale remains separate and preserves integrity probes", () => {
   assert.deepEqual(fieldTest.COUNTS, { competitions: 1, pairs: 25, players: 50, matches: 60, courts: 6, referees: 6, rounds: 10 });
   const runner = fs.readFileSync(path.join(__dirname, "../rehearsal/event-scale-rehearsal.js"), "utf8");
   assert.match(runner, /sameCourtContention/); assert.match(runner, /STALE_DISPATCH_VERSION/);
   assert.match(runner, /assertNoConcurrentResources\(dispatched\.map/);
+  assert.match(runner, /complete\([^\n]+name\)/);
   assert.match(runner, /confirmed, COUNTS\.matches/);
 });

@@ -7,7 +7,7 @@ const path = require("node:path");
 const { validateDataSafety } = require("../deploy/field-test/data-safety");
 const { VERSION, COUNTS, COURTS, REFEREES, buildFixture } = require("./event-scale-fixture");
 const { readRuntimeBuildId, BUILD_ID_FILE } = require("./build-identity");
-const { assertNoConcurrentResources, buildUsageEvidence } = require("./event-scale-accounting");
+const { assertNoConcurrentResources, buildUsageEvidence, waveEntryName } = require("./event-scale-accounting");
 
 const BASE_URL = process.env.BASE_URL || "http://127.0.0.1:3000";
 const OUTPUT = process.env.REHEARSAL_EVIDENCE_DIR || path.join(__dirname, "evidence");
@@ -85,11 +85,12 @@ async function run() {
 
   async function exerciseWave(wave) {
     assertNoConcurrentResources(wave.map(({ match, referee }) => ({ courtId: match.schedule.courtId, refereeId: referee })));
-    await Promise.all(wave.map(({ match, referee }, index) => dispatch(master, competitionId, match, referee, `wave${waveNumber}:${index}`)));
+    const entries = wave.map(({ match, referee }, index) => ({ match, referee, name: waveEntryName(waveNumber, index, match.matchId) }));
+    await Promise.all(entries.map(({ match, referee, name }) => dispatch(master, competitionId, match, referee, name)));
     const active = await overview(master, competitionId);
     const dispatched = active.filter((match) => status(match) === "dispatched");
     assertNoConcurrentResources(dispatched.map((match) => ({ courtId: match.schedule.courtId, refereeId: match.referee.refereeId })));
-    await Promise.all(wave.map(({ match, referee }) => complete(master, refereeCookies[referee], competitionId, match.matchId, referee, `wave${waveNumber}`)));
+    await Promise.all(entries.map(({ match, referee, name }) => complete(master, refereeCookies[referee], competitionId, match.matchId, referee, name)));
     assignments.push(...wave.map(({ match, referee }) => ({ courtId: match.schedule.courtId, refereeId: referee })));
     const after = await overview(master, competitionId);
     assert.equal(after.filter((match) => ["dispatched", "accepted", "playing"].includes(status(match))).length, 0);

@@ -26,4 +26,8 @@ function assertNoConcurrentResources(assignments) {
   if (new Set(referees).size !== referees.length) throw new Error("a referee has multiple concurrent active matches");
 }
 
-module.exports = { assertNoConcurrentResources, buildUsageEvidence };
+function waveEntryName(waveNumber, entryIndex, matchId) {
+  return `wave${waveNumber}:entry${entryIndex}:match${matchId}`;
+}
+
+module.exports = { assertNoConcurrentResources, buildUsageEvidence, waveEntryName };
