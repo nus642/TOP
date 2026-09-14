@@ -87,6 +87,14 @@ test("app restart continuity stops and starts only app while preserving containe
   assert.match(trace, /compose\.yaml stop app/);
   assert.match(trace, /compose\.yaml start app/);
   assert.match(trace, /app node rehearsal\/app-restart-continuity\.js after/);
+  assert.match(trace, /RESTART_APP_STOPPED=true/);
+  assert.match(trace, /RESTART_HTTP_UNAVAILABLE=true/);
+  assert.match(trace, /RESTART_DB_SAME_CONTAINER=true/);
+  assert.match(trace, /RESTART_DB_SAME_STARTED_AT=true/);
+  assert.match(trace, /RESTART_DB_RUNNING=true/);
+  assert.match(trace, /RESTART_DB_HEALTHY=true/);
+  assert.match(trace, /RESTART_DB_READ_ONLY_QUERY_SUCCEEDED=true/);
+  assert.match(trace, /RESTART_DB_STATE_UNCHANGED=true/);
   assert.doesNotMatch(trace, /(?:stop|start|restart|rm) db/);
   assert.doesNotMatch(trace, /(?:down|up|create|recreate)/);
 });

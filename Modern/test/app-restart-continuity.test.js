@@ -25,3 +25,12 @@ test("restart evidence preserves all approved phase distinctions", () => {
     "continuation-operation-complete", "final-integrity"
   ]) assert.ok(source.includes(phase), `missing evidence phase ${phase}`);
 });
+
+test("failure checkpoints consume sanitized host observations", () => {
+  for (const field of [
+    "RESTART_APP_STOPPED", "RESTART_HTTP_UNAVAILABLE", "RESTART_DB_SAME_CONTAINER",
+    "RESTART_DB_SAME_STARTED_AT", "RESTART_DB_RUNNING", "RESTART_DB_HEALTHY",
+    "RESTART_DB_READ_ONLY_QUERY_SUCCEEDED", "RESTART_DB_STATE_UNCHANGED"
+  ]) assert.ok(source.includes(`observed("${field}")`), `missing host observation ${field}`);
+  assert.doesNotMatch(source, /rawDb|databaseContents|environmentDump/);
+});

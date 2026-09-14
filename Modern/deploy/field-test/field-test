@@ -134,7 +134,14 @@ case "$operation" in
     [ "$(compose ps -q app)" = "$app_before" ] || die "app container was recreated; expected stop/start only"
     [ "$(docker_command inspect --format '{{.Image}}' "$app_before")" = "$app_image" ] || die "app image identity changed"
     [ "$(docker_command inspect --format '{{index .Config.Labels "org.opencontainers.image.revision"}}' "$app_before")" = "$app_revision" ] || die "app OCI revision changed"
-    compose exec -T -e "RESTART_APP_CONTAINER_ID=$app_before" -e "RESTART_APP_IMAGE_ID=$app_image" -e "RESTART_OCI_REVISION=$app_revision" -e "RESTART_DB_CONTAINER_ID=$db_before" -e "RESTART_DB_STARTED_AT=$db_started" app node rehearsal/app-restart-continuity.js after
+    compose exec -T \
+      -e "RESTART_APP_CONTAINER_ID=$app_before" -e RESTART_APP_STOPPED=true -e RESTART_HTTP_UNAVAILABLE=true \
+      -e "RESTART_APP_IMAGE_ID=$app_image" -e "RESTART_OCI_REVISION=$app_revision" \
+      -e "RESTART_DB_CONTAINER_ID=$db_before" -e "RESTART_DB_STARTED_AT=$db_started" \
+      -e RESTART_DB_SAME_CONTAINER=true -e RESTART_DB_SAME_STARTED_AT=true \
+      -e RESTART_DB_RUNNING=true -e RESTART_DB_HEALTHY=true \
+      -e RESTART_DB_READ_ONLY_QUERY_SUCCEEDED=true -e RESTART_DB_STATE_UNCHANGED=true \
+      app node rehearsal/app-restart-continuity.js after
     ;;
   *) die "usage: $0 verify|backup|reset|restore BACKUP.sql|rehearsal|event-scale-rehearsal|app-restart-continuity" ;;
 esac
