@@ -17,6 +17,11 @@
             "additionalProperties": false
           },
     "fixture": { "type": "object", "required": ["version", "counts"] },
+    "profile": { "enum": ["event-scale"] },
+    "target": { "type": "object" },
+    "actual": { "type": "object", "required": ["exercisedMatches", "completedMatches", "confirmedMatches"] },
+    "usage": { "type": ["object", "null"] },
+    "integrity": { "type": "object" },
     "startedAt": { "type": "string", "format": "date-time" },
     "endedAt": { "type": "string", "format": "date-time" },
     "checkpoints": { "type": "array", "items": { "type": "object", "required": ["name", "passed"] } },

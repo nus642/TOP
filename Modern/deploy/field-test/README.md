@@ -72,6 +72,17 @@ After an operator performs the separately acknowledged reset above, this single 
 
 The command reuses all Field Test identity checks, targets only the running app in this pinned Compose project, and **never resets data**. It fails closed if tournament 1 already exists. The fixture is `modern-field-test-rehearsal-v1`: one competition, 25 pairs/50 synthetic players, 60 matches in 10 rounds, six courts, and six synthetic referees. The first wave dispatches, accepts, starts, scores, and confirms six matches. Its released court/referee are then used by a real second match. Two matches concurrently contend for C1 (exactly one must succeed). The stale-version probe independently uses otherwise-free C2 and referee 03, requires the exact `STALE_DISPATCH_VERSION` rejection, compares match assignment/version and full Court state, and follows with a valid control dispatch to prove no hidden reservation was left. These probes are real MySQL evidence only when this command completes against the isolated Compose stack; unit tests do not make that claim.
 
+For the separate full-event operational profile, reset explicitly and run
+`./field-test event-scale-rehearsal`. It imports the deterministic
+`modern-event-scale-rehearsal-2026-09-12-v1` fixture (80 synthetic players/40
+pairs, 156 matches, 8 courts, 10 referees, and 20 scheduling rounds), then
+dispatches, accepts, starts, scores, and confirms every match in repeated
+resource-turnover waves. The first eight referees initially cover C1-C8; the
+ordinary deterministic rotation subsequently brings referees 9 and 10 across
+the courts. This is an integrity rehearsal, not a throughput benchmark. It
+retains both contention and stale-write probes and the same isolation,
+no-auto-reset, and runtime-build-identity boundaries as the fast profile.
+
 Every attempt writes `deploy/field-test/evidence/latest.json` through the app's evidence-only bind mount. Generated manifests are ignored and mode 0600; the committed `evidence/manifest.schema.json` documents their sanitized shape. Evidence contains environment/build identity, fixture counts, timestamps, checkpoints, turnover/probe outcomes, and pass/fail only—never credentials, cookies, environment dumps, or participant inputs. Archive a reviewed manifest outside the working tree if retention is required. Reset and rerun to demonstrate equivalent fixture state; do not run a second rehearsal over existing data.
 
 Real-device/browser evidence, interruption and restart recovery, Lighthouse/Nginx/HTTPS deployment, UI watermarking, real participant data, production cutover, and production eligibility remain explicitly deferred.
