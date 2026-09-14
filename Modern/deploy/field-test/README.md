@@ -127,3 +127,11 @@ TOP_MYSQL_84_JSON_STABILITY=1 node --test --test-name-pattern='MySQL 8.4 JSON by
 ```
 
 The opt-in test starts an isolated `mysql:8.4` container with no published ports, fails unless the server reports MySQL 8.4, inserts the reviewed JSON value matrix, captures `HEX(CAST(payload AS BINARY))`, dumps with the Field Test backup options, restores into a second disposable database, and requires exact byte equality. It removes only the exact disposable container ID it created and never addresses a Field Test or Legacy database.
+
+On Lighthouse, where Node is intentionally unavailable on the host, run the canonical host-shell prerequisite instead:
+
+```sh
+./field-test db-recovery-json-stability-proof
+```
+
+This dedicated command does not inspect or connect to the Modern Field Test stack and requires no destructive acknowledgement. Host POSIX shell owns all Docker orchestration; it selects direct Docker or `sudo -n docker`, publishes no port, mounts no socket, creates no named network or volume, and removes only the immutable ID of its one disposable `mysql:8.4` container. A successful command emits one safe JSON evidence record. It is safe to run before the watchdog-only proof or DB recovery rehearsal.

@@ -1,0 +1,86 @@
+#!/bin/sh
+set -eu
+
+umask 077
+image=mysql:8.4
+root_password=disposable-json-stability-only
+source_db=top_json_stability_source
+restored_db=top_json_stability_restored
+container_id=
+temporary_directory=
+
+die() { printf '%s\n' "JSON stability proof rejected: $*" >&2; exit 1; }
+
+if docker info >/dev/null 2>&1; then
+  docker_access_mode=direct
+  docker_command() { docker "$@"; }
+elif command -v sudo >/dev/null 2>&1 && sudo -n -k docker info >/dev/null 2>&1; then
+  docker_access_mode=sudo-n
+  docker_command() { sudo -n docker "$@"; }
+else
+  die "Docker unavailable through direct access or sudo -n"
+fi
+
+cleanup() {
+  if [ -n "$container_id" ]; then
+    case "$container_id" in
+      *[!0-9a-f]*|'') return ;;
+    esac
+    [ "${#container_id}" -eq 64 ] && docker_command rm --force "$container_id" >/dev/null 2>&1 || true
+  fi
+  [ -z "$temporary_directory" ] || rm -rf -- "$temporary_directory"
+}
+trap cleanup EXIT HUP INT TERM
+
+temporary_directory=$(mktemp -d "${TMPDIR:-/tmp}/top-json-stability.XXXXXX")
+container_name="top-json-stability-$$-$(date +%s)"
+container_id=$(docker_command run --detach --rm --name "$container_name" --env "MYSQL_ROOT_PASSWORD=$root_password" "$image")
+case "$container_id" in *[!0-9a-f]*|'') die "Docker did not return an immutable lowercase container ID";; esac
+[ "${#container_id}" -eq 64 ] || die "Docker did not return an immutable 64-hex container ID"
+
+attempt=0
+until docker_command exec -e "MYSQL_PWD=$root_password" "$container_id" mysqladmin ping -h 127.0.0.1 -uroot --silent >/dev/null 2>&1; do
+  attempt=$((attempt + 1))
+  [ "$attempt" -lt 90 ] || die "disposable MySQL did not become ready"
+  sleep 1
+done
+
+identity=$(printf 'SELECT VERSION(), @@version_comment;\n' | docker_command exec -i -e "MYSQL_PWD=$root_password" "$container_id" mysql --batch --skip-column-names -uroot)
+version=$(printf '%s\n' "$identity" | awk -F '\t' 'NR==1 {print $1}')
+version_comment=$(printf '%s\n' "$identity" | awk -F '\t' 'NR==1 {print $2}')
+case "$version" in 8.4|8.4.*) ;; *) die "server is not MySQL 8.4";; esac
+case "$version_comment" in *MySQL\ Community\ Server*|*MySQL\ Enterprise\ Server*) ;; *) die "server is not Oracle MySQL";; esac
+
+cat <<'SQL' | docker_command exec -i -e "MYSQL_PWD=$root_password" "$container_id" mysql --default-character-set=utf8mb4 -uroot
+CREATE DATABASE top_json_stability_source CHARACTER SET utf8mb4;
+CREATE DATABASE top_json_stability_restored CHARACTER SET utf8mb4;
+USE top_json_stability_source;
+CREATE TABLE json_stability_cases (
+  id INT NOT NULL PRIMARY KEY,
+  label VARCHAR(40) NOT NULL,
+  payload JSON NOT NULL
+);
+INSERT INTO json_stability_cases VALUES
+  (1, 'multi-key-object', JSON_OBJECT('zeta', 1, 'alpha', 'two', 'middle', FALSE)),
+  (2, 'nested-object', JSON_OBJECT('outer', JSON_OBJECT('child', JSON_OBJECT('enabled', TRUE, 'value', NULL)))),
+  (3, 'array', JSON_ARRAY(1, 'two', FALSE, NULL, JSON_OBJECT('nested', JSON_ARRAY(3, 4)))),
+  (4, 'numeric-values', JSON_OBJECT('largeInteger', 9007199254740993, 'decimal', 123.456, 'negative', -7)),
+  (5, 'booleans', JSON_OBJECT('yes', TRUE, 'no', FALSE)),
+  (6, 'strings', JSON_OBJECT('ascii', 'pickleball', 'unicode', '匹克球', 'escaped', 'quote"slash\\')),
+  (7, 'json-null', CAST('null' AS JSON));
+SQL
+
+snapshot_sql="SET time_zone = '+00:00'; SELECT id,label,HEX(CAST(payload AS BINARY)) FROM json_stability_cases ORDER BY id;"
+printf '%s\n' "$snapshot_sql" | docker_command exec -i -e "MYSQL_PWD=$root_password" "$container_id" mysql --batch --skip-column-names --default-character-set=utf8mb4 -uroot "$source_db" >"$temporary_directory/before.tsv"
+[ "$(wc -l <"$temporary_directory/before.tsv" | tr -d ' ')" -eq 7 ] || die "JSON matrix snapshot is incomplete"
+
+docker_command exec -e "MYSQL_PWD=$root_password" "$container_id" mysqldump \
+  --single-transaction --routines --triggers --no-tablespaces \
+  --set-gtid-purged=OFF --default-character-set=utf8mb4 \
+  -uroot "$source_db" >"$temporary_directory/dump.sql"
+docker_command exec -i -e "MYSQL_PWD=$root_password" "$container_id" mysql --default-character-set=utf8mb4 -uroot "$restored_db" <"$temporary_directory/dump.sql"
+printf '%s\n' "$snapshot_sql" | docker_command exec -i -e "MYSQL_PWD=$root_password" "$container_id" mysql --batch --skip-column-names --default-character-set=utf8mb4 -uroot "$restored_db" >"$temporary_directory/after.tsv"
+cmp "$temporary_directory/before.tsv" "$temporary_directory/after.tsv" >/dev/null || die "server-derived JSON bytes changed across dump/restore"
+
+digest=$(sha256sum "$temporary_directory/before.tsv" | awk '{print $1}')
+printf '{"event":"mysql84-json-stability-proof","passed":true,"image":"mysql:8.4","version":"%s","dockerAccessMode":"%s","containerId":"%s","caseCount":7,"representation":"HEX(CAST(payload AS BINARY))","digest":"%s"}\n' "$version" "$docker_access_mode" "$container_id" "$digest"

@@ -16,7 +16,7 @@ die() { printf '%s\n' "field-test operation rejected: $*" >&2; exit 1; }
 
 if docker info >/dev/null 2>&1; then
   use_sudo=false
-elif command -v sudo >/dev/null 2>&1 && sudo docker info >/dev/null 2>&1; then
+elif command -v sudo >/dev/null 2>&1 && sudo -n docker info >/dev/null 2>&1; then
   use_sudo=true
 else
   die "Docker is unavailable (including through sudo)"
@@ -143,6 +143,10 @@ case "$operation" in
       -e RESTART_DB_READ_ONLY_QUERY_SUCCEEDED=true -e RESTART_DB_STATE_UNCHANGED=true \
       app node rehearsal/app-restart-continuity.js after
     ;;
+  db-recovery-json-stability-proof)
+    [ "$#" -eq 1 ] || die "usage: $0 db-recovery-json-stability-proof"
+    exec "$directory/db-recovery-json-stability-proof"
+    ;;
   db-recovery|db-recovery-resume|db-recovery-watchdog-proof-start|db-recovery-watchdog-proof-observe)
     [ "$#" -eq 2 ] || die "usage: $0 $operation RUN_ID"
     app_node deploy/field-test/data-operation.js preflight
@@ -154,5 +158,5 @@ case "$operation" in
     esac
     exec "$directory/db-recovery-host" "$host_operation" "$2"
     ;;
-  *) die "usage: $0 verify|backup|reset|restore BACKUP.sql|rehearsal|event-scale-rehearsal|app-restart-continuity|db-recovery RUN_ID|db-recovery-resume RUN_ID|db-recovery-watchdog-proof-start RUN_ID|db-recovery-watchdog-proof-observe RUN_ID" ;;
+  *) die "usage: $0 verify|backup|reset|restore BACKUP.sql|rehearsal|event-scale-rehearsal|app-restart-continuity|db-recovery-json-stability-proof|db-recovery RUN_ID|db-recovery-resume RUN_ID|db-recovery-watchdog-proof-start RUN_ID|db-recovery-watchdog-proof-observe RUN_ID" ;;
 esac
