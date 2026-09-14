@@ -16,6 +16,7 @@ function harness({ failPreflight = false, failDump = false, failNormalization = 
   for (const command of ["node", "npm"]) {
     fs.writeFileSync(path.join(directory, command), `#!/bin/sh\necho host-${command} >>"$TRACE"\nexit 99\n`, { mode: 0o755 });
   }
+  fs.writeFileSync(path.join(directory, "curl"), "#!/bin/sh\nexit 7\n", { mode: 0o755 });
   fs.writeFileSync(path.join(directory, "docker"), `#!/bin/sh
 echo "$*" >>"$TRACE"
 [ "$1" = info ] && exit 0
@@ -23,6 +24,13 @@ case "$*" in
   *"compose.yaml config --services"*) printf 'app\ndb\n' ;;
   *"compose.yaml ps -q db"*) printf 'db-container-id\n' ;;
   *"compose.yaml ps -q app"*) printf 'app-container-id\n' ;;
+  *"compose.yaml port app 3000"*) printf '127.0.0.1:3000\n' ;;
+  *"inspect --format {{.Image}} app-container-id"*) printf 'sha256:image-id\n' ;;
+  *"inspect --format {{index .Config.Labels"*) printf '0123456789abcdef0123456789abcdef01234567\n' ;;
+  *"inspect --format {{.State.StartedAt}} db-container-id"*) printf '2026-09-14T00:00:00Z\n' ;;
+  *"inspect --format {{.State.Status}} app-container-id"*) printf 'exited\n' ;;
+  *"inspect --format {{.State.Status}} db-container-id"*) printf 'running\n' ;;
+  *"inspect --format {{if .State.Health}}"*) printf 'healthy\n' ;;
   *"db sh"*"mysqldump"*)
     printf '%s\n' '-- partial MySQL dump'
     ${failDump ? "exit 29" : "exit 0"} ;;
@@ -78,7 +86,7 @@ test("app restart continuity stops and starts only app while preserving containe
   assert.match(trace, /exec -T app node rehearsal\/app-restart-continuity\.js before/);
   assert.match(trace, /compose\.yaml stop app/);
   assert.match(trace, /compose\.yaml start app/);
-  assert.match(trace, /exec -T app node rehearsal\/app-restart-continuity\.js after/);
+  assert.match(trace, /app node rehearsal\/app-restart-continuity\.js after/);
   assert.doesNotMatch(trace, /(?:stop|start|restart|rm) db/);
   assert.doesNotMatch(trace, /(?:down|up|create|recreate)/);
 });
