@@ -1,0 +1,15 @@
+#!/bin/sh
+set -eu
+
+deadline_seconds=45
+[ "$#" -eq 1 ] || { printf '%s\n' 'watchdog requires exactly one immutable container ID' >&2; exit 64; }
+container_id=$1
+case "$container_id" in *[!0-9a-f]*|'') exit 64;; esac
+[ "${#container_id}" -eq 64 ] || exit 64
+
+printf '{"event":"armed","containerId":"%s","watchdogPid":%s,"deadlineSeconds":%s}\n' "$container_id" "$$" "$deadline_seconds"
+trap 'printf "{\"event\":\"disarmed\",\"containerId\":\"%s\",\"watchdogPid\":%s}\n" "$container_id" "$$"; exit 0' TERM
+sleep "$deadline_seconds" &
+wait "$!"
+if docker unpause "$container_id" >/dev/null 2>&1; then result=unpaused; else result=unpause-command-nonzero; fi
+printf '{"event":"deadline","containerId":"%s","watchdogPid":%s,"result":"%s"}\n' "$container_id" "$$" "$result"

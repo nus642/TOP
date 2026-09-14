@@ -5,6 +5,7 @@ deploy/field-test/backups/
 rehearsal/.rehearsal-state.json
 deploy/field-test/evidence/*
 !deploy/field-test/evidence/manifest.schema.json
+!deploy/field-test/evidence/db-recovery-manifest.schema.json
 dev/*
 !dev/dev-login.html
 !dev/prepare-m2-test-data.js

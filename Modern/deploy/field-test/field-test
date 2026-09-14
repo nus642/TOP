@@ -30,6 +30,62 @@ compose() {
   fi
 }
 
+docker_host() {
+  if [ "$use_sudo" = true ]; then sudo docker "$@"; else docker "$@"; fi
+}
+
+verified_db_container_id() {
+  candidate=$(compose ps -q db)
+  [ -n "$candidate" ] || die "Modern Field Test db container is not running"
+  container_id=$(docker_host inspect --format '{{.Id}}' "$candidate")
+  [ "${#container_id}" -eq 64 ] || die "db container did not resolve to an immutable full ID"
+  [ "$(docker_host inspect --format '{{index .Config.Labels "com.docker.compose.project"}}' "$container_id")" = modern-field-test-v1 ] || die "unsafe db Compose project"
+  [ "$(docker_host inspect --format '{{index .Config.Labels "com.docker.compose.service"}}' "$container_id")" = db ] || die "unsafe db Compose service"
+  docker_host inspect --format '{{range .Mounts}}{{if eq .Destination "/var/lib/mysql"}}{{.Name}}{{end}}{{end}}' "$container_id" | grep -qx modern-field-test-v1-db || die "unsafe db volume"
+  docker_host inspect --format '{{range $name, $_ := .NetworkSettings.Networks}}{{$name}}{{"\n"}}{{end}}' "$container_id" | grep -qx modern-field-test-v1 || die "unsafe db network"
+  printf '%s\n' "$container_id"
+}
+
+verified_app_container_id() {
+  candidate=$(compose ps -q app)
+  [ -n "$candidate" ] || die "Modern Field Test app container is not running"
+  app_id=$(docker_host inspect --format '{{.Id}}' "$candidate")
+  [ "${#app_id}" -eq 64 ] || die "app container did not resolve to an immutable full ID"
+  [ "$(docker_host inspect --format '{{index .Config.Labels "com.docker.compose.project"}}' "$app_id")" = modern-field-test-v1 ] || die "unsafe app Compose project"
+  [ "$(docker_host inspect --format '{{index .Config.Labels "com.docker.compose.service"}}' "$app_id")" = app ] || die "unsafe app Compose service"
+  printf '%s\n' "$app_id"
+}
+
+launch_watchdog() {
+  container_id=$1 evidence_file=$2
+  watchdog=$directory/db-unpause-watchdog
+  if [ "$use_sudo" = true ]; then
+    setsid nohup sudo -n "$watchdog" "$container_id" >"$evidence_file" 2>&1 </dev/null &
+  else
+    setsid nohup "$watchdog" "$container_id" >"$evidence_file" 2>&1 </dev/null &
+  fi
+  watchdog_pid=$!
+  watchdog_start=$(awk '{print $22}' "/proc/$watchdog_pid/stat")
+  attempts=0
+  while ! grep -q '"event":"armed"' "$evidence_file" 2>/dev/null; do
+    kill -0 "$watchdog_pid" 2>/dev/null || die "watchdog exited before arming"
+    attempts=$((attempts + 1)); [ "$attempts" -lt 50 ] || die "watchdog did not arm"
+    sleep 0.1
+  done
+  grep -q "\"containerId\":\"$container_id\"" "$evidence_file" || die "watchdog armed for the wrong container"
+  [ "$(awk '{print $22}' "/proc/$watchdog_pid/stat")" = "$watchdog_start" ] || die "watchdog PID identity changed"
+  [ "$(ps -o sid= -p "$watchdog_pid" | tr -d ' ')" != "$(ps -o sid= -p $$ | tr -d ' ')" ] || die "watchdog is not in an independent session"
+}
+
+disarm_watchdog() {
+  pid=$1 start=$2 evidence_file=$3
+  if kill -0 "$pid" 2>/dev/null && [ "$(awk '{print $22}' "/proc/$pid/stat")" = "$start" ]; then
+    kill -TERM "$pid"
+    wait "$pid" || true
+  fi
+  grep -q '"event":"disarmed"\|"event":"deadline"' "$evidence_file" || die "watchdog left no terminal evidence"
+}
+
 app_node() { compose exec -T app node "$@"; }
 app_node_destructive() { compose exec -T -e "TOP_FIELD_TEST_DESTRUCTIVE_ACKNOWLEDGEMENT=${TOP_FIELD_TEST_DESTRUCTIVE_ACKNOWLEDGEMENT-}" app node "$@"; }
 db_mysql() { compose exec -T db sh -ceu 'export MYSQL_PWD="$MYSQL_PASSWORD"; exec mysql --batch --skip-column-names -h 127.0.0.1 -u "$MYSQL_USER" "$MYSQL_DATABASE"' field-test-mysql; }
@@ -99,5 +155,92 @@ case "$operation" in
     compose exec -T --user root app sh -ceu 'chown node:node /app/rehearsal/evidence; chmod 0700 /app/rehearsal/evidence'
     app_node rehearsal/event-scale-rehearsal.js
     ;;
-  *) die "usage: $0 verify|backup|reset|restore BACKUP.sql|rehearsal|event-scale-rehearsal" ;;
+  watchdog-proof)
+    [ "$#" -eq 1 ] || die "usage: $0 watchdog-proof"
+    app_node deploy/field-test/data-operation.js preflight
+    container_id=$(verified_db_container_id)
+    mkdir -p -- "$directory/evidence"
+    stamp=$(date -u '+%Y-%m-%dT%H-%M-%SZ')
+    proof="$directory/evidence/watchdog-proof-$stamp.jsonl"
+    context="$directory/evidence/watchdog-proof-$stamp.context"
+    : >"$proof"; chmod 0600 "$proof"
+    before=$(app_node rehearsal/db-recovery-rehearsal.js snapshot-sha | tail -n 1)
+    launch_watchdog "$container_id" "$proof"
+    printf '%s\n%s\n%s\n' "$container_id" "$before" "$proof" >"$context"; chmod 0600 "$context"
+    docker_host pause "$container_id" >/dev/null
+    # This command intentionally leaves recovery to the independent watchdog.
+    # An observer must verify unpause, health, and data equality after killing
+    # this foreground controller or dropping its SSH session.
+    printf 'watchdog proof armed; container=%s controller=%s watchdog=%s evidence=%s context=%s\nThe controller will now terminate without cleanup. After the deadline, run: %s watchdog-proof-verify %s\n' "$container_id" "$$" "$watchdog_pid" "$proof" "$context" "$0" "$context"
+    kill -KILL $$
+    ;;
+  watchdog-proof-verify)
+    [ "$#" -eq 2 ] || die "usage: $0 watchdog-proof-verify CONTEXT"
+    context=$2
+    case "$context" in evidence/*.context) context=$directory/$context;; esac
+    case "$context" in "$directory/evidence/"*.context) ;; *) die "watchdog proof context must be run-specific evidence";; esac
+    [ -f "$context" ] && [ ! -L "$context" ] || die "watchdog proof context unavailable"
+    container_id=$(sed -n '1p' "$context"); before=$(sed -n '2p' "$context"); proof=$(sed -n '3p' "$context")
+    [ "$(verified_db_container_id)" = "$container_id" ] || die "watchdog proof container identity changed"
+    [ "$(docker_host inspect --format '{{.State.Paused}}' "$container_id")" = false ] || die "watchdog did not unpause by its deadline"
+    grep -q '"event":"deadline".*"result":"unpaused"' "$proof" || die "watchdog deadline evidence missing"
+    app_node deploy/field-test/data-operation.js verify
+    after=$(app_node rehearsal/db-recovery-rehearsal.js snapshot-sha | tail -n 1)
+    [ "$after" = "$before" ] || die "watchdog proof changed database state"
+    printf 'watchdog-only Lighthouse proof PASS: %s\n' "$proof"
+    ;;
+  db-recovery-start)
+    [ "$#" -eq 1 ] || die "usage: $0 db-recovery-start"
+    [ "${TOP_FIELD_TEST_SINGLE_WRITER_ACKNOWLEDGEMENT-}" = CONTROLLED-SINGLE-WRITER-MODERN-FIELD-TEST-V1 ] || die "controlled single-writer acknowledgement required"
+    app_node deploy/field-test/data-operation.js preflight
+    compose exec -T --user root app sh -ceu 'chown node:node /app/rehearsal/evidence; chmod 0700 /app/rehearsal/evidence'
+    container_id=$(verified_db_container_id); app_id=$(verified_app_container_id)
+    db_image=$(docker_host inspect --format '{{.Image}}' "$container_id"); app_image=$(docker_host inspect --format '{{.Image}}' "$app_id")
+    run_id=$(compose exec -T -e "TOP_FIELD_TEST_SINGLE_WRITER_ACKNOWLEDGEMENT=$TOP_FIELD_TEST_SINGLE_WRITER_ACKNOWLEDGEMENT" -e "TOP_RUNTIME_DB_CONTAINER_ID=$container_id" -e "TOP_RUNTIME_APP_CONTAINER_ID=$app_id" -e "TOP_RUNTIME_DB_IMAGE_ID=$db_image" -e "TOP_RUNTIME_APP_IMAGE_ID=$app_image" app node rehearsal/db-recovery-rehearsal.js start | tail -n 1)
+    backup_output=$($0 backup)
+    backup_file=${backup_output#backup created: }
+    [ -f "$backup_file" ] && [ ! -L "$backup_file" ] || die "recovery backup was not safely published"
+    backup_sha=$(sha256sum "$backup_file" | awk '{print $1}')
+    backup_bytes=$(wc -c <"$backup_file" | tr -d ' ')
+    app_node rehearsal/db-recovery-rehearsal.js bind-and-mutate "$run_id" "$(basename "$backup_file")" "$backup_sha" "$backup_bytes"
+    [ "$(verified_db_container_id)" = "$container_id" ] || die "db container identity changed before failure injection"
+    watchdog_evidence="$directory/evidence/db-recovery-$run_id-watchdog.jsonl"
+    : >"$watchdog_evidence"; chmod 0600 "$watchdog_evidence"
+    launch_watchdog "$container_id" "$watchdog_evidence"
+    docker_host pause "$container_id" >/dev/null
+    direct_failed=false; app_failed=false
+    if ! timeout 8 "$0" verify >/dev/null 2>&1; then direct_failed=true; fi
+    set +e
+    timeout 8 "$0" db-failure-read-probe >/dev/null 2>&1
+    probe_status=$?
+    set -e
+    [ "$probe_status" -ne 42 ] || die "application unexpectedly used the database during failure"
+    app_failed=true
+    docker_host unpause "$container_id" >/dev/null || true
+    attempts=0
+    until app_node deploy/field-test/data-operation.js verify >/dev/null 2>&1; do attempts=$((attempts + 1)); [ "$attempts" -lt 30 ] || die "database did not recover after unpause"; sleep 1; done
+    recovered=true
+    disarm_watchdog "$watchdog_pid" "$watchdog_start" "$watchdog_evidence"
+    app_node rehearsal/db-recovery-rehearsal.js record-failure "$run_id" "$container_id" "$(basename "$watchdog_evidence")" "$direct_failed" "$app_failed" "$recovered" >/dev/null
+    printf 'DB failure observed and cleared. Restore gate reached.\nRun ID: %s\nBackup: %s\nSHA-256: %s\nTo resume, explicitly export TOP_FIELD_TEST_DESTRUCTIVE_ACKNOWLEDGEMENT and run:\n  %s db-recovery-resume %s\n' "$run_id" "$backup_file" "$backup_sha" "$0" "$run_id"
+    ;;
+  db-recovery-resume)
+    [ "$#" -eq 2 ] || die "usage: $0 db-recovery-resume RUN_ID"
+    [ "${TOP_FIELD_TEST_DESTRUCTIVE_ACKNOWLEDGEMENT-}" = DESTROY-MODERN-FIELD-TEST-V1-DATA ] || die "existing destructive acknowledgement required"
+    run_id=$2
+    backup_name=$(app_node rehearsal/db-recovery-rehearsal.js restore-path "$run_id" | tail -n 1)
+    backup_file=$directory/backups/$backup_name
+    [ -f "$backup_file" ] && [ ! -L "$backup_file" ] || die "recorded recovery backup is unavailable"
+    recorded_sha=$(app_node -e 'const fs=require("fs");const e=JSON.parse(fs.readFileSync(`/app/rehearsal/evidence/db-recovery-${process.argv[1]}.json`));process.stdout.write(e.backup.sha256)' "$run_id")
+    [ "$(sha256sum "$backup_file" | awk '{print $1}')" = "$recorded_sha" ] || die "recorded recovery backup hash changed"
+    "$0" restore "$backup_file"
+    app_node rehearsal/db-recovery-rehearsal.js resume "$run_id"
+    app_node deploy/field-test/data-operation.js verify
+    printf 'DB recovery rehearsal PASS: run %s\n' "$run_id"
+    ;;
+  db-failure-read-probe)
+    [ "$#" -eq 1 ] || die "internal probe takes no arguments"
+    app_node -e 'fetch("http://127.0.0.1:3000/api/public/competitions/1/referee-roster").then(r=>process.exit(r.ok?42:0)).catch(()=>process.exit(0))'
+    ;;
+  *) die "usage: $0 verify|backup|reset|restore BACKUP.sql|rehearsal|event-scale-rehearsal|watchdog-proof|watchdog-proof-verify CONTEXT|db-recovery-start|db-recovery-resume RUN_ID" ;;
 esac
