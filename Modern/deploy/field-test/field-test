@@ -55,7 +55,9 @@ case "$operation" in
     raw=$(mktemp "$directory/backups/.backup.XXXXXX")
     staged=$(mktemp "$directory/backups/.backup.XXXXXX")
     temporary_files="$raw $staged"
-    compose exec -T db sh -ceu 'export MYSQL_PWD="$MYSQL_PASSWORD"; exec mysqldump --single-transaction --routines --triggers --set-gtid-purged=OFF -h 127.0.0.1 -u "$MYSQL_USER" "$MYSQL_DATABASE"' field-test-backup >"$raw"
+    if ! compose exec -T db sh -ceu 'export MYSQL_PWD="$MYSQL_PASSWORD"; exec mysqldump --single-transaction --routines --triggers --no-tablespaces --set-gtid-purged=OFF -h 127.0.0.1 -u "$MYSQL_USER" "$MYSQL_DATABASE"' field-test-backup >"$raw"; then
+      die "mysqldump failed; no backup was created"
+    fi
     app_node deploy/field-test/data-operation.js validate-backup <"$raw" >"$staged"
     stamp=$(date -u '+%Y-%m-%dT%H-%M-%SZ')
     final=$directory/backups/modern-field-test-v1-$stamp.sql
