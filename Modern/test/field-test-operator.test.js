@@ -20,6 +20,9 @@ function harness({ failPreflight = false, failDump = false, failNormalization = 
 echo "$*" >>"$TRACE"
 [ "$1" = info ] && exit 0
 case "$*" in
+  *"compose.yaml config --services"*) printf 'app\ndb\n' ;;
+  *"compose.yaml ps -q db"*) printf 'db-container-id\n' ;;
+  *"compose.yaml ps -q app"*) printf 'app-container-id\n' ;;
   *"db sh"*"mysqldump"*)
     printf '%s\n' '-- partial MySQL dump'
     ${failDump ? "exit 29" : "exit 0"} ;;
@@ -66,6 +69,18 @@ test("canonical host verify and rehearsal paths invoke Node only through app", (
   assert.doesNotMatch(trace, /host-(?:node|npm)/);
   assert.match(trace, /exec -T app node deploy\/field-test\/data-operation\.js verify/);
   assert.match(trace, /exec -T app node rehearsal\/full-scale-rehearsal\.js/);
+});
+
+test("app restart continuity stops and starts only app while preserving container identities", () => {
+  const fixture = harness();
+  assert.equal(run(["app-restart-continuity"], fixture).status, 0);
+  const trace = fs.readFileSync(fixture.log, "utf8");
+  assert.match(trace, /exec -T app node rehearsal\/app-restart-continuity\.js before/);
+  assert.match(trace, /compose\.yaml stop app/);
+  assert.match(trace, /compose\.yaml start app/);
+  assert.match(trace, /exec -T app node rehearsal\/app-restart-continuity\.js after/);
+  assert.doesNotMatch(trace, /(?:stop|start|restart|rm) db/);
+  assert.doesNotMatch(trace, /(?:down|up|create|recreate)/);
 });
 
 test("failed destructive preflight cannot reach a db command", () => {

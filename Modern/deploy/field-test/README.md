@@ -85,4 +85,12 @@ no-auto-reset, and runtime-build-identity boundaries as the fast profile.
 
 Every attempt writes `deploy/field-test/evidence/latest.json` through the app's evidence-only bind mount. Generated manifests are ignored and mode 0600; the committed `evidence/manifest.schema.json` documents their sanitized shape. Evidence contains environment/build identity, fixture counts, timestamps, checkpoints, turnover/probe outcomes, and pass/fail only—never credentials, cookies, environment dumps, or participant inputs. Archive a reviewed manifest outside the working tree if retention is required. Reset and rerun to demonstrate equivalent fixture state; do not run a second rehearsal over existing data.
 
-Real-device/browser evidence, interruption and restart recovery, Lighthouse/Nginx/HTTPS deployment, UI watermarking, real participant data, production cutover, and production eligibility remain explicitly deferred.
+## App failure / restart continuity
+
+After a successful deterministic rehearsal, run `./field-test app-restart-continuity`. The command fails closed unless the pinned project contains exactly `app` and `db`, both are already running, and their container identities remain unchanged. It executes only `docker compose stop app` followed by `docker compose start app`; it never stops, restarts, or recreates `db`, and it does not invoke reset or restore.
+
+The resulting `evidence/app-restart-continuity-latest.json` reports three separate observations: exact operational-state snapshot continuity, expected loss of the old Master and referee process-local sessions (both must return 401), and successful authorized reads after those sessions are re-established. Session cookies exist only in a mode-0600 transient handoff, are deleted after verification, and are never included in evidence. This rehearsal intentionally does not change or fix authentication persistence.
+
+Source-level tests validate orchestration and evidence logic with fakes; they are not real Lighthouse or real MySQL recovery evidence. The real rehearsal must still be run on the reviewed Lighthouse Modern Field Test stack and its sanitized manifest reviewed and archived.
+
+Real-device/browser evidence, Lighthouse/Nginx/HTTPS deployment, UI watermarking, real participant data, production cutover, and production eligibility remain explicitly deferred.
