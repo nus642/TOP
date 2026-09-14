@@ -10,6 +10,7 @@ const { buildFixture, REFEREES } = require("./field-test-fixture");
 const { snapshot } = require("./db-recovery/snapshot");
 const { MutationGate } = require("./db-recovery/mutation-gate");
 const { requireExpectedRpo } = require("./db-recovery/rpo");
+const { assertPristineBootstrap } = require("./db-recovery/pristine-baseline");
 const OUTPUT = process.env.REHEARSAL_EVIDENCE_DIR || path.join(__dirname, "evidence");
 const RUN_RE = /^[a-z0-9][a-z0-9-]{0,63}$/; const CLAIM = "Recovery point bound to backup under the controlled single-writer synthetic rehearsal assumption.";
 const ATTESTATION = "CONTROLLED-SINGLE-WRITER-MODERN-FIELD-TEST-V1";
@@ -33,8 +34,10 @@ async function finish(g,master,cookie,id,m,ref,s2,stage) { await mutation(g,`sco
 async function prepare() {
   validateDataSafety(process.env); fs.mkdirSync(dir, { recursive: true, mode: 0o700 }); assert.ok(!fs.existsSync(manifestPath), "run evidence already exists");
   const gate = new MutationGate(), fixture = buildFixture(), master = await session(`db-recovery-master-${runId}`, "master");
-  assert.equal((await request("GET", "/api/competition?tournamentId=1", master)).json.tournament, null, "requires explicit operator reset; no automatic reset is performed");
-  const made = await mutation(gate,"create","POST","/api/competition",master,fixture.competition); const id=made.json.competition?.id??made.json.id;
+  const baseline = await dbSnapshot();
+  const bootstrap = (await request("GET", "/api/competition?tournamentId=1", master)).json;
+  assertPristineBootstrap(bootstrap, baseline);
+  const made = await mutation(gate,"configure-bootstrap","PUT","/api/competition/1",master,fixture.competition); const id=made.json.competition?.id??made.json.id; assert.equal(id, 1);
   await mutation(gate,"schedule","POST",`/api/competition/${id}/schedule/import`,master,fixture.schedule); await mutation(gate,"roster","POST",`/api/referee-coordination/${id}/referees/roster`,master,{refereeIds:fixture.referees});
   for (const state of ["registration_open","ready","running"]) await mutation(gate,`lifecycle-${state}`,"POST",`/api/competition/${id}/lifecycle/transition`,master,{state});
   await mutation(gate,"check-in","POST",`/api/master-workflow/${id}/check-in-all`,master,{});
