@@ -143,5 +143,16 @@ case "$operation" in
       -e RESTART_DB_READ_ONLY_QUERY_SUCCEEDED=true -e RESTART_DB_STATE_UNCHANGED=true \
       app node rehearsal/app-restart-continuity.js after
     ;;
-  *) die "usage: $0 verify|backup|reset|restore BACKUP.sql|rehearsal|event-scale-rehearsal|app-restart-continuity" ;;
+  db-recovery|db-recovery-resume|db-recovery-watchdog-proof-start|db-recovery-watchdog-proof-observe)
+    [ "$#" -eq 2 ] || die "usage: $0 $operation RUN_ID"
+    app_node deploy/field-test/data-operation.js preflight
+    case "$operation" in
+      db-recovery) host_operation=prepare ;;
+      db-recovery-resume) host_operation=resume ;;
+      db-recovery-watchdog-proof-start) host_operation=watchdog-proof-start ;;
+      *) host_operation=watchdog-proof-observe ;;
+    esac
+    exec "$directory/db-recovery-host" "$host_operation" "$2"
+    ;;
+  *) die "usage: $0 verify|backup|reset|restore BACKUP.sql|rehearsal|event-scale-rehearsal|app-restart-continuity|db-recovery RUN_ID|db-recovery-resume RUN_ID|db-recovery-watchdog-proof-start RUN_ID|db-recovery-watchdog-proof-observe RUN_ID" ;;
 esac

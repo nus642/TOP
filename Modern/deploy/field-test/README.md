@@ -94,3 +94,26 @@ While the app is down, the wrapper requires stopped/unreachable app observations
 Source-level tests validate orchestration and evidence logic with fakes; they are not real Lighthouse or real MySQL recovery evidence. The real rehearsal must still be run on the reviewed Lighthouse Modern Field Test stack and its sanitized manifest reviewed and archived.
 
 Real-device/browser evidence, Lighthouse/Nginx/HTTPS deployment, UI watermarking, real participant data, production cutover, and production eligibility remain explicitly deferred.
+
+## DB failure / restore continuity (source-review commands)
+
+This Modern Field Test v1 rehearsal is deliberately split at a destructive restore gate. It never resets data automatically and never selects a backup by `latest` or wildcard.
+
+```sh
+./field-test db-recovery RUN_ID
+TOP_FIELD_TEST_DESTRUCTIVE_ACKNOWLEDGEMENT=DESTROY-MODERN-FIELD-TEST-V1-DATA \
+  ./field-test db-recovery-resume RUN_ID
+```
+
+The first command establishes the five-match Recovery Point, invokes the existing `backup` path, creates and accounts for the post-backup delta, performs the bounded exact-container pause/unpause, and stops. The resume command resolves the run-specific manifest, checks the recorded artifact hash, invokes the existing `restore` path with that exact path, proves an exact snapshot match, and continues with fresh sessions.
+
+The separate manual Lighthouse prerequisite is intentionally two-session and must not be run automatically from development:
+
+```sh
+# Session 1: this controller deliberately SIGKILLs itself after arming and pausing.
+./field-test db-recovery-watchdog-proof-start RUN_ID
+# Independent session 2: wait for deadline recovery and prove before == after.
+./field-test db-recovery-watchdog-proof-observe RUN_ID
+```
+
+Neither watchdog-only command creates a backup, restores data, or issues a competition mutation. Evidence is run-specific under `evidence/db-recovery/RUN_ID/` with private file modes.

@@ -8,3 +8,4 @@ deploy/field-test/evidence/*
 dev/*
 !dev/dev-login.html
 !dev/prepare-m2-test-data.js
+!deploy/field-test/evidence/db-recovery-manifest.schema.json

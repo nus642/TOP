@@ -1,0 +1,956 @@
+{
+  "competition_referees": {
+    "columns": [
+      {
+        "name": "id",
+        "type": "bigint",
+        "nullable": false
+      },
+      {
+        "name": "competition_id",
+        "type": "int",
+        "nullable": false
+      },
+      {
+        "name": "referee_id",
+        "type": "varchar(100)",
+        "nullable": false
+      },
+      {
+        "name": "active",
+        "type": "tinyint(1)",
+        "nullable": false
+      },
+      {
+        "name": "eligible",
+        "type": "tinyint(1)",
+        "nullable": false
+      },
+      {
+        "name": "created_at",
+        "type": "timestamp(6)",
+        "nullable": false
+      }
+    ],
+    "primaryKey": [
+      "id"
+    ]
+  },
+  "competition_standings": {
+    "columns": [
+      {
+        "name": "competition_id",
+        "type": "int",
+        "nullable": false
+      },
+      {
+        "name": "participant_id",
+        "type": "int",
+        "nullable": false
+      },
+      {
+        "name": "played",
+        "type": "int",
+        "nullable": false
+      },
+      {
+        "name": "wins",
+        "type": "int",
+        "nullable": false
+      },
+      {
+        "name": "losses",
+        "type": "int",
+        "nullable": false
+      },
+      {
+        "name": "score_for",
+        "type": "int",
+        "nullable": false
+      },
+      {
+        "name": "score_against",
+        "type": "int",
+        "nullable": false
+      },
+      {
+        "name": "score_difference",
+        "type": "int",
+        "nullable": false
+      },
+      {
+        "name": "updated_at",
+        "type": "timestamp(6)",
+        "nullable": false
+      }
+    ],
+    "primaryKey": [
+      "competition_id",
+      "participant_id"
+    ]
+  },
+  "court_disruptions": {
+    "columns": [
+      {
+        "name": "id",
+        "type": "bigint",
+        "nullable": false
+      },
+      {
+        "name": "tournament_id",
+        "type": "int",
+        "nullable": false
+      },
+      {
+        "name": "court_id",
+        "type": "varchar(100)",
+        "nullable": false
+      },
+      {
+        "name": "affected_match_id",
+        "type": "int",
+        "nullable": true
+      },
+      {
+        "name": "opening_condition",
+        "type": "enum('constrained','uncertain')",
+        "nullable": false
+      },
+      {
+        "name": "disposition",
+        "type": "enum('attention_required','deferred','resolved')",
+        "nullable": false
+      },
+      {
+        "name": "opened_by",
+        "type": "varchar(100)",
+        "nullable": false
+      },
+      {
+        "name": "opened_at",
+        "type": "timestamp(6)",
+        "nullable": false
+      },
+      {
+        "name": "deferred_by",
+        "type": "varchar(100)",
+        "nullable": true
+      },
+      {
+        "name": "deferred_at",
+        "type": "timestamp(6)",
+        "nullable": true
+      },
+      {
+        "name": "recovered_by",
+        "type": "varchar(100)",
+        "nullable": true
+      },
+      {
+        "name": "recovered_at",
+        "type": "timestamp(6)",
+        "nullable": true
+      },
+      {
+        "name": "resolved_at",
+        "type": "timestamp(6)",
+        "nullable": true
+      },
+      {
+        "name": "version",
+        "type": "bigint",
+        "nullable": false
+      }
+    ],
+    "primaryKey": [
+      "id"
+    ]
+  },
+  "court_operating_conditions": {
+    "columns": [
+      {
+        "name": "tournament_id",
+        "type": "int",
+        "nullable": false
+      },
+      {
+        "name": "court_id",
+        "type": "varchar(100)",
+        "nullable": false
+      },
+      {
+        "name": "condition_name",
+        "type": "enum('available','occupied','constrained','uncertain')",
+        "nullable": false
+      },
+      {
+        "name": "source_type",
+        "type": "enum('initial_baseline','match_execution','master_report','migration_match_execution')",
+        "nullable": false
+      },
+      {
+        "name": "source_reference",
+        "type": "varchar(100)",
+        "nullable": false
+      },
+      {
+        "name": "actor_id",
+        "type": "varchar(100)",
+        "nullable": true
+      },
+      {
+        "name": "effective_at",
+        "type": "timestamp(6)",
+        "nullable": false
+      },
+      {
+        "name": "version",
+        "type": "bigint",
+        "nullable": false
+      },
+      {
+        "name": "last_chronology_id",
+        "type": "bigint",
+        "nullable": true
+      }
+    ],
+    "primaryKey": [
+      "tournament_id",
+      "court_id"
+    ]
+  },
+  "match_official_records": {
+    "columns": [
+      {
+        "name": "id",
+        "type": "bigint",
+        "nullable": false
+      },
+      {
+        "name": "tournament_id",
+        "type": "int",
+        "nullable": false
+      },
+      {
+        "name": "match_id",
+        "type": "int",
+        "nullable": false
+      },
+      {
+        "name": "referee_id",
+        "type": "varchar(100)",
+        "nullable": false
+      },
+      {
+        "name": "score1",
+        "type": "int",
+        "nullable": false
+      },
+      {
+        "name": "score2",
+        "type": "int",
+        "nullable": false
+      },
+      {
+        "name": "confirmed_by",
+        "type": "varchar(100)",
+        "nullable": false
+      },
+      {
+        "name": "confirmed_at",
+        "type": "timestamp(6)",
+        "nullable": false
+      },
+      {
+        "name": "confirmation_responsibility",
+        "type": "varchar(100)",
+        "nullable": false
+      },
+      {
+        "name": "evidence_reference",
+        "type": "varchar(500)",
+        "nullable": true
+      },
+      {
+        "name": "evidence_metadata",
+        "type": "json",
+        "nullable": true
+      },
+      {
+        "name": "provenance",
+        "type": "json",
+        "nullable": true
+      },
+      {
+        "name": "created_at",
+        "type": "timestamp(6)",
+        "nullable": false
+      }
+    ],
+    "primaryKey": [
+      "id"
+    ]
+  },
+  "match_schedules": {
+    "columns": [
+      {
+        "name": "id",
+        "type": "bigint",
+        "nullable": false
+      },
+      {
+        "name": "tournament_id",
+        "type": "int",
+        "nullable": false
+      },
+      {
+        "name": "match_id",
+        "type": "int",
+        "nullable": false
+      },
+      {
+        "name": "scheduled_at",
+        "type": "datetime(6)",
+        "nullable": false
+      },
+      {
+        "name": "court_id",
+        "type": "varchar(100)",
+        "nullable": true
+      },
+      {
+        "name": "created_at",
+        "type": "timestamp(6)",
+        "nullable": false
+      }
+    ],
+    "primaryKey": [
+      "id"
+    ]
+  },
+  "matches": {
+    "columns": [
+      {
+        "name": "id",
+        "type": "int",
+        "nullable": false
+      },
+      {
+        "name": "tournament_id",
+        "type": "int",
+        "nullable": false
+      },
+      {
+        "name": "round_num",
+        "type": "int",
+        "nullable": false
+      },
+      {
+        "name": "court",
+        "type": "varchar(20)",
+        "nullable": false
+      },
+      {
+        "name": "player1_id",
+        "type": "int",
+        "nullable": true
+      },
+      {
+        "name": "player2_id",
+        "type": "int",
+        "nullable": true
+      },
+      {
+        "name": "player3_id",
+        "type": "int",
+        "nullable": true
+      },
+      {
+        "name": "player4_id",
+        "type": "int",
+        "nullable": true
+      },
+      {
+        "name": "team1_name",
+        "type": "varchar(100)",
+        "nullable": true
+      },
+      {
+        "name": "team2_name",
+        "type": "varchar(100)",
+        "nullable": true
+      },
+      {
+        "name": "score1",
+        "type": "int",
+        "nullable": true
+      },
+      {
+        "name": "score2",
+        "type": "int",
+        "nullable": true
+      },
+      {
+        "name": "game_format",
+        "type": "tinyint unsigned",
+        "nullable": false
+      },
+      {
+        "name": "score_rule",
+        "type": "varchar(10)",
+        "nullable": false
+      },
+      {
+        "name": "target_score",
+        "type": "smallint unsigned",
+        "nullable": false
+      },
+      {
+        "name": "cap_score",
+        "type": "smallint unsigned",
+        "nullable": false
+      },
+      {
+        "name": "referee_id",
+        "type": "varchar(100)",
+        "nullable": true
+      },
+      {
+        "name": "assigned_at",
+        "type": "timestamp",
+        "nullable": true
+      },
+      {
+        "name": "dispatch_id",
+        "type": "varchar(100)",
+        "nullable": true
+      },
+      {
+        "name": "dispatch_version",
+        "type": "bigint",
+        "nullable": true
+      },
+      {
+        "name": "responsibility_accepted_at",
+        "type": "timestamp",
+        "nullable": true
+      },
+      {
+        "name": "started_at",
+        "type": "timestamp",
+        "nullable": true
+      },
+      {
+        "name": "result_confirmed_at",
+        "type": "timestamp",
+        "nullable": true
+      },
+      {
+        "name": "result_confirmed_by",
+        "type": "varchar(100)",
+        "nullable": true
+      },
+      {
+        "name": "status",
+        "type": "enum('idle','upcoming','assigned','accepted','playing','interrupted','scored','awaiting_confirmation','confirmed','finished')",
+        "nullable": true
+      }
+    ],
+    "primaryKey": [
+      "id"
+    ]
+  },
+  "pairings": {
+    "columns": [
+      {
+        "name": "id",
+        "type": "int",
+        "nullable": false
+      },
+      {
+        "name": "tournament_id",
+        "type": "int",
+        "nullable": false
+      },
+      {
+        "name": "player1_id",
+        "type": "int",
+        "nullable": false
+      },
+      {
+        "name": "player2_id",
+        "type": "int",
+        "nullable": false
+      }
+    ],
+    "primaryKey": [
+      "id"
+    ]
+  },
+  "player_check_ins": {
+    "columns": [
+      {
+        "name": "id",
+        "type": "int",
+        "nullable": false
+      },
+      {
+        "name": "tournament_id",
+        "type": "int",
+        "nullable": false
+      },
+      {
+        "name": "player_id",
+        "type": "int",
+        "nullable": false
+      },
+      {
+        "name": "checked_in",
+        "type": "tinyint(1)",
+        "nullable": false
+      },
+      {
+        "name": "checked_in_at",
+        "type": "timestamp",
+        "nullable": true
+      },
+      {
+        "name": "source",
+        "type": "varchar(50)",
+        "nullable": true
+      },
+      {
+        "name": "updated_at",
+        "type": "timestamp",
+        "nullable": true
+      }
+    ],
+    "primaryKey": [
+      "id"
+    ]
+  },
+  "player_opponents": {
+    "columns": [
+      {
+        "name": "player_id",
+        "type": "int",
+        "nullable": false
+      },
+      {
+        "name": "opponent_id",
+        "type": "int",
+        "nullable": false
+      },
+      {
+        "name": "tournament_id",
+        "type": "int",
+        "nullable": false
+      }
+    ],
+    "primaryKey": [
+      "player_id",
+      "opponent_id",
+      "tournament_id"
+    ]
+  },
+  "player_partners": {
+    "columns": [
+      {
+        "name": "player_id",
+        "type": "int",
+        "nullable": false
+      },
+      {
+        "name": "partner_id",
+        "type": "int",
+        "nullable": false
+      },
+      {
+        "name": "tournament_id",
+        "type": "int",
+        "nullable": false
+      }
+    ],
+    "primaryKey": [
+      "player_id",
+      "partner_id",
+      "tournament_id"
+    ]
+  },
+  "players": {
+    "columns": [
+      {
+        "name": "id",
+        "type": "int",
+        "nullable": false
+      },
+      {
+        "name": "tournament_id",
+        "type": "int",
+        "nullable": false
+      },
+      {
+        "name": "name",
+        "type": "varchar(50)",
+        "nullable": false
+      },
+      {
+        "name": "level",
+        "type": "int",
+        "nullable": true
+      },
+      {
+        "name": "wins",
+        "type": "int",
+        "nullable": true
+      },
+      {
+        "name": "losses",
+        "type": "int",
+        "nullable": true
+      },
+      {
+        "name": "net",
+        "type": "int",
+        "nullable": true
+      },
+      {
+        "name": "curP",
+        "type": "int",
+        "nullable": true
+      },
+      {
+        "name": "lastR",
+        "type": "int",
+        "nullable": true
+      },
+      {
+        "name": "paired",
+        "type": "tinyint(1)",
+        "nullable": true
+      }
+    ],
+    "primaryKey": [
+      "id"
+    ]
+  },
+  "referee_dispatch_reservations": {
+    "columns": [
+      {
+        "name": "id",
+        "type": "bigint",
+        "nullable": false
+      },
+      {
+        "name": "dispatch_id",
+        "type": "varchar(100)",
+        "nullable": false
+      },
+      {
+        "name": "match_id",
+        "type": "int",
+        "nullable": false
+      },
+      {
+        "name": "court_id",
+        "type": "varchar(100)",
+        "nullable": false
+      },
+      {
+        "name": "referee_id",
+        "type": "varchar(100)",
+        "nullable": false
+      },
+      {
+        "name": "expected_version",
+        "type": "bigint",
+        "nullable": false
+      },
+      {
+        "name": "correlation_id",
+        "type": "varchar(100)",
+        "nullable": false
+      },
+      {
+        "name": "competition_id",
+        "type": "int",
+        "nullable": false
+      },
+      {
+        "name": "accepted_at",
+        "type": "timestamp(6)",
+        "nullable": true
+      },
+      {
+        "name": "rejected_at",
+        "type": "timestamp(6)",
+        "nullable": true
+      },
+      {
+        "name": "rejected_reason",
+        "type": "varchar(255)",
+        "nullable": true
+      },
+      {
+        "name": "created_at",
+        "type": "timestamp(6)",
+        "nullable": false
+      }
+    ],
+    "primaryKey": [
+      "id"
+    ]
+  },
+  "team_members": {
+    "columns": [
+      {
+        "name": "id",
+        "type": "int",
+        "nullable": false
+      },
+      {
+        "name": "team_id",
+        "type": "int",
+        "nullable": false
+      },
+      {
+        "name": "player_id",
+        "type": "int",
+        "nullable": false
+      },
+      {
+        "name": "role",
+        "type": "varchar(30)",
+        "nullable": false
+      },
+      {
+        "name": "created_at",
+        "type": "timestamp",
+        "nullable": true
+      }
+    ],
+    "primaryKey": [
+      "id"
+    ]
+  },
+  "team_rooms": {
+    "columns": [
+      {
+        "name": "id",
+        "type": "int",
+        "nullable": false
+      },
+      {
+        "name": "tournament_id",
+        "type": "int",
+        "nullable": false
+      },
+      {
+        "name": "code",
+        "type": "varchar(50)",
+        "nullable": true
+      },
+      {
+        "name": "name",
+        "type": "varchar(100)",
+        "nullable": true
+      },
+      {
+        "name": "status",
+        "type": "varchar(30)",
+        "nullable": false
+      },
+      {
+        "name": "created_at",
+        "type": "timestamp",
+        "nullable": true
+      },
+      {
+        "name": "updated_at",
+        "type": "timestamp",
+        "nullable": true
+      }
+    ],
+    "primaryKey": [
+      "id"
+    ]
+  },
+  "teams": {
+    "columns": [
+      {
+        "name": "id",
+        "type": "int",
+        "nullable": false
+      },
+      {
+        "name": "tournament_id",
+        "type": "int",
+        "nullable": false
+      },
+      {
+        "name": "name",
+        "type": "varchar(100)",
+        "nullable": false
+      },
+      {
+        "name": "status",
+        "type": "varchar(30)",
+        "nullable": false
+      },
+      {
+        "name": "created_at",
+        "type": "timestamp",
+        "nullable": true
+      },
+      {
+        "name": "updated_at",
+        "type": "timestamp",
+        "nullable": true
+      }
+    ],
+    "primaryKey": [
+      "id"
+    ]
+  },
+  "tournament_coordination_chronology": {
+    "columns": [
+      {
+        "name": "id",
+        "type": "bigint",
+        "nullable": false
+      },
+      {
+        "name": "tournament_id",
+        "type": "int",
+        "nullable": false
+      },
+      {
+        "name": "court_id",
+        "type": "varchar(100)",
+        "nullable": false
+      },
+      {
+        "name": "match_id",
+        "type": "int",
+        "nullable": true
+      },
+      {
+        "name": "event_type",
+        "type": "varchar(80)",
+        "nullable": false
+      },
+      {
+        "name": "source_type",
+        "type": "varchar(40)",
+        "nullable": false
+      },
+      {
+        "name": "actor_id",
+        "type": "varchar(100)",
+        "nullable": true
+      },
+      {
+        "name": "effective_at",
+        "type": "timestamp(6)",
+        "nullable": false
+      },
+      {
+        "name": "correlation_id",
+        "type": "varchar(100)",
+        "nullable": false
+      },
+      {
+        "name": "court_version",
+        "type": "bigint",
+        "nullable": true
+      },
+      {
+        "name": "disruption_version",
+        "type": "bigint",
+        "nullable": true
+      },
+      {
+        "name": "details",
+        "type": "json",
+        "nullable": true
+      }
+    ],
+    "primaryKey": [
+      "id"
+    ]
+  },
+  "tournaments": {
+    "columns": [
+      {
+        "name": "id",
+        "type": "int",
+        "nullable": false
+      },
+      {
+        "name": "name",
+        "type": "varchar(100)",
+        "nullable": false
+      },
+      {
+        "name": "sport",
+        "type": "varchar(50)",
+        "nullable": false
+      },
+      {
+        "name": "status",
+        "type": "varchar(30)",
+        "nullable": false
+      },
+      {
+        "name": "created_at",
+        "type": "timestamp",
+        "nullable": true
+      },
+      {
+        "name": "updated_at",
+        "type": "timestamp",
+        "nullable": true
+      }
+    ],
+    "primaryKey": [
+      "id"
+    ]
+  },
+  "waivers": {
+    "columns": [
+      {
+        "name": "id",
+        "type": "int",
+        "nullable": false
+      },
+      {
+        "name": "tournament_id",
+        "type": "int",
+        "nullable": false
+      },
+      {
+        "name": "player_id",
+        "type": "int",
+        "nullable": false
+      },
+      {
+        "name": "waiver_version",
+        "type": "varchar(50)",
+        "nullable": false
+      },
+      {
+        "name": "accepted_by",
+        "type": "varchar(100)",
+        "nullable": false
+      },
+      {
+        "name": "accepted_at",
+        "type": "timestamp",
+        "nullable": false
+      }
+    ],
+    "primaryKey": [
+      "id"
+    ]
+  }
+}
