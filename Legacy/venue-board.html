@@ -24,7 +24,9 @@
         .running .status { background: #0f766e; color: #ccfbf1; }
         .pending .status { background: #92400e; color: #fef3c7; }
         .matchup { min-height: 0; display: grid; grid-template-columns: minmax(0,1fr) auto minmax(0,1fr); align-items: center; gap: clamp(10px, 1vw, 20px); margin: 1vh 0; }
+        .side-stack { min-width: 0; display: grid; align-content: center; gap: .45em; text-align: center; }
         .side { overflow: hidden; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; font-size: clamp(23px, 2.25vw, 44px); font-weight: 900; line-height: 1.15; text-align: center; overflow-wrap: anywhere; }
+        .team-context { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; color: #94a3b8; font-size: clamp(12px, .95vw, 19px); font-weight: 750; }
         .versus { color: #64748b; font-size: clamp(14px, 1.1vw, 22px); font-weight: 900; }
         .score { text-align: center; font: 950 clamp(31px, 3.6vw, 70px)/1 ui-monospace, monospace; color: #5eead4; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
         .pending .score { color: #fbbf24; font-family: inherit; font-size: clamp(19px, 1.6vw, 30px); }
@@ -61,6 +63,14 @@
         return node;
     }
 
+    function appendSide(parent, primary, teamContext) {
+        const side = document.createElement('div');
+        side.className = 'side-stack';
+        appendText(side, 'side', primary || '待定');
+        if (teamContext) appendText(side, 'team-context', teamContext);
+        parent.appendChild(side);
+    }
+
     function render(projection) {
         const matches = VenueProjection.relevantMatches(projection, { showIdle, limit: 8 });
         const signature = JSON.stringify([projection.event, matches]);
@@ -85,9 +95,9 @@
             appendText(top, 'status', match.status);
             card.appendChild(top);
             const matchup = document.createElement('div'); matchup.className = 'matchup';
-            appendText(matchup, 'side', match.side_a || '待定');
+            appendSide(matchup, match.side_a, match.side_a_team);
             appendText(matchup, 'versus', 'VS');
-            appendText(matchup, 'side', match.side_b || '待定');
+            appendSide(matchup, match.side_b, match.side_b_team);
             card.appendChild(matchup);
             appendText(card, 'score', match.status === RUNNING ? (match.score || '0 - 0') : match.status === PENDING ? '即将开赛' : '空闲');
             appendText(card, 'referee', match.referee ? `裁判 ${match.referee}` : '');
