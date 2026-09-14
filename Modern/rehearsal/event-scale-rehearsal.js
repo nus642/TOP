@@ -7,7 +7,7 @@ const path = require("node:path");
 const { validateDataSafety } = require("../deploy/field-test/data-safety");
 const { VERSION, COUNTS, COURTS, REFEREES, buildFixture } = require("./event-scale-fixture");
 const { readRuntimeBuildId, BUILD_ID_FILE } = require("./build-identity");
-const { buildUsageEvidence } = require("./event-scale-accounting");
+const { assertNoConcurrentResources, buildUsageEvidence } = require("./event-scale-accounting");
 
 const BASE_URL = process.env.BASE_URL || "http://127.0.0.1:3000";
 const OUTPUT = process.env.REHEARSAL_EVIDENCE_DIR || path.join(__dirname, "evidence");
@@ -84,13 +84,11 @@ async function run() {
   let waveNumber = 0;
 
   async function exerciseWave(wave) {
-    assert.equal(new Set(wave.map((entry) => entry.match.schedule.courtId)).size, wave.length, "wave courts must be unique");
-    assert.equal(new Set(wave.map((entry) => entry.referee)).size, wave.length, "wave referees must be unique");
+    assertNoConcurrentResources(wave.map(({ match, referee }) => ({ courtId: match.schedule.courtId, refereeId: referee })));
     await Promise.all(wave.map(({ match, referee }, index) => dispatch(master, competitionId, match, referee, `wave${waveNumber}:${index}`)));
     const active = await overview(master, competitionId);
     const dispatched = active.filter((match) => status(match) === "dispatched");
-    assert.equal(new Set(dispatched.map((match) => match.schedule.courtId)).size, dispatched.length);
-    assert.equal(new Set(dispatched.map((match) => match.referee.refereeId)).size, dispatched.length);
+    assertNoConcurrentResources(dispatched.map((match) => ({ courtId: match.schedule.courtId, refereeId: match.referee.refereeId })));
     await Promise.all(wave.map(({ match, referee }) => complete(master, refereeCookies[referee], competitionId, match.matchId, referee, `wave${waveNumber}`)));
     assignments.push(...wave.map(({ match, referee }) => ({ courtId: match.schedule.courtId, refereeId: referee })));
     const after = await overview(master, competitionId);

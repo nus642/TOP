@@ -12,8 +12,10 @@ function buildFixture() {
   const rounds = Array.from({ length: COUNTS.rounds }, (_, roundIndex) => {
     const matchesThisRound = Math.min(COUNTS.courts, COUNTS.matches - sequence);
     const matches = COURTS.slice(0, matchesThisRound).map((court, courtIndex) => {
-      const home = (roundIndex * 9 + courtIndex) % COUNTS.pairs;
-      const away = (home + roundIndex + courtIndex + 1) % COUNTS.pairs;
+      // Draw each round from two disjoint eight-pair blocks so a pair (and
+      // therefore either of its players) can never occupy two courts at once.
+      const home = (roundIndex * 16 + courtIndex) % COUNTS.pairs;
+      const away = (roundIndex * 16 + COUNTS.courts + courtIndex) % COUNTS.pairs;
       const minuteOffset = roundIndex * 30;
       sequence += 1;
       return {

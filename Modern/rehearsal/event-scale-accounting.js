@@ -19,4 +19,11 @@ function buildUsageEvidence(assignments, courts, referees) {
   };
 }
 
-module.exports = { buildUsageEvidence };
+function assertNoConcurrentResources(assignments) {
+  const courts = assignments.map(({ courtId }) => courtId);
+  const referees = assignments.map(({ refereeId }) => refereeId);
+  if (new Set(courts).size !== courts.length) throw new Error("a court has multiple concurrent active matches");
+  if (new Set(referees).size !== referees.length) throw new Error("a referee has multiple concurrent active matches");
+}
+
+module.exports = { assertNoConcurrentResources, buildUsageEvidence };
