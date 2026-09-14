@@ -10,7 +10,7 @@ const { spawnSync } = require("node:child_process");
 const modern = path.join(__dirname, "..");
 const operator = path.join(modern, "deploy/field-test/field-test");
 
-function harness({ failPreflight = false, failDump = false, databaseIdentity = "modern_field_test_v1" } = {}) {
+function harness({ failPreflight = false, failDump = false, failNormalization = false, databaseIdentity = "modern_field_test_v1" } = {}) {
   const directory = fs.mkdtempSync(path.join(os.tmpdir(), "field-test-operator-"));
   const log = path.join(directory, "docker.log");
   for (const command of ["node", "npm"]) {
@@ -23,6 +23,8 @@ case "$*" in
   *"db sh"*"mysqldump"*)
     printf '%s\n' '-- partial MySQL dump'
     ${failDump ? "exit 29" : "exit 0"} ;;
+  *"app node deploy/field-test/data-operation.js validate-backup"*)
+    ${failNormalization ? "exit 31" : "cat"} ;;
   *"app node deploy/field-test/data-operation.js validate-restore"*) cat ;;
   *"app node deploy/field-test/data-operation.js preflight --destructive --emit-drop-sql"*)
     ${failPreflight ? "exit 23" : "printf 'DROP TABLE IF EXISTS `safe`;\\n'"} ;;
@@ -90,6 +92,21 @@ test("mysqldump failure fails closed before validation or publication", () => {
   const trace = fs.readFileSync(fixture.log, "utf8");
   assert.match(trace, /exec -T db sh .*mysqldump .*--no-tablespaces/);
   assert.doesNotMatch(trace, /data-operation\.js validate-backup/);
+});
+
+test("failed backup normalization does not publish a final artifact", () => {
+  const fixture = harness({ failNormalization: true });
+  const backupDirectory = path.join(modern, "deploy/field-test/backups");
+  fs.mkdirSync(backupDirectory, { recursive: true });
+  const before = fs.readdirSync(backupDirectory).sort();
+
+  const result = run(["backup"], fixture);
+
+  assert.notEqual(result.status, 0);
+  assert.doesNotMatch(result.stdout, /backup created/);
+  assert.deepEqual(fs.readdirSync(backupDirectory).sort(), before);
+  const trace = fs.readFileSync(fixture.log, "utf8");
+  assert.match(trace, /data-operation\.js validate-backup/);
 });
 
 test("wrong db-container mysql target prevents every destructive command", () => {

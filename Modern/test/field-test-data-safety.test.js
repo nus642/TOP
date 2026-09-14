@@ -4,7 +4,7 @@ const fs = require("node:fs");
 const path = require("node:path");
 const { spawnSync } = require("node:child_process");
 
-const { DESTRUCTIVE_ACKNOWLEDGEMENT, validateDataSafety } = require("../deploy/field-test/data-safety");
+const { DESTRUCTIVE_ACKNOWLEDGEMENT, validateBackupDump, validateDataSafety } = require("../deploy/field-test/data-safety");
 
 const validEnvironment = () => ({
   TOP_ENVIRONMENT: "field-test",
@@ -68,6 +68,37 @@ test("restore rejects an artifact that can select an unsafe target before databa
   assert.notEqual(result.status, 0);
   assert.match(result.stderr, /ambiguous or unsafe database target/);
   assert.doesNotMatch(result.stderr, /password|test-placeholder/i);
+});
+
+test("backup removes a privileged mysqldump view definer without removing the view", () => {
+  const dump = Buffer.from(`-- MySQL dump 10.13  Distrib 8.0.43\n${"-".repeat(100)}\n/*!50001 CREATE ALGORITHM=UNDEFINED */\n/*!50013 DEFINER=\`root\`@\`localhost\` SQL SECURITY DEFINER */\n/*!50001 VIEW \`master_operational_match_overview\` AS select 1 AS \`match_id\` */;\n`);
+
+  const backup = validateBackupDump(dump).toString("utf8");
+
+  assert.match(backup, /^-- TOP-DATABASE: modern_field_test_v1\n-- MySQL dump/);
+  assert.doesNotMatch(backup, /DEFINER=\`root\`@\`localhost\`/);
+  assert.match(backup, /\/\*!50013 SQL SECURITY DEFINER \*\//);
+  assert.match(backup, /VIEW \`master_operational_match_overview\` AS select 1/);
+});
+
+test("backup normalization preserves every unrelated dump byte", () => {
+  const before = Buffer.concat([
+    Buffer.from(`-- MySQL dump 10.13  Distrib 8.0.43\n${"-".repeat(100)}\nINSERT INTO \`binary_data\` VALUES ('`),
+    Buffer.from([0x00, 0x80, 0xc3, 0x28, 0xff]),
+    Buffer.from(`');\n/*!50013 DEFINER=\`root\`@\`localhost\` SQL SECURITY DEFINER */\n/*!50001 VIEW \`preserved_view\` AS select 1 */;\n-- trailing bytes: `),
+    Buffer.from([0xfe, 0x7f])
+  ]);
+  const target = Buffer.from("/*!50013 DEFINER=`root`@`localhost` SQL SECURITY DEFINER */");
+  const replacement = Buffer.from("/*!50013 SQL SECURITY DEFINER */");
+  const targetOffset = before.indexOf(target);
+  const expected = Buffer.concat([
+    Buffer.from("-- TOP-DATABASE: modern_field_test_v1\n"),
+    before.subarray(0, targetOffset),
+    replacement,
+    before.subarray(targetOffset + target.length)
+  ]);
+
+  assert.deepEqual(validateBackupDump(before), expected);
 });
 
 test("recovery operations separate pre-drop target identity from post-operation schema health", () => {
