@@ -19,7 +19,7 @@ function validateSchema(rows) {
   if (JSON.stringify(actual) !== JSON.stringify(contract)) throw new Error("Modern Field Test current-schema contract drift detected");
   return actual;
 }
-function quote(name) { if (!/^[a-z_][a-z0-9_]*$/.test(name)) throw new Error("unsafe schema identifier"); return `\`${name}\``; }
+function quote(name) { if (!/^[A-Za-z_][A-Za-z0-9_]*$/.test(name)) throw new Error("unsafe schema identifier"); return `\`${name}\``; }
 function rowQuery(table, spec) {
   const cells = spec.columns.map((c, i) => `IF(${quote(c.name)} IS NULL,'N',CONCAT('H',HEX(CAST(${quote(c.name)} AS BINARY)))) AS c${i}`);
   return `SELECT ${cells.join(",")} FROM ${quote(table)} ORDER BY ${spec.primaryKey.map(quote).join(",")}`;
