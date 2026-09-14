@@ -117,3 +117,5 @@ The separate manual Lighthouse prerequisite is intentionally two-session and mus
 ```
 
 Neither watchdog-only command creates a backup, restores data, or issues a competition mutation. Evidence is run-specific under `evidence/db-recovery/RUN_ID/` with private file modes.
+
+The host controller pins one Docker access mode before arming: direct `docker`, or non-interactive `sudo -n docker`. In sudo mode it proves password-cache-independent foreground and detached-session access before pause; the watchdog receives only that validated mode plus the immutable container ID and can still perform only the exact-ID `unpause` action.

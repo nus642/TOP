@@ -5,15 +5,21 @@ umask 077
 container_id=$1
 case "$container_id" in *[!0-9a-f]*|'') printf '%s\n' '{"event":"rejected","reason":"container-id-must-be-64-lowercase-hex"}'; exit 64;; esac
 [ "${#container_id}" -eq 64 ] || { printf '%s\n' '{"event":"rejected","reason":"container-id-must-be-64-lowercase-hex"}'; exit 64; }
+docker_access_mode=${TOP_DB_WATCHDOG_DOCKER_MODE-}
+case "$docker_access_mode" in
+  direct) docker_unpause() { docker unpause "$container_id"; } ;;
+  sudo-n) docker_unpause() { sudo -n docker unpause "$container_id"; } ;;
+  *) printf '%s\n' '{"event":"rejected","reason":"preselected-docker-access-mode-required"}'; exit 64 ;;
+esac
 deadline_seconds=45
 start_ticks=$(awk '{print $22}' "/proc/$$/stat")
-printf '{"event":"armed","containerId":"%s","pid":%s,"procStartTicks":"%s","deadlineSeconds":%s,"armedEpoch":%s}\n' "$container_id" "$$" "$start_ticks" "$deadline_seconds" "$(date +%s)"
-disarm() { printf '{"event":"disarmed","containerId":"%s","pid":%s}\n' "$container_id" "$$"; exit 0; }
+printf '{"event":"armed","containerId":"%s","pid":%s,"procStartTicks":"%s","deadlineSeconds":%s,"armedEpoch":%s,"dockerAccessMode":"%s"}\n' "$container_id" "$$" "$start_ticks" "$deadline_seconds" "$(date +%s)" "$docker_access_mode"
+disarm() { printf '{"event":"disarmed","containerId":"%s","pid":%s,"dockerAccessMode":"%s"}\n' "$container_id" "$$" "$docker_access_mode"; exit 0; }
 trap disarm TERM
 sleep "$deadline_seconds" & sleeper=$!
 wait "$sleeper" || true
 trap - TERM
-printf '{"event":"deadline","containerId":"%s","pid":%s}\n' "$container_id" "$$"
-if docker unpause "$container_id"; then result=unpaused; else result=unpause-failed; fi
-printf '{"event":"deadline-result","containerId":"%s","pid":%s,"result":"%s"}\n' "$container_id" "$$" "$result"
+printf '{"event":"deadline","containerId":"%s","pid":%s,"dockerAccessMode":"%s"}\n' "$container_id" "$$" "$docker_access_mode"
+if docker_unpause; then result=unpaused; else result=unpause-failed; fi
+printf '{"event":"deadline-result","containerId":"%s","pid":%s,"dockerAccessMode":"%s","result":"%s"}\n' "$container_id" "$$" "$docker_access_mode" "$result"
 [ "$result" = unpaused ]
