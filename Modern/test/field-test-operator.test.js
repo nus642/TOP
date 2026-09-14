@@ -99,6 +99,19 @@ test("app restart continuity stops and starts only app while preserving containe
   assert.doesNotMatch(trace, /(?:down|up|create|recreate)/);
 });
 
+test("restart continuity reservation projection uses only canonical schema columns", () => {
+  const source = fs.readFileSync(operator, "utf8");
+  const schema = fs.readFileSync(path.join(modern, "db.sql"), "utf8");
+  const projection = source.match(/SELECT ([^;]+) FROM referee_dispatch_reservations ORDER BY ([^;]+);/);
+  assert.ok(projection, "reservation continuity projection expected");
+  assert.equal(projection[1], "competition_id,match_id,dispatch_id,referee_id,court_id,expected_version,correlation_id,accepted_at,rejected_at,rejected_reason");
+  assert.equal(projection[2], "competition_id,match_id,dispatch_id");
+  const table = schema.match(/CREATE TABLE IF NOT EXISTS referee_dispatch_reservations \(([\s\S]*?)\n\)/)?.[1];
+  assert.ok(table, "canonical reservation schema expected");
+  for (const column of projection[1].split(",")) assert.match(table, new RegExp(`\\n\\s*${column}\\s`), `${column} must exist in canonical schema`);
+  assert.doesNotMatch(projection[1], /(?:^|,)tournament_id(?:,|$)|(?:^|,)status(?:,|$)/);
+});
+
 test("failed destructive preflight cannot reach a db command", () => {
   const fixture = harness({ failPreflight: true });
   const artifact = path.join(fixture.directory, "backup.sql");
