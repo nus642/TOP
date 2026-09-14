@@ -81,6 +81,26 @@ test("backup removes a privileged mysqldump view definer without removing the vi
   assert.match(backup, /VIEW \`master_operational_match_overview\` AS select 1/);
 });
 
+test("backup normalization preserves every unrelated dump byte", () => {
+  const before = Buffer.concat([
+    Buffer.from(`-- MySQL dump 10.13  Distrib 8.0.43\n${"-".repeat(100)}\nINSERT INTO \`binary_data\` VALUES ('`),
+    Buffer.from([0x00, 0x80, 0xc3, 0x28, 0xff]),
+    Buffer.from(`');\n/*!50013 DEFINER=\`root\`@\`localhost\` SQL SECURITY DEFINER */\n/*!50001 VIEW \`preserved_view\` AS select 1 */;\n-- trailing bytes: `),
+    Buffer.from([0xfe, 0x7f])
+  ]);
+  const target = Buffer.from("/*!50013 DEFINER=`root`@`localhost` SQL SECURITY DEFINER */");
+  const replacement = Buffer.from("/*!50013 SQL SECURITY DEFINER */");
+  const targetOffset = before.indexOf(target);
+  const expected = Buffer.concat([
+    Buffer.from("-- TOP-DATABASE: modern_field_test_v1\n"),
+    before.subarray(0, targetOffset),
+    replacement,
+    before.subarray(targetOffset + target.length)
+  ]);
+
+  assert.deepEqual(validateBackupDump(before), expected);
+});
+
 test("recovery operations separate pre-drop target identity from post-operation schema health", () => {
   const source = fs.readFileSync(path.join(__dirname, "../deploy/field-test/data-operation.js"), "utf8");
   const operator = fs.readFileSync(path.join(__dirname, "../deploy/field-test/field-test"), "utf8");

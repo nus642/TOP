@@ -21,14 +21,26 @@ function artifactText(artifact) {
   return artifact.toString("utf8");
 }
 
+function normalizeViewDefiner(line) {
+  const match = line.toString("latin1").match(
+    /^\/\*!(\d{5}) DEFINER=`(?:``|[^`])+`@`(?:``|[^`])+` SQL SECURITY (DEFINER|INVOKER) \*\/$/
+  );
+  return match ? Buffer.from(`/*!${match[1]} SQL SECURITY ${match[2]} */`) : line;
+}
+
 function validateBackupDump(artifact) {
   const text = artifactText(artifact);
   if (!text.includes("MySQL dump")) throw new Error("backup artifact usability check failed");
-  const normalized = text.replace(
-    /^\/\*!(\d{5}) DEFINER=`(?:``|[^`])+`@`(?:``|[^`])+` SQL SECURITY (DEFINER|INVOKER) \*\/$/gm,
-    "/*!$1 SQL SECURITY $2 */"
-  );
-  return Buffer.from(BACKUP_HEADER + normalized);
+  const chunks = [Buffer.from(BACKUP_HEADER)];
+  let start = 0;
+  while (start < artifact.length) {
+    const newline = artifact.indexOf(0x0a, start);
+    const end = newline === -1 ? artifact.length : newline;
+    chunks.push(normalizeViewDefiner(artifact.subarray(start, end)));
+    if (newline !== -1) chunks.push(artifact.subarray(newline, newline + 1));
+    start = newline === -1 ? artifact.length : newline + 1;
+  }
+  return Buffer.concat(chunks);
 }
 
 function validateRestoreArtifact(artifact) {
