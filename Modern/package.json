@@ -8,7 +8,8 @@
     "dev": "nodemon server.js",
     "test": "node --test",
     "field-test:rehearsal": "deploy/field-test/field-test rehearsal",
-    "field-test:event-scale-rehearsal": "deploy/field-test/field-test event-scale-rehearsal"
+    "field-test:event-scale-rehearsal": "deploy/field-test/field-test event-scale-rehearsal",
+    "field-test:db-recovery-start": "deploy/field-test/field-test db-recovery-start"
   },
   "keywords": [],
   "author": "",

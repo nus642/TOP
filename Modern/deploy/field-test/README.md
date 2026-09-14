@@ -86,3 +86,54 @@ no-auto-reset, and runtime-build-identity boundaries as the fast profile.
 Every attempt writes `deploy/field-test/evidence/latest.json` through the app's evidence-only bind mount. Generated manifests are ignored and mode 0600; the committed `evidence/manifest.schema.json` documents their sanitized shape. Evidence contains environment/build identity, fixture counts, timestamps, checkpoints, turnover/probe outcomes, and pass/fail only—never credentials, cookies, environment dumps, or participant inputs. Archive a reviewed manifest outside the working tree if retention is required. Reset and rerun to demonstrate equivalent fixture state; do not run a second rehearsal over existing data.
 
 Real-device/browser evidence, interruption and restart recovery, Lighthouse/Nginx/HTTPS deployment, UI watermarking, real participant data, production cutover, and production eligibility remain explicitly deferred.
+
+## DB failure / restore continuity rehearsal
+
+This profile is gated behind a successful, separately reviewed Lighthouse
+watchdog proof. The proof pauses only the already verified immutable `db`
+container ID. Its detached 45-second watchdog can only run `docker unpause` for
+that exact ID, and must demonstrate recovery after the foreground controller or
+its SSH session disappears:
+
+```bash
+./field-test watchdog-proof
+# The proof controller deliberately terminates without cleanup. From a separate
+# session, after the fixed deadline, run the printed command:
+./field-test watchdog-proof-verify evidence/watchdog-proof-….context
+```
+
+Run that proof under observation before the first recovery rehearsal; do not
+treat unit tests as Lighthouse evidence. After an explicitly acknowledged reset
+and with no outside writers, begin the synthetic single-writer run:
+
+```bash
+export TOP_FIELD_TEST_SINGLE_WRITER_ACKNOWLEDGEMENT=CONTROLLED-SINGLE-WRITER-MODERN-FIELD-TEST-V1
+./field-test db-recovery-start
+unset TOP_FIELD_TEST_SINGLE_WRITER_ACKNOWLEDGEMENT
+```
+
+Start establishes confirmed, playing, and assigned Matches, closes its own
+write gate, snapshots every canonical base table, calls the existing `backup`
+operation, checks an identical bracketing snapshot, records a deterministic
+post-backup delta, and performs the bounded DB-pause probe. Its formal claim is
+exactly: **Recovery point bound to backup under the controlled single-writer
+synthetic rehearsal assumption.** The gate controls the runner only; it is not
+a global database lock, and the evidence records that outside writers were not
+technically locked out.
+
+The command then stops at a run-specific restore gate. It never resets or
+restores automatically. Review the printed run ID, backup path, and SHA-256,
+then resume only with the existing destructive acknowledgement:
+
+```bash
+export TOP_FIELD_TEST_DESTRUCTIVE_ACKNOWLEDGEMENT=DESTROY-MODERN-FIELD-TEST-V1-DATA
+./field-test db-recovery-resume RUN-ID
+unset TOP_FIELD_TEST_DESTRUCTIVE_ACKNOWLEDGEMENT
+```
+
+Resume resolves the backup recorded for that run, rechecks its hash, invokes
+the existing `restore` operation, proves exact recovery-point equality and
+expected RPO loss, establishes fresh sessions, completes the recovered playing
+Match, and completes a subsequent Match with its released Court and Referee.
+It does not restart the app. Run-specific JSON and watchdog JSONL evidence are
+written mode 0600 under `evidence/` and must be archived for eligibility review.

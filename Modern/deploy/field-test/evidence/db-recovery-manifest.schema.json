@@ -1,0 +1,31 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://top.invalid/modern-field-test/db-recovery-manifest.schema.json",
+  "title": "Modern Field Test DB failure and restore continuity evidence",
+  "type": "object",
+  "required": ["schemaVersion", "profile", "run", "environment", "build", "databaseIdentity", "fixture", "checkpoints", "gate", "matches", "recoveryPoint", "backup", "postBackupDelta", "failureObserved", "restoreCompleted", "recoveredState", "expectedRpoLoss", "operationalContinuation", "finalIntegrity", "summary"],
+  "properties": {
+    "schemaVersion": { "const": 1 },
+    "profile": { "const": "db-failure-restore-continuity" },
+    "run": { "type": "object", "required": ["id", "startedAt"] },
+    "environment": { "type": "object", "required": ["id", "database"], "properties": { "id": { "pattern": "^modern-field-test-v1-" }, "database": { "const": "modern_field_test_v1" } } },
+    "build": { "type": "object", "required": ["identity", "source"] },
+    "databaseIdentity": { "type": "object", "required": ["databaseName", "serverUuid", "serverVersion", "currentUser", "containerId", "imageId", "applicationUserClass"] },
+    "fixture": { "type": "object" },
+    "checkpoints": { "type": "array" },
+    "gate": { "type": "object" },
+    "matches": { "type": "object" },
+    "recoveryPoint": { "type": ["object", "null"] },
+    "backup": { "type": ["object", "null"] },
+    "postBackupDelta": { "type": ["object", "null"] },
+    "failureObserved": { "type": ["object", "null"] },
+    "restoreCompleted": { "type": ["object", "null"] },
+    "recoveredState": { "type": ["object", "null"] },
+    "expectedRpoLoss": { "type": ["object", "null"] },
+    "operationalContinuation": { "type": ["object", "null"] },
+    "finalIntegrity": { "type": ["object", "null"] },
+    "summary": { "type": "object", "required": ["passed"] },
+    "competitionId": { "type": "integer" }
+  },
+  "additionalProperties": false
+}
