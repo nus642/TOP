@@ -93,5 +93,11 @@ case "$operation" in
     compose exec -T --user root app sh -ceu 'chown node:node /app/rehearsal/evidence; chmod 0700 /app/rehearsal/evidence'
     app_node rehearsal/full-scale-rehearsal.js
     ;;
-  *) die "usage: $0 verify|backup|reset|restore BACKUP.sql|rehearsal" ;;
+  event-scale-rehearsal)
+    [ "$#" -eq 1 ] || die "usage: $0 event-scale-rehearsal"
+    app_node deploy/field-test/data-operation.js preflight
+    compose exec -T --user root app sh -ceu 'chown node:node /app/rehearsal/evidence; chmod 0700 /app/rehearsal/evidence'
+    app_node rehearsal/event-scale-rehearsal.js
+    ;;
+  *) die "usage: $0 verify|backup|reset|restore BACKUP.sql|rehearsal|event-scale-rehearsal" ;;
 esac
