@@ -24,7 +24,11 @@ function artifactText(artifact) {
 function validateBackupDump(artifact) {
   const text = artifactText(artifact);
   if (!text.includes("MySQL dump")) throw new Error("backup artifact usability check failed");
-  return Buffer.concat([Buffer.from(BACKUP_HEADER), artifact]);
+  const normalized = text.replace(
+    /^\/\*!(\d{5}) DEFINER=`(?:``|[^`])+`@`(?:``|[^`])+` SQL SECURITY (DEFINER|INVOKER) \*\/$/gm,
+    "/*!$1 SQL SECURITY $2 */"
+  );
+  return Buffer.from(BACKUP_HEADER + normalized);
 }
 
 function validateRestoreArtifact(artifact) {
