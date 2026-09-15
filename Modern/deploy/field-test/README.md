@@ -135,3 +135,12 @@ On Lighthouse, where Node is intentionally unavailable on the host, run the cano
 ```
 
 This dedicated command does not inspect or connect to the Modern Field Test stack and requires no destructive acknowledgement. Host POSIX shell owns all Docker orchestration; it selects direct Docker or `sudo -n docker`, publishes no port, mounts no socket, creates no named network or volume, and removes only the immutable ID of its one disposable `mysql:8.4` container. A successful command emits one safe JSON evidence record. It is safe to run before the watchdog-only proof or DB recovery rehearsal.
+
+The DB recovery rehearsal requires a canonical explicit reset immediately before a fresh recovery RUN_ID. Run:
+
+```sh
+TOP_FIELD_TEST_DESTRUCTIVE_ACKNOWLEDGEMENT=DESTROY-MODERN-FIELD-TEST-V1-DATA ./field-test reset
+./field-test db-recovery RUN_ID
+```
+
+A watchdog-proof RUN_ID and a recovery RUN_ID must be distinct; existing run evidence is never reused. Any interrupted `post-backup-delta-in-progress` run is invalid and non-resumable: explicitly reset and choose a fresh RUN_ID.
