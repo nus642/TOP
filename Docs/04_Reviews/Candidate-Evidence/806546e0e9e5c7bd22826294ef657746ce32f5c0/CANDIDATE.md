@@ -15,12 +15,12 @@ category directory.
 
 No Evidence Records are included in this foundation package.
 
-The category directories are intentionally empty:
+The category directories contain only `.gitkeep` tracking markers:
 
 - `01-candidate-identity/`
 - `02-scope-boundary/`
 - `08-limitations/`
 
-Their presence reserves a stable filing structure only. It does not state or
-imply that review work has been performed, that evidence exists, or that any
-gate has been evaluated or satisfied.
+The markers are not Evidence Records. Their presence reserves a stable filing
+structure only. It does not state or imply that review work has been performed,
+that evidence exists, or that any gate has been evaluated or satisfied.
