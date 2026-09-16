@@ -6,6 +6,10 @@ This directory contains evidence-led reviews that sit before architecture or imp
 
 - [2026-09-12 Production Trial & Field Validation Review](./2026-09-12-Production-Trial-Field-Validation-Review.md)
 
+## Candidate evidence
+
+- [Candidate Evidence Packages](./Candidate-Evidence/README.md)
+
 ## Governance
 
 A Review freezes evidence, observations, and hypotheses. It does not by itself authorize Canon, architecture, domain-model, product, or engineering changes.
