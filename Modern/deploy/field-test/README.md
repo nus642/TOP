@@ -94,3 +94,53 @@ While the app is down, the wrapper requires stopped/unreachable app observations
 Source-level tests validate orchestration and evidence logic with fakes; they are not real Lighthouse or real MySQL recovery evidence. The real rehearsal must still be run on the reviewed Lighthouse Modern Field Test stack and its sanitized manifest reviewed and archived.
 
 Real-device/browser evidence, Lighthouse/Nginx/HTTPS deployment, UI watermarking, real participant data, production cutover, and production eligibility remain explicitly deferred.
+
+## DB failure / restore continuity (source-review commands)
+
+This Modern Field Test v1 rehearsal is deliberately split at a destructive restore gate. It never resets data automatically and never selects a backup by `latest` or wildcard.
+
+```sh
+./field-test db-recovery RUN_ID
+TOP_FIELD_TEST_DESTRUCTIVE_ACKNOWLEDGEMENT=DESTROY-MODERN-FIELD-TEST-V1-DATA \
+  ./field-test db-recovery-resume RUN_ID
+```
+
+The first command establishes the five-match Recovery Point, invokes the existing `backup` path, creates and accounts for the post-backup delta, performs the bounded exact-container pause/unpause, and stops. The resume command resolves the run-specific manifest, checks the recorded artifact hash, invokes the existing `restore` path with that exact path, proves an exact snapshot match, and continues with fresh sessions.
+
+The separate manual Lighthouse prerequisite is intentionally two-session and must not be run automatically from development:
+
+```sh
+# Session 1: this controller deliberately SIGKILLs itself after arming and pausing.
+./field-test db-recovery-watchdog-proof-start RUN_ID
+# Independent session 2: wait for deadline recovery and prove before == after.
+./field-test db-recovery-watchdog-proof-observe RUN_ID
+```
+
+Neither watchdog-only command creates a backup, restores data, or issues a competition mutation. Evidence is run-specific under `evidence/db-recovery/RUN_ID/` with private file modes.
+
+The host controller pins one Docker access mode before arming: direct `docker`, or non-interactive `sudo -n docker`. In sudo mode it proves password-cache-independent foreground and detached-session access before pause; the watchdog receives only that validated mode plus the immutable container ID and can still perform only the exact-ID `unpause` action.
+
+Before authorizing the Lighthouse DB recovery run, execute the disposable MySQL 8.4 JSON dump/restore proof from the repository's `Modern` directory:
+
+```sh
+TOP_MYSQL_84_JSON_STABILITY=1 node --test --test-name-pattern='MySQL 8.4 JSON byte stability' test/db-recovery-continuity.test.js
+```
+
+The opt-in test starts an isolated `mysql:8.4` container with no published ports, fails unless the server reports MySQL 8.4, inserts the reviewed JSON value matrix, captures `HEX(CAST(payload AS BINARY))`, dumps with the Field Test backup options, restores into a second disposable database, and requires exact byte equality. It removes only the exact disposable container ID it created and never addresses a Field Test or Legacy database.
+
+On Lighthouse, where Node is intentionally unavailable on the host, run the canonical host-shell prerequisite instead:
+
+```sh
+./field-test db-recovery-json-stability-proof
+```
+
+This dedicated command does not inspect or connect to the Modern Field Test stack and requires no destructive acknowledgement. Host POSIX shell owns all Docker orchestration; it selects direct Docker or `sudo -n docker`, publishes no port, mounts no socket, creates no named network or volume, and removes only the immutable ID of its one disposable `mysql:8.4` container. A successful command emits one safe JSON evidence record. It is safe to run before the watchdog-only proof or DB recovery rehearsal.
+
+The DB recovery rehearsal requires a canonical explicit reset immediately before a fresh recovery RUN_ID. Run:
+
+```sh
+TOP_FIELD_TEST_DESTRUCTIVE_ACKNOWLEDGEMENT=DESTROY-MODERN-FIELD-TEST-V1-DATA ./field-test reset
+./field-test db-recovery RUN_ID
+```
+
+A watchdog-proof RUN_ID and a recovery RUN_ID must be distinct; existing run evidence is never reused. Any interrupted `post-backup-delta-in-progress` run is invalid and non-resumable: explicitly reset and choose a fresh RUN_ID.

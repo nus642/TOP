@@ -1,0 +1,18 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://top.example/schemas/modern-field-test-db-recovery-v1.json",
+  "title": "Modern Field Test v1 DB Recovery Evidence",
+  "type": "object",
+  "required": ["run", "environment", "artifactIdentity", "databaseIdentity", "recoveryPoint", "recoveryPointBinding", "backupIdentity", "postBackupDelta", "failureObserved", "watchdog", "restoreCompleted", "recoveredState", "expectedRpoLoss", "operationalContinuation", "finalIntegrity", "legacyBoundary", "summary"],
+  "properties": {
+    "schemaVersion": { "const": 1 },
+    "run": { "type": "object" }, "environment": { "type": "object" }, "artifactIdentity": { "type": "object" },
+    "databaseIdentity": { "type": "object" }, "recoveryPoint": { "type": "object" }, "recoveryPointBinding": { "type": "object" },
+    "backupIdentity": { "type": ["object", "null"] }, "postBackupDelta": { "type": ["object", "null"] },
+    "failureObserved": { "type": ["object", "null"] }, "watchdog": { "type": ["object", "null"] },
+    "restoreCompleted": { "type": ["object", "null"] }, "recoveredState": { "type": ["object", "null"] },
+    "expectedRpoLoss": { "type": ["object", "null"] }, "operationalContinuation": { "type": ["object", "null"] },
+    "finalIntegrity": { "type": ["object", "null"] }, "legacyBoundary": { "type": "object" }, "summary": { "type": "object" }
+  },
+  "additionalProperties": true
+}
