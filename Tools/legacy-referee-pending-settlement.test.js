@@ -95,5 +95,5 @@ test('re-entry derives pending settlement from authoritative score and preserves
   assert.match(html, /cap: t\.cap_score == null \|\| t\.cap_score === '' \? '' : Number\(t\.cap_score\)/);
   const reentry = html.slice(html.indexOf('window.continueServerAssignment ='), html.indexOf('async function discoverServerAssignment'));
   assert.match(reentry, /reconcileGameCompletion\(\)/);
-  assert.match(html, /\['not_started','in_progress','game_complete_pending_settlement'\]/);
+  assert.match(html, /\['not_started','between_games_preparation','in_progress','deciding_game_end_change','game_complete_pending_settlement'\]/);
 });

@@ -213,6 +213,10 @@
         </div>
 
         <div id="step2" class="hidden-section">
+            <div id="betweenGamesHeading" class="hidden mb-4 p-4 rounded-xl border border-amber-500/40 bg-amber-900/20 text-center">
+                <div id="betweenGamesTitle" class="text-xl font-black text-amber-300">下一局准备</div>
+                <div class="text-xs text-slate-300 mt-1">队伍及选手保持不变；可调整发球队、发球员和接发球员后明确开始下一局</div>
+            </div>
             <div class="flex justify-between items-center mb-4 bg-slate-800 p-3 rounded-xl border border-slate-700 shadow-md">
                 <button id="prepTimerBtn" onclick="togglePrepTimer()" class="bg-indigo-600 px-4 py-2 rounded-lg text-sm font-bold btn-press text-white shadow-md border border-indigo-400/30">⏱️ 热身倒数</button>
                 <span id="prepTimer" class="text-2xl font-mono font-black text-amber-400 bg-black/40 px-3 py-1 rounded-lg border border-black/50">00:00</span>
@@ -234,15 +238,15 @@
                 <div>
                     <label class="text-[11px] font-black text-emerald-400 mb-2 block tracking-widest">2. 发球权 (第一回合发球队伍)</label>
                     <div class="flex gap-2">
-                        <label class="radio-label py-3 truncate w-1/2" style="padding:0; border:none; background:transparent;"><input type="radio" name="serve" value="1" checked><span class="radio-label py-3 w-full" id="serveLabel1">左队</span></label>
-                        <label class="radio-label py-3 truncate w-1/2" style="padding:0; border:none; background:transparent;"><input type="radio" name="serve" value="2"><span class="radio-label py-3 w-full" id="serveLabel2">右队</span></label>
+                        <label class="radio-label py-3 truncate w-1/2" style="padding:0; border:none; background:transparent;"><input type="radio" name="serve" value="1" onchange="backupPreparationChoices()" checked><span class="radio-label py-3 w-full" id="serveLabel1">左队</span></label>
+                        <label class="radio-label py-3 truncate w-1/2" style="padding:0; border:none; background:transparent;"><input type="radio" name="serve" value="2" onchange="backupPreparationChoices()"><span class="radio-label py-3 w-full" id="serveLabel2">右队</span></label>
                     </div>
                 </div>
                 <div id="doublesStance" class="hidden border-t border-slate-700 pt-4 mt-2">
-                    <label class="text-[11px] font-black text-amber-400 mb-2 block tracking-widest flex items-center gap-1"><span>📍</span> 3. 双打首发站位 (站在己方<u class="text-white mx-1">右侧/偶数区</u>的人)</label>
+                    <label id="stanceLabel" class="text-[11px] font-black text-amber-400 mb-2 block tracking-widest flex items-center gap-1"><span>📍</span> 3. 双打首发站位（两队可分别选择发球员/接发球员）</label>
                     <div class="grid grid-cols-2 gap-3">
-                        <select id="t1Stance" class="input-base text-xs font-bold text-center bg-slate-900"></select>
-                        <select id="t2Stance" class="input-base text-xs font-bold text-center bg-slate-900"></select>
+                        <select id="t1Stance" onchange="backupPreparationChoices()" class="input-base text-xs font-bold text-center bg-slate-900"></select>
+                        <select id="t2Stance" onchange="backupPreparationChoices()" class="input-base text-xs font-bold text-center bg-slate-900"></select>
                     </div>
                 </div>
             </div>
@@ -403,7 +407,8 @@ const normalizeMatchId = id => String(id ?? '').replace(/\s+/g, '').toUpperCase(
         let matchState = { t1Score: 0, t2Score: 0, t1Wins: 0, t2Wins: 0, currentGame: 1, history: [], timeline: [], halfSwitched: false, over: false };
         let gameState = { viewBa: false, servTeam: 1, initServTeam: 1, servNum: 2, court: 'Right', t1: { r: '', l: '' }, t2: { r: '', l: '' }, initRightP1: '', initRightP2: '', servingPlayer: '' };
 
-        // 裁判端执行生命周期：not_started | in_progress | game_complete_pending_settlement | finalized
+        // 裁判端执行生命周期：not_started | between_games_preparation | in_progress |
+        // deciding_game_end_change | game_complete_pending_settlement | finalized
         let matchPhase = 'not_started';
         let recoveryBlocked = false;
         let serverAssignment = null;
@@ -505,7 +510,8 @@ const normalizeMatchId = id => String(id ?? '').replace(/\s+/g, '').toUpperCase(
             if(currentMatch && currentMatch.id && matchPhase !== 'finalized') {
                 // [PR#155 R8] 进行中比赛即使暂时显示 step 2，备份仍必须保存 phase=in_progress，恢复目标必须是 step 3
                 let backupStep = getCurrentStep();
-                if (matchPhase === 'in_progress' || matchPhase === 'game_complete_pending_settlement') backupStep = getCurrentStep() === 4 ? 4 : 3;
+                if (matchPhase === 'between_games_preparation') backupStep = 2;
+                else if (['in_progress','deciding_game_end_change','game_complete_pending_settlement'].includes(matchPhase)) backupStep = getCurrentStep() === 4 ? 4 : 3;
                 const identity = recoveryIdentity();
                 try { localStorage.setItem(recoveryBackupKey(), JSON.stringify({ version: 6, identity, step: backupStep, currentMatch: {...currentMatch, eventId: identity.eventId, matchId: identity.matchId}, matchState, gameState, timeoutUsed, matchPhase })); } catch(e) { }
             }
@@ -530,7 +536,7 @@ const normalizeMatchId = id => String(id ?? '').replace(/\s+/g, '').toUpperCase(
             if (data.currentMatch.eventId !== identity.eventId || normalizeMatchId(data.currentMatch.matchId) !== identity.matchId) return '比赛载荷身份不匹配';
             if (recoveryRefereeId(identity.refereeId) !== expected.refereeId) return '裁判归属不匹配';
             if (recoveryText(identity.court) !== expected.court) return '场地身份不匹配';
-            if (identity.lifecycle !== data.matchPhase || !['not_started','in_progress','game_complete_pending_settlement'].includes(identity.lifecycle)) return '生命周期无效';
+            if (identity.lifecycle !== data.matchPhase || !['not_started','between_games_preparation','in_progress','deciding_game_end_change','game_complete_pending_settlement'].includes(identity.lifecycle)) return '生命周期无效';
             if (!Array.isArray(identity.participants) || identity.participants.length !== 6 || identity.participants.some((value, index) => recoveryParticipant(value) !== expected.participants[index])) return '参赛者身份不匹配';
             return '';
         }
@@ -539,7 +545,7 @@ const normalizeMatchId = id => String(id ?? '').replace(/\s+/g, '').toUpperCase(
             const identity = data.identity;
             const task = Object.values(dashboard.tasks || {}).find(item => normalizeMatchId(item?.id) === identity.matchId);
             if (!task) return '服务端不存在对应活动比赛';
-            const isActive = identity.lifecycle === 'in_progress' || identity.lifecycle === 'game_complete_pending_settlement';
+            const isActive = identity.lifecycle !== 'not_started';
             const expectedCourtStatus = isActive ? '比赛中' : '待开赛';
             const taskStatus = recoveryText(task.status);
             const lifecycleMatches = isActive
@@ -560,7 +566,7 @@ const normalizeMatchId = id => String(id ?? '').replace(/\s+/g, '').toUpperCase(
             const identity = data.identity;
             if (!assignment || normalizeMatchId(assignment.match_id) !== identity.matchId) return '服务端活动比赛与本地备份不匹配';
             const lifecycleMatches = assignment.lifecycle === identity.lifecycle
-                || (assignment.lifecycle === 'in_progress' && identity.lifecycle === 'game_complete_pending_settlement');
+                || (assignment.lifecycle === 'in_progress' && ['between_games_preparation','deciding_game_end_change','game_complete_pending_settlement'].includes(identity.lifecycle));
             if (recoveryText(assignment.court) !== identity.court || !lifecycleMatches) return '任务生命周期或场地已变更';
             const task = assignment.task || {};
             const ruleError = validateAuthoritativeRules(task);
@@ -604,10 +610,22 @@ const normalizeMatchId = id => String(id ?? '').replace(/\s+/g, '').toUpperCase(
 
                             if(data.step === 2) {
                                 $('label-init-ba-f').innerText = `${currentMatch.t1Name} (左)`; $('label-init-ba-t').innerText = `${currentMatch.t2Name} (左)`;
-                                $('serveLabel1').innerText = `${currentMatch.t1Name} 首发`; $('serveLabel2').innerText = `${currentMatch.t2Name} 首发`; showStep(2);
+                                $('serveLabel1').innerText = `${currentMatch.t1Name} 发球`; $('serveLabel2').innerText = `${currentMatch.t2Name} 发球`;
+                                $('t1Stance').innerHTML = `<option value="P1">${currentMatch.t1p1}</option>${currentMatch.type==='doubles'?`<option value="P2">${currentMatch.t1p2}</option>`:''}`;
+                                $('t2Stance').innerHTML = `<option value="P1">${currentMatch.t2p1}</option>${currentMatch.type==='doubles'?`<option value="P2">${currentMatch.t2p2}</option>`:''}`;
+                                const preparation = matchState.preparation || {};
+                                const serveRadio = typeof document !== 'undefined' ? document.querySelector(`input[name="serve"][value="${preparation.serveTeam || 1}"]`) : null;
+                                if (serveRadio) serveRadio.checked = true;
+                                if (preparation.t1Stance) $('t1Stance').value = preparation.t1Stance;
+                                if (preparation.t2Stance) $('t2Stance').value = preparation.t2Stance;
+                                if(currentMatch.type === 'doubles') $('doublesStance').classList.remove('hidden');
+                                showStep(2);
                             } else if(data.step === 3) {
                                 renderGame(); showStep(3); $('recoveryBadge').classList.remove('hidden');
                                 if(matchState.over) $('endGameBtn').classList.remove('hidden');
+                                if (matchPhase === 'deciding_game_end_change') {
+                                    startTimer(60, '🔄 恢复待完成的交换场区：确认双方站位后继续比赛。');
+                                }
                             } else showStep(data.step);
 
                             // 恢复只读取已核对的本地执行状态，绝不写回/复活服务端生命周期。
@@ -974,7 +992,7 @@ const normalizeMatchId = id => String(id ?? '').replace(/\s+/g, '').toUpperCase(
         }
 
         function reconcileGameCompletion() {
-            if (matchPhase === 'not_started' || matchPhase === 'finalized') return;
+            if (['not_started','between_games_preparation','deciding_game_end_change','finalized'].includes(matchPhase)) return;
             const complete = isGameComplete();
             matchPhase = complete ? 'game_complete_pending_settlement' : 'in_progress';
             matchState.over = complete;
@@ -987,12 +1005,16 @@ const normalizeMatchId = id => String(id ?? '').replace(/\s+/g, '').toUpperCase(
             $('pointLeft').disabled = !scoringAllowed;
             $('pointRight').disabled = !scoringAllowed;
             // Undo is a correction, not a scoring action, and remains available while settlement is pending.
-            $('undoPoint').disabled = !!activeTimer || matchPhase === 'not_started' || matchPhase === 'finalized';
+            $('undoPoint').disabled = !!activeTimer || !['in_progress','game_complete_pending_settlement'].includes(matchPhase);
         }
 
         function updateSetupAuthority() {
-            const readOnly = matchPhase === 'in_progress' || matchPhase === 'game_complete_pending_settlement';
+            const readOnly = ['in_progress','deciding_game_end_change','game_complete_pending_settlement'].includes(matchPhase);
             document.querySelectorAll('#step2 input, #step2 select').forEach(element => { element.disabled = readOnly; });
+            if (matchPhase === 'between_games_preparation') {
+                document.querySelectorAll('#step2 input, #step2 select').forEach(element => { element.disabled = false; });
+                document.querySelectorAll('input[name="init_ba"]').forEach(element => { element.disabled = true; });
+            }
             ['prepTimerBtn', 'flipCoinBtn', 'backToSetupBtn'].forEach(id => { const element = $(id); if (element) element.disabled = readOnly; });
             const confirmBtn = $('confirmStartBtn');
             if (confirmBtn) confirmBtn.disabled = false;
@@ -1007,9 +1029,16 @@ const normalizeMatchId = id => String(id ?? '').replace(/\s+/g, '').toUpperCase(
             $(`step${step}`).classList.remove('hidden-section');
             // [PR#155 R8] 根据 matchPhase 更新按钮文案
             if (step === 2) {
+                const betweenGames = matchPhase === 'between_games_preparation';
+                $('betweenGamesHeading').classList.toggle('hidden', !betweenGames);
+                if (betweenGames) $('betweenGamesTitle').innerText = `下一局准备 / Game ${matchState.currentGame} Preparation`;
                 const confirmBtn = $('confirmStartBtn');
                 if (confirmBtn) {
-                    if (matchPhase === 'in_progress' || matchPhase === 'game_complete_pending_settlement') {
+                    if (betweenGames) {
+                        confirmBtn.innerText = `▶ 明确开始 Game ${matchState.currentGame}`;
+                        confirmBtn.classList.remove('bg-blue-600');
+                        confirmBtn.classList.add('bg-emerald-600');
+                    } else if (matchPhase === 'in_progress' || matchPhase === 'game_complete_pending_settlement') {
                         confirmBtn.innerText = matchPhase === 'game_complete_pending_settlement' ? '↩️ 返回等待结算' : '↩️ 返回进行中比赛';
                         confirmBtn.classList.remove('bg-emerald-600');
                         confirmBtn.classList.add('bg-blue-600');
@@ -1168,12 +1197,26 @@ const normalizeMatchId = id => String(id ?? '').replace(/\s+/g, '').toUpperCase(
         };
 
         window.confirmAndStart = async () => {
+            if (matchPhase === 'between_games_preparation') {
+                await executeStartMatch();
+                return;
+            }
             // [PR#155 R8] 进行中比赛返回设置页时，主按钮调用 resumeActiveMatch 而非重新开赛
             if (matchPhase === 'in_progress' || matchPhase === 'game_complete_pending_settlement') {
                 await resumeActiveMatch();
                 return;
             }
             showDndReminder();
+        };
+
+        window.backupPreparationChoices = () => {
+            if (matchPhase !== 'between_games_preparation') return;
+            matchState.preparation = {
+                serveTeam: parseInt(getRadio('serve') || 1),
+                t1Stance: $('t1Stance').value,
+                t2Stance: $('t2Stance').value
+            };
+            backupState();
         };
 
         function showDndReminder() {
@@ -1197,7 +1240,8 @@ const normalizeMatchId = id => String(id ?? '').replace(/\s+/g, '').toUpperCase(
 
         async function executeStartMatch() {
             stopPrepCounting();
-            let viewBa = getRadio('init_ba') === 't';
+            const isNextGame = matchPhase === 'between_games_preparation';
+            let viewBa = isNextGame ? gameState.viewBa : getRadio('init_ba') === 't';
             let serveTeam = parseInt(getRadio('serve') || 1);
             let initServNum = (currentMatch.type === 'doubles' && currentMatch.meth === 'sideout') ? 2 : 1;
             gameState = { viewBa: viewBa, servTeam: serveTeam, initServTeam: serveTeam, servNum: initServNum, court: 'Right', t1: { r:'', l:'' }, t2: { r:'', l:'' }, initRightP1: '', initRightP2: '', servingPlayer: '' };
@@ -1233,7 +1277,7 @@ const normalizeMatchId = id => String(id ?? '').replace(/\s+/g, '').toUpperCase(
 
             // [PR#155 REVIEW FIX] 联网模式必须调用原子 start_task，只有服务端确认成功后才进入 step 3。
             // 不再使用两个独立写入（updateRefereeStatus + syncLiveScore），避免部分写入风险。
-            if (sysMode !== 'local') {
+            if (sysMode !== 'local' && !isNextGame) {
                 const startRes = await apiCall('start_task', {
                     match_id: currentMatch.id, referee_id: currentRefereeId,
                     score_text: 'G1 0-0', match_name: `${currentMatch.t1Name} vs ${currentMatch.t2Name}`
@@ -1244,8 +1288,8 @@ const normalizeMatchId = id => String(id ?? '').replace(/\s+/g, '').toUpperCase(
                     if (startBtn) { startBtn.disabled = false; }
                     return;
                 }
-            } else {
-                // 本地模式保留原有行为
+            } else if (sysMode === 'local' && !isNextGame) {
+                // 本地模式只在整场比赛首次开赛时更新本地裁判状态。
                 try { await updateRefereeStatus('执裁中', currentMatch.court); } catch(e){}
             }
 
@@ -1258,7 +1302,7 @@ const normalizeMatchId = id => String(id ?? '').replace(/\s+/g, '').toUpperCase(
 
             $('recoveryBadge').classList.add('hidden');
             renderGame();
-            if (sysMode === 'local') syncLiveScore();
+            if (isNextGame || sysMode === 'local') syncLiveScore();
             showStep(3);
         }
 
@@ -1389,19 +1433,48 @@ const normalizeMatchId = id => String(id ?? '').replace(/\s+/g, '').toUpperCase(
             window.timerCancelCb = onCancelCallback;
             const shield = document.createElement('div'); shield.id = 'timerShield';
             shield.className = 'fixed top-0 left-0 right-0 h-36 bg-red-700 text-slate-100 z-[99999] flex flex-col justify-center items-center shadow-[0_10px_30px_rgba(220,38,38,0.5)] font-black border-b-4 border-red-500 animate-enter';
-            shield.innerHTML = `<div id="tmsg" class="text-sm mb-3 tracking-widest flex items-center gap-2"><span>🛡️</span> ${msg}</div><div class="flex flex-col items-center gap-4"><div class="text-3xl font-black font-mono tracking-wider bg-black/40 px-6 py-1.5 rounded-xl shadow-inner text-amber-400"><span id="tsec">${sec}</span><span class="text-lg text-slate-300 ml-1">s</span></div><div class="flex gap-3 mt-1"><button onclick="stopTimerManually(true)" class="bg-slate-800 hover:bg-slate-700 text-white px-5 py-2.5 rounded-xl text-xs font-black shadow-md border border-slate-600 transition-colors">强行解除并继续</button></div></div>`;
+            const isEndChange = matchPhase === 'deciding_game_end_change';
+            const action = isEndChange
+                ? '<button onclick="completeDecidingGameEndChange()" class="bg-emerald-700 hover:bg-emerald-600 text-white px-5 py-2.5 rounded-xl text-xs font-black shadow-md border border-emerald-500 transition-colors">✓ 确认双方已完成换场并继续</button>'
+                : '<button onclick="stopTimerManually(true)" class="bg-slate-800 hover:bg-slate-700 text-white px-5 py-2.5 rounded-xl text-xs font-black shadow-md border border-slate-600 transition-colors">强行解除并继续</button>';
+            shield.innerHTML = `<div id="tmsg" class="text-sm mb-3 tracking-widest flex items-center gap-2"><span>🛡️</span> ${msg}</div><div class="flex flex-col items-center gap-4"><div class="text-3xl font-black font-mono tracking-wider bg-black/40 px-6 py-1.5 rounded-xl shadow-inner text-amber-400"><span id="tsec">${sec}</span><span class="text-lg text-slate-300 ml-1">s</span></div><div class="flex gap-3 mt-1">${action}</div></div>`;
             document.body.appendChild(shield);
-            let left = sec; activeTimer = setInterval(() => { left--; if($('tsec')) $('tsec').innerText = left; if(left <= 0) stopTimerManually(false); }, 1000);
+            let left = sec; activeTimer = setInterval(() => {
+                left--; if($('tsec')) $('tsec').innerText = Math.max(0, left);
+                if(left <= 0 && matchPhase === 'deciding_game_end_change') {
+                    clearInterval(activeTimer); activeTimer = null;
+                    if($('tmsg')) $('tmsg').innerText = '换场计时已结束，请确认双方已完成换场后继续';
+                    updateScoringAuthority();
+                } else if(left <= 0) stopTimerManually(false);
+            }, 1000);
         }
 
         window.stopTimerManually = function(isManual = true) {
+            if (matchPhase === 'deciding_game_end_change') {
+                showToast('⚠️ 决胜局换场必须使用“确认双方已完成换场并继续”', true);
+                return;
+            }
             if(activeTimer) clearInterval(activeTimer); activeTimer = null;
             const shield = $('timerShield'); if(shield) shield.remove();
             updateScoringAuthority();
             if(isManual && window.timerCancelCb) { window.timerCancelCb(); window.timerCancelCb = null; }
         };
 
-        window.triggerManualCancel = () => { if(activeTimer) { stopTimerManually(true); showToast('✅ 已强行解除倒计时'); } else showToast('⏳ 当前无倒计时'); };
+        window.completeDecidingGameEndChange = function() {
+            if (matchPhase !== 'deciding_game_end_change' || !matchState.endChangePending) return;
+            if(activeTimer) clearInterval(activeTimer); activeTimer = null;
+            const shield = $('timerShield'); if(shield) shield.remove();
+            matchState.endChangePending = false;
+            matchPhase = 'in_progress';
+            window.timerCancelCb = null;
+            backupState(); renderGame(); updateScoringAuthority();
+            showToast('✅ 双方换场完成，恢复计分');
+        };
+
+        window.triggerManualCancel = () => {
+            if(matchPhase === 'deciding_game_end_change') return showToast('⚠️ 请在换场面板确认双方已完成换场', true);
+            if(activeTimer) { stopTimerManually(true); showToast('✅ 已强行解除倒计时'); } else showToast('⏳ 当前无倒计时');
+        };
 
         window.requestTimeout = (isLeftBtn) => {
             let isT1Target = gameState.viewBa ? !isLeftBtn : isLeftBtn;
@@ -1434,7 +1507,7 @@ const normalizeMatchId = id => String(id ?? '').replace(/\s+/g, '').toUpperCase(
             targetScoreDOM.style.transform = 'scale(1.2)'; targetScoreDOM.style.color = '#fbbf24';
             setTimeout(() => { targetScoreDOM.style.transform = 'scale(1)'; targetScoreDOM.style.color = 'white'; }, 200);
 
-            matchState.history.push({ t1Score: matchState.t1Score, t2Score: matchState.t2Score, gameState: JSON.parse(JSON.stringify(gameState)), timeoutUsed: {...timeoutUsed}, halfSwitched: matchState.halfSwitched });
+            matchState.history.push({ t1Score: matchState.t1Score, t2Score: matchState.t2Score, gameState: JSON.parse(JSON.stringify(gameState)), timeoutUsed: {...timeoutUsed}, halfSwitched: matchState.halfSwitched, endChangePending: !!matchState.endChangePending, matchPhase });
             const winTeam = gameState.viewBa ? (isLeftClick ? 2 : 1) : (isLeftClick ? 1 : 2);
             matchState.timeline.push(winTeam);
 
@@ -1488,10 +1561,19 @@ const normalizeMatchId = id => String(id ?? '').replace(/\s+/g, '').toUpperCase(
             let maxScore = Math.max(matchState.t1Score, matchState.t2Score);
             let switchPoint = Math.ceil(currentMatch.target / 2);
 
-            if (maxScore === switchPoint && !matchState.halfSwitched) {
+            // Only the deciding third game changes ends in-game. Lock scoring in the
+            // same call stack as the accepted threshold rally; UI/timer work follows.
+            if (currentMatch.format === 3 && matchState.currentGame === 3 && maxScore === switchPoint && !matchState.halfSwitched) {
+                matchPhase = 'deciding_game_end_change';
+                matchState.endChangePending = true;
+                matchState.halfSwitched = true;
+                gameState.viewBa = !gameState.viewBa;
+                backupState();
+                updateScoringAuthority();
                 setTimeout(() => {
+                    if (matchPhase !== 'deciding_game_end_change' || !matchState.endChangePending) return;
                     alert(`🔥 场地交换提示：\n\n一方已达到 ${switchPoint} 分！\n请指挥双方交换场地。\n\n⚠️ 【重要提醒】：请双方选手交换场区，确认站位后继续比赛。如使用球队暂停，球拍请放在场内。`);
-                    gameState.viewBa = !gameState.viewBa; matchState.halfSwitched = true; renderGame(); backupState();
+                    renderGame(); backupState();
                     startTimer(60, '🔄 交换场区：请双方选手交换场区，确认站位后继续比赛。如使用球队暂停，球拍请放在场内。');
                 }, 300);
             }
@@ -1504,25 +1586,53 @@ const normalizeMatchId = id => String(id ?? '').replace(/\s+/g, '').toUpperCase(
         window.toggleRefereeView = () => { gameState.viewBa = !gameState.viewBa; renderGame(); backupState(); };
 
         window.undoLastPoint = () => {
+            if (!['in_progress','game_complete_pending_settlement'].includes(matchPhase) || activeTimer) return showToast('⚠️ 当前转换尚未完成，不能撤分', true);
             if (matchState.history.length > 0) {
                 let last = matchState.history.pop(); matchState.timeline.pop();
-                matchState.t1Score = last.t1Score; matchState.t2Score = last.t2Score; gameState = last.gameState; timeoutUsed = last.timeoutUsed; matchState.halfSwitched = last.halfSwitched;
+                matchState.t1Score = last.t1Score; matchState.t2Score = last.t2Score; gameState = last.gameState; timeoutUsed = last.timeoutUsed;
+                matchState.halfSwitched = last.halfSwitched; matchState.endChangePending = !!last.endChangePending; matchPhase = last.matchPhase || 'in_progress';
                 reconcileGameCompletion();
                 renderGame(); syncLiveScore(); backupState(); showToast('↩️ 已回档');
             } else showToast('⚠️ 无历史可撤回', true);
         };
 
+        function prepareNextGame(winningTeam) {
+            matchState.currentGame++;
+            matchState.halfSwitched = false;
+            matchState.timeline = [];
+            matchState.history = [];
+            matchState.over = false;
+            gameState.viewBa = !gameState.viewBa; // the single between-games change of ends
+            timeoutUsed = {t1:false, t2:false, medicalT1:false, medicalT2:false};
+
+            $('label-init-ba-f').innerText = `${currentMatch.t1Name} (场端已确定)`;
+            $('label-init-ba-t').innerText = `${currentMatch.t2Name} (场端已确定)`;
+            $('serveLabel1').innerText = `${currentMatch.t1Name} 发球`;
+            $('serveLabel2').innerText = `${currentMatch.t2Name} 发球`;
+            const serveRadio = document.querySelector(`input[name="serve"][value="${winningTeam}"]`);
+            if (serveRadio) serveRadio.checked = true; // editable default, not a mandate
+            const t1s = `<option value="P1">${currentMatch.t1p1}</option>${currentMatch.type==='doubles'?`<option value="P2">${currentMatch.t1p2}</option>`:''}`;
+            const t2s = `<option value="P1">${currentMatch.t2p1}</option>${currentMatch.type==='doubles'?`<option value="P2">${currentMatch.t2p2}</option>`:''}`;
+            $('t1Stance').innerHTML = t1s; $('t2Stance').innerHTML = t2s;
+            if (currentMatch.type === 'doubles') $('doublesStance').classList.remove('hidden');
+            matchState.preparation = { serveTeam: winningTeam, t1Stance: 'P1', t2Stance: 'P1' };
+
+            matchPhase = 'between_games_preparation';
+            $('endGameBtn').classList.add('hidden');
+            showStep(2);
+        }
+
         window.endCurrentGame = () => {
             if (matchPhase !== 'game_complete_pending_settlement' || !isGameComplete()) return showToast('⚠️ 当前比分尚未达到合法终局', true);
-            alert('⚠️ 裁判提醒：\n比赛已完结，请务必【回收比赛用球及手环】！');
-
-            if(matchState.t1Score > matchState.t2Score) matchState.t1Wins++; else matchState.t2Wins++;
+            const winningTeam = matchState.t1Score > matchState.t2Score ? 1 : 2;
+            if(winningTeam === 1) matchState.t1Wins++; else matchState.t2Wins++;
             matchState.results = matchState.results || [];
             matchState.results.push(`G${matchState.currentGame}: ${matchState.t1Score} - ${matchState.t2Score}`);
 
             matchState.over = true;
 
             if(currentMatch.format === 1 || matchState.t1Wins === 2 || matchState.t2Wins === 2) {
+                alert('⚠️ 裁判提醒：\n比赛已完结，请务必【回收比赛用球及手环】！');
                 let winner = matchState.t1Wins > matchState.t2Wins ? currentMatch.t1Name : currentMatch.t2Name;
                 let details = matchState.results.join(' | ');
                 let finalScoreDisplay = currentMatch.format === 1 ? `${matchState.t1Score} - ${matchState.t2Score}` : `${matchState.t1Wins} - ${matchState.t2Wins}`;
@@ -1533,9 +1643,7 @@ const normalizeMatchId = id => String(id ?? '').replace(/\s+/g, '').toUpperCase(
                 showStep(4);
                 setTimeout(() => { if(window.initSignatureBoard) window.initSignatureBoard(); }, 200);
             } else {
-                let initServNum = (currentMatch.type === 'doubles' && currentMatch.meth === 'sideout') ? 2 : 1;
-                matchState.currentGame++; gameState.servNum = initServNum; matchState.halfSwitched = false; matchState.timeline = []; timeoutUsed = {t1:false, t2:false, medicalT1:false, medicalT2:false};
-                showStep(2);
+                prepareNextGame(winningTeam);
             }
         };
 

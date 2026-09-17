@@ -52,19 +52,20 @@ describe('交换场区：运行时行为（真实执行 award 内 halfSwitch 块
 
   function makeSandbox(overrides = {}) {
     const calls = { alerts: [], timers: [], renders: 0, backups: 0 };
-    const matchState = { t1Score: 6, t2Score: 3, halfSwitched: false, over: false, ...overrides.matchState };
+    const matchState = { t1Score: 6, t2Score: 3, currentGame: 3, halfSwitched: false, over: false, ...overrides.matchState };
     const gameState = {
       viewBa: false, servTeam: 1, servNum: 2, servingPlayer: '张三',
       t1: { r: '张三', l: '李四' }, t2: { r: '王五', l: '赵六' },
       ...overrides.gameState
     };
     const timeoutUsed = { t1: false, t2: false, medicalT1: false, medicalT2: false };
-    const currentMatch = { id: 'HT-001', court: '2', ref: '测试裁判', target: 11, cap: 15, meth: 'sideout', type: 'doubles' };
+    const currentMatch = { id: 'HT-001', court: '2', ref: '测试裁判', format: 3, target: 11, cap: 15, meth: 'sideout', type: 'doubles' };
     const sandbox = {
-      matchState, gameState, timeoutUsed, currentMatch,
+      matchState, gameState, timeoutUsed, currentMatch, matchPhase: 'in_progress',
       alert: (m) => calls.alerts.push(m),
       renderGame: () => { calls.renders++; },
       backupState: () => { calls.backups++; },
+      updateScoringAuthority: () => {},
       startTimer: (sec, msg) => calls.timers.push({ sec, msg }),
       setTimeout: (fn) => { fn(); return 0; }, // 立即执行，模拟 300ms 后触发
       Math, console, JSON,
@@ -133,9 +134,11 @@ describe('交换场区：运行时行为（真实执行 award 内 halfSwitch 块
     assert.equal(calls.alerts.length, 0);
   });
 
-  it('R7: 暂停结束路径（stopTimerManually）不触碰比赛状态（源码锚定）', () => {
-    const stopFn = extractBetween(src, 'window.stopTimerManually = function', 'window.triggerManualCancel', 'stopTimerManually');
-    assert.ok(!stopFn.includes('matchState'), 'stopTimerManually 不得修改 matchState');
+  it('R7: 通用计时解除不能完成决胜局换场（源码锚定）', () => {
+    const stopFn = extractBetween(src, 'window.stopTimerManually = function', 'window.completeDecidingGameEndChange', 'stopTimerManually');
+    assert.ok(stopFn.includes("matchPhase === 'deciding_game_end_change'"), '仅处理决胜局换场生命周期');
+    assert.ok(!stopFn.includes("matchPhase = 'in_progress'"), '通用计时解除不得恢复计分');
+    assert.ok(!stopFn.includes('matchState.endChangePending = false'), '通用计时解除不得清除待换场标志');
     assert.ok(!stopFn.includes('gameState'), 'stopTimerManually 不得修改 gameState');
     assert.ok(stopFn.includes('clearInterval'), '应清除定时器');
     assert.ok(stopFn.includes('updateScoringAuthority()'), '应按当前生命周期恢复得分权限');
