@@ -395,7 +395,7 @@ const normalizeMatchId = id => String(id ?? '').replace(/\s+/g, '').toUpperCase(
         const LEGACY_BACKUP_KEY = 'pickle_referee_backup_v5';
 
         const urlParams = new URLSearchParams(window.location.search);
-        let sysMode = 'ind';
+        let sysMode = urlParams.get('mode') === 'local' ? 'local' : 'ind';
 
         let eventCode = null, currentRefereeId = null, currentRefereeName = '', currentRefLevel = 'L1';
         let currentMatch = {};
