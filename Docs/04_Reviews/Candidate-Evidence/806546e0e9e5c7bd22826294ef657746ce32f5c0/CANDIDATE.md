@@ -13,14 +13,19 @@ category directory.
 
 ## Evidence inventory
 
-No Evidence Records are included in this foundation package.
+| Evidence Record ID | Evidence domain |
+|---|---|
+| `ER-806546e0e9e5-01-01` | Candidate Identity |
+| `ER-806546e0e9e5-02-01` | Scope Boundary |
+| `ER-806546e0e9e5-06-01` | Database Recovery Continuity |
 
-The category directories contain only `.gitkeep` tracking markers:
+Evidence Records document verified properties of the candidate. They do not
+constitute:
 
-- `01-candidate-identity/`
-- `02-scope-boundary/`
-- `08-limitations/`
+- approval
+- eligibility
+- release authorization
 
-The markers are not Evidence Records. Their presence reserves a stable filing
-structure only. It does not state or imply that review work has been performed,
-that evidence exists, or that any gate has been evaluated or satisfied.
+The `.gitkeep` tracking markers are not Evidence Records. Their presence
+reserves a stable filing structure only and does not state or imply that any
+gate has been evaluated or satisfied.

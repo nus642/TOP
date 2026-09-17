@@ -10,22 +10,30 @@ repository state.
 ```text
 <full-commit-sha>/
 ├── CANDIDATE.md
-├── 01-candidate-identity/.gitkeep
-├── 02-scope-boundary/.gitkeep
+├── 01-candidate-identity/
+├── 02-scope-boundary/
+├── 06-recovery/
 └── 08-limitations/.gitkeep
 ```
 
 - `CANDIDATE.md` is the package index and identifies the candidate.
-- `01-candidate-identity/` is reserved for evidence that independently records
+- `01-candidate-identity/` contains evidence that independently records
   or verifies candidate identity.
-- `02-scope-boundary/` is reserved for evidence describing what a review did
+- `02-scope-boundary/` contains evidence describing what a review did
   and did not examine.
+- `06-recovery/` contains evidence describing recovery continuity.
 - `08-limitations/` is reserved for observed limitations, qualifications, and
   constraints on interpretation.
 
+The current active evidence domains are:
+
+1. **01 Candidate Identity**
+2. **02 Scope Boundary**
+3. **06 Recovery Continuity**
+
 Category numbers are not contiguous because evidence domains are introduced
-incrementally as they mature. Missing numbers are reserved for future evidence
-domains and are not active records.
+incrementally as they mature. Missing numbers represent reserved future
+evidence categories. They are not active Evidence Records.
 
 Directories being present does not mean that evidence has been collected.
 Evidence Records are added only when evidence exists; placeholder or empty
