@@ -134,11 +134,11 @@ describe('交换场区：运行时行为（真实执行 award 内 halfSwitch 块
     assert.equal(calls.alerts.length, 0);
   });
 
-  it('R7: 换场计时结束显式恢复得分生命周期（源码锚定）', () => {
-    const stopFn = extractBetween(src, 'window.stopTimerManually = function', 'window.triggerManualCancel', 'stopTimerManually');
+  it('R7: 通用计时解除不能完成决胜局换场（源码锚定）', () => {
+    const stopFn = extractBetween(src, 'window.stopTimerManually = function', 'window.completeDecidingGameEndChange', 'stopTimerManually');
     assert.ok(stopFn.includes("matchPhase === 'deciding_game_end_change'"), '仅处理决胜局换场生命周期');
-    assert.ok(stopFn.includes("matchPhase = 'in_progress'"), '完成换场后恢复进行中');
-    assert.ok(stopFn.includes('matchState.endChangePending = false'), '清除待换场标志');
+    assert.ok(!stopFn.includes("matchPhase = 'in_progress'"), '通用计时解除不得恢复计分');
+    assert.ok(!stopFn.includes('matchState.endChangePending = false'), '通用计时解除不得清除待换场标志');
     assert.ok(!stopFn.includes('gameState'), 'stopTimerManually 不得修改 gameState');
     assert.ok(stopFn.includes('clearInterval'), '应清除定时器');
     assert.ok(stopFn.includes('updateScoringAuthority()'), '应按当前生命周期恢复得分权限');

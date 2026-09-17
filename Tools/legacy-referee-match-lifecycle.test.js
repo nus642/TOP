@@ -7,8 +7,9 @@ const html = fs.readFileSync('Legacy/referee.html', 'utf8');
 
 function functionSource(name) {
   const starts = [`function ${name}(`, `window.${name} =`];
-  const start = Math.max(...starts.map(marker => html.indexOf(marker)));
+  let start = Math.max(...starts.map(marker => html.indexOf(marker)));
   assert.notEqual(start, -1, `${name} source exists`);
+  if (html.slice(start - 6, start) === 'async ') start -= 6;
   const arrow = html.indexOf('=>', start);
   const declarationEnd = html.indexOf(') {', start);
   const brace = arrow !== -1 && (declarationEnd === -1 || arrow < declarationEnd)
@@ -27,7 +28,7 @@ function elements() {
   return id => {
     if (!map.has(id)) map.set(id, {
       id, disabled: false, value: 'P1', innerText: '', innerHTML: '', style: {},
-      classList: { add() {}, remove() {}, toggle() {}, contains() { return false; } }
+      remove() {}, classList: { add() {}, remove() {}, toggle() {}, contains() { return false; } }
     });
     return map.get(id);
   };
@@ -41,14 +42,15 @@ function scoringSandbox(game = 1, score = 5) {
     currentMatch: { format: 3, target: 11, cap: 0, meth: 'rally', type: 'singles', t1p1: 'A', t2p1: 'B' },
     matchState: { t1Score: score, t2Score: 0, t1Wins: 0, t2Wins: 0, currentGame: game, history: [], timeline: [], halfSwitched: false, over: false },
     gameState: { viewBa: false, servTeam: 1, initServTeam: 1, servNum: 1, t1: { r: 'A', l: 'A' }, t2: { r: 'B', l: 'B' }, servingPlayer: 'A' },
-    timeoutUsed: {}, setTimeout: fn => { deferred.push(fn); }, alert() {},
+    timeoutUsed: {}, setTimeout: fn => { deferred.push(fn); }, clearInterval() {}, alert() {},
     renderGame() {}, syncLiveScore() {}, backupState() {}, startTimer() {}, showToast() {}
   };
   context.window = context;
   vm.createContext(context);
   vm.runInContext([
     functionSource('isGameComplete'), functionSource('reconcileGameCompletion'),
-    functionSource('updateScoringAuthority'), functionSource('award')
+    functionSource('updateScoringAuthority'), functionSource('award'),
+    functionSource('completeDecidingGameEndChange'), functionSource('undoLastPoint')
   ].join('\n'), context);
   return { context, deferred };
 }
@@ -144,18 +146,85 @@ test('previous-game winner is an editable default and player choices are indepen
   assert.match(functionSource('backupPreparationChoices'), /serveTeam:[\s\S]*t1Stance:[\s\S]*t2Stance:/);
 });
 
-test('next games reuse match lifecycle without another backend start_task', () => {
-  const start = functionSource('executeStartMatch');
-  assert.match(start, /const isNextGame = matchPhase === 'between_games_preparation'/);
-  assert.match(start, /sysMode !== 'local' && !isNextGame/);
-  assert.equal((start.match(/apiCall\('start_task'/g) || []).length, 1);
+async function runNextGame(mode = 'team') {
+  const $ = elements();
+  $('t1Stance').value = 'P2'; $('t2Stance').value = 'P2';
+  const calls = [];
+  const context = {
+    window: null, $, sysMode: mode, matchPhase: 'between_games_preparation', activeTimer: null,
+    currentMatch: { id: 'M1', court: '1', format: 3, target: 11, cap: 0, type: 'doubles', meth: 'rally', t1Name: 'Blue', t2Name: 'Green', t1p1: 'A', t1p2: 'B', t2p1: 'C', t2p2: 'D' },
+    matchState: { currentGame: 2, t1Wins: 1, t2Wins: 0, t1Score: 11, t2Score: 5, history: [{}], timeline: [1], halfSwitched: false, over: false },
+    gameState: { viewBa: true }, timeoutUsed: {}, getRadio: name => name === 'serve' ? '2' : 'f',
+    stopPrepCounting() {}, apiCall: async action => { calls.push(action); return { status: 'success' }; },
+    updateRefereeStatus: async () => calls.push('referee_update_status'), setLiveSyncStatus() {},
+    backupState() {}, renderGame() {}, syncLiveScore: async () => calls.push('sync_live_score'), showStep: step => calls.push(`step:${step}`), showToast() {}, document: { querySelector: () => null }
+  };
+  context.window = context;
+  vm.createContext(context);
+  vm.runInContext(`${functionSource('executeStartMatch')}\nthis.startNext = executeStartMatch`, context);
+  await context.startNext();
+  return { context, calls };
+}
+
+test('connected next game behavior reuses the match and independently applies overridden team/server/receiver', async () => {
+  const { context, calls } = await runNextGame('team');
+  assert.ok(!calls.includes('start_task'));
+  assert.ok(!calls.includes('referee_update_status'));
+  assert.ok(calls.includes('sync_live_score'));
+  assert.equal(context.matchPhase, 'in_progress');
+  assert.equal(context.matchState.currentGame, 2);
+  assert.equal(context.matchState.t1Wins, 1);
+  assert.equal(context.gameState.viewBa, true, 'between-game end change remains intact');
+  assert.equal(context.gameState.servTeam, 2, 'referee override wins over default');
+  assert.equal(context.gameState.servingPlayer, 'D', 'team 2 server selection is applied');
+  assert.equal(context.gameState.t1.r, 'B', 'team 1 receiver selection is independent');
 });
 
-test('backup accepts and restores preparation and deciding-game end-change phases', () => {
-  assert.match(functionSource('backupState'), /between_games_preparation/);
-  assert.match(functionSource('validateRecoveryPayload'), /deciding_game_end_change/);
-  assert.match(functionSource('checkAndRestoreBackup'), /startTimer\(60, '🔄 恢复待完成的交换场区/);
-  assert.match(functionSource('stopTimerManually'), /matchPhase = 'in_progress'/);
+test('Local next game runs the same behavior without any backend lifecycle call', async () => {
+  const { context, calls } = await runNextGame('local');
+  assert.equal(context.matchPhase, 'in_progress');
+  assert.ok(!calls.includes('start_task'));
+  assert.ok(!calls.includes('referee_update_status'));
+});
+
+async function restoreLifecycleBackup(phase, step) {
+  const $ = elements();
+  const timers = [];
+  const data = {
+    version: 6, identity: {}, matchPhase: phase, step,
+    currentMatch: { id: 'M1', type: 'doubles', t1Name: 'Blue', t2Name: 'Green', t1p1: 'A', t1p2: 'B', t2p1: 'C', t2p2: 'D' },
+    matchState: { currentGame: step === 2 ? 2 : 3, t1Score: 6, t2Score: 2, timeline: [], endChangePending: phase === 'deciding_game_end_change', preparation: { serveTeam: 2, t1Stance: 'P2', t2Stance: 'P1' } },
+    gameState: { viewBa: true }, timeoutUsed: {}
+  };
+  const context = {
+    window: null, $, document: { querySelector: () => ({ checked: false }) }, sysMode: 'local',
+    currentMatch: {}, matchState: {}, gameState: {}, timeoutUsed: {}, matchPhase: 'not_started',
+    LEGACY_BACKUP_KEY: 'v5', localStorage: { removeItem() {}, getItem: key => key === 'backup' ? JSON.stringify(data) : null },
+    recoveryBackupKey: () => 'backup', validateRecoveryPayload: () => '', clearBackup() {}, confirm: () => true,
+    reconcileGameCompletion() {}, setAuthoritativeFieldsLocked() {}, showStep() {}, renderGame() {},
+    startTimer: (sec, msg) => timers.push({ sec, msg })
+  };
+  context.window = context;
+  vm.createContext(context);
+  vm.runInContext(`${functionSource('checkAndRestoreBackup')}\nthis.restore = checkAndRestoreBackup`, context);
+  assert.equal(await context.restore(), true);
+  return { context, timers };
+}
+
+test('recovery behavior restores editable between-game preparation choices', async () => {
+  const { context, timers } = await restoreLifecycleBackup('between_games_preparation', 2);
+  assert.equal(context.matchPhase, 'between_games_preparation');
+  assert.equal(context.$('t1Stance').value, 'P2');
+  assert.equal(context.$('t2Stance').value, 'P1');
+  assert.equal(timers.length, 0);
+});
+
+test('recovery behavior keeps deciding-game end change locked and recreates its completion surface', async () => {
+  const { context, timers } = await restoreLifecycleBackup('deciding_game_end_change', 3);
+  assert.equal(context.matchPhase, 'deciding_game_end_change');
+  assert.equal(context.matchState.endChangePending, true);
+  assert.equal(timers.length, 1);
+  assert.equal(timers[0].sec, 60);
 });
 
 test('Local API guards remain backend-free for the shared lifecycle', () => {
@@ -169,4 +238,35 @@ test('established deciding-game threshold and undo snapshot semantics remain int
   assert.match(functionSource('award'), /halfSwitched: matchState\.halfSwitched/);
   assert.match(functionSource('undoLastPoint'), /gameState = last\.gameState/);
   assert.match(functionSource('undoLastPoint'), /matchState\.halfSwitched = last\.halfSwitched/);
+});
+
+test('undo is atomic around the deciding-game end-change transition', () => {
+  const source = functionSource('undoLastPoint');
+  assert.match(source, /!\['in_progress','game_complete_pending_settlement'\]\.includes\(matchPhase\) \|\| activeTimer/);
+  assert.match(source, /matchState\.endChangePending = !!last\.endChangePending; matchPhase = last\.matchPhase/);
+  assert.match(functionSource('award'), /if \(matchPhase !== 'deciding_game_end_change' \|\| !matchState\.endChangePending\) return/);
+});
+
+test('undo behavior cannot interleave with a pending switch and atomically restores its pre-rally snapshot afterward', () => {
+  const { context } = scoringSandbox(3);
+  context.award(true);
+  context.undoLastPoint();
+  assert.equal(context.matchState.t1Score, 6, 'pending transition rejects undo');
+  assert.equal(context.gameState.viewBa, true);
+  context.completeDecidingGameEndChange();
+  context.undoLastPoint();
+  assert.equal(context.matchState.t1Score, 5);
+  assert.equal(context.gameState.viewBa, false);
+  assert.equal(context.matchState.halfSwitched, false);
+  assert.equal(context.matchState.endChangePending, false);
+  assert.equal(context.matchPhase, 'in_progress');
+});
+
+test('deciding-game end change resumes only through its explicit completion action', () => {
+  assert.doesNotMatch(functionSource('stopTimerManually'), /matchPhase = 'in_progress'/);
+  const complete = functionSource('completeDecidingGameEndChange');
+  assert.match(complete, /matchPhase !== 'deciding_game_end_change' \|\| !matchState\.endChangePending/);
+  assert.match(complete, /matchState\.endChangePending = false/);
+  assert.match(complete, /matchPhase = 'in_progress'/);
+  assert.match(functionSource('startTimer'), /completeDecidingGameEndChange\(\)/);
 });

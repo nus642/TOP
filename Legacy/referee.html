@@ -1433,24 +1433,48 @@ const normalizeMatchId = id => String(id ?? '').replace(/\s+/g, '').toUpperCase(
             window.timerCancelCb = onCancelCallback;
             const shield = document.createElement('div'); shield.id = 'timerShield';
             shield.className = 'fixed top-0 left-0 right-0 h-36 bg-red-700 text-slate-100 z-[99999] flex flex-col justify-center items-center shadow-[0_10px_30px_rgba(220,38,38,0.5)] font-black border-b-4 border-red-500 animate-enter';
-            shield.innerHTML = `<div id="tmsg" class="text-sm mb-3 tracking-widest flex items-center gap-2"><span>🛡️</span> ${msg}</div><div class="flex flex-col items-center gap-4"><div class="text-3xl font-black font-mono tracking-wider bg-black/40 px-6 py-1.5 rounded-xl shadow-inner text-amber-400"><span id="tsec">${sec}</span><span class="text-lg text-slate-300 ml-1">s</span></div><div class="flex gap-3 mt-1"><button onclick="stopTimerManually(true)" class="bg-slate-800 hover:bg-slate-700 text-white px-5 py-2.5 rounded-xl text-xs font-black shadow-md border border-slate-600 transition-colors">强行解除并继续</button></div></div>`;
+            const isEndChange = matchPhase === 'deciding_game_end_change';
+            const action = isEndChange
+                ? '<button onclick="completeDecidingGameEndChange()" class="bg-emerald-700 hover:bg-emerald-600 text-white px-5 py-2.5 rounded-xl text-xs font-black shadow-md border border-emerald-500 transition-colors">✓ 确认双方已完成换场并继续</button>'
+                : '<button onclick="stopTimerManually(true)" class="bg-slate-800 hover:bg-slate-700 text-white px-5 py-2.5 rounded-xl text-xs font-black shadow-md border border-slate-600 transition-colors">强行解除并继续</button>';
+            shield.innerHTML = `<div id="tmsg" class="text-sm mb-3 tracking-widest flex items-center gap-2"><span>🛡️</span> ${msg}</div><div class="flex flex-col items-center gap-4"><div class="text-3xl font-black font-mono tracking-wider bg-black/40 px-6 py-1.5 rounded-xl shadow-inner text-amber-400"><span id="tsec">${sec}</span><span class="text-lg text-slate-300 ml-1">s</span></div><div class="flex gap-3 mt-1">${action}</div></div>`;
             document.body.appendChild(shield);
-            let left = sec; activeTimer = setInterval(() => { left--; if($('tsec')) $('tsec').innerText = left; if(left <= 0) stopTimerManually(false); }, 1000);
+            let left = sec; activeTimer = setInterval(() => {
+                left--; if($('tsec')) $('tsec').innerText = Math.max(0, left);
+                if(left <= 0 && matchPhase === 'deciding_game_end_change') {
+                    clearInterval(activeTimer); activeTimer = null;
+                    if($('tmsg')) $('tmsg').innerText = '换场计时已结束，请确认双方已完成换场后继续';
+                    updateScoringAuthority();
+                } else if(left <= 0) stopTimerManually(false);
+            }, 1000);
         }
 
         window.stopTimerManually = function(isManual = true) {
+            if (matchPhase === 'deciding_game_end_change') {
+                showToast('⚠️ 决胜局换场必须使用“确认双方已完成换场并继续”', true);
+                return;
+            }
             if(activeTimer) clearInterval(activeTimer); activeTimer = null;
             const shield = $('timerShield'); if(shield) shield.remove();
-            if (matchPhase === 'deciding_game_end_change') {
-                matchState.endChangePending = false;
-                matchPhase = 'in_progress';
-                backupState();
-            }
             updateScoringAuthority();
             if(isManual && window.timerCancelCb) { window.timerCancelCb(); window.timerCancelCb = null; }
         };
 
-        window.triggerManualCancel = () => { if(activeTimer) { stopTimerManually(true); showToast('✅ 已强行解除倒计时'); } else showToast('⏳ 当前无倒计时'); };
+        window.completeDecidingGameEndChange = function() {
+            if (matchPhase !== 'deciding_game_end_change' || !matchState.endChangePending) return;
+            if(activeTimer) clearInterval(activeTimer); activeTimer = null;
+            const shield = $('timerShield'); if(shield) shield.remove();
+            matchState.endChangePending = false;
+            matchPhase = 'in_progress';
+            window.timerCancelCb = null;
+            backupState(); renderGame(); updateScoringAuthority();
+            showToast('✅ 双方换场完成，恢复计分');
+        };
+
+        window.triggerManualCancel = () => {
+            if(matchPhase === 'deciding_game_end_change') return showToast('⚠️ 请在换场面板确认双方已完成换场', true);
+            if(activeTimer) { stopTimerManually(true); showToast('✅ 已强行解除倒计时'); } else showToast('⏳ 当前无倒计时');
+        };
 
         window.requestTimeout = (isLeftBtn) => {
             let isT1Target = gameState.viewBa ? !isLeftBtn : isLeftBtn;
@@ -1483,7 +1507,7 @@ const normalizeMatchId = id => String(id ?? '').replace(/\s+/g, '').toUpperCase(
             targetScoreDOM.style.transform = 'scale(1.2)'; targetScoreDOM.style.color = '#fbbf24';
             setTimeout(() => { targetScoreDOM.style.transform = 'scale(1)'; targetScoreDOM.style.color = 'white'; }, 200);
 
-            matchState.history.push({ t1Score: matchState.t1Score, t2Score: matchState.t2Score, gameState: JSON.parse(JSON.stringify(gameState)), timeoutUsed: {...timeoutUsed}, halfSwitched: matchState.halfSwitched });
+            matchState.history.push({ t1Score: matchState.t1Score, t2Score: matchState.t2Score, gameState: JSON.parse(JSON.stringify(gameState)), timeoutUsed: {...timeoutUsed}, halfSwitched: matchState.halfSwitched, endChangePending: !!matchState.endChangePending, matchPhase });
             const winTeam = gameState.viewBa ? (isLeftClick ? 2 : 1) : (isLeftClick ? 1 : 2);
             matchState.timeline.push(winTeam);
 
@@ -1547,6 +1571,7 @@ const normalizeMatchId = id => String(id ?? '').replace(/\s+/g, '').toUpperCase(
                 backupState();
                 updateScoringAuthority();
                 setTimeout(() => {
+                    if (matchPhase !== 'deciding_game_end_change' || !matchState.endChangePending) return;
                     alert(`🔥 场地交换提示：\n\n一方已达到 ${switchPoint} 分！\n请指挥双方交换场地。\n\n⚠️ 【重要提醒】：请双方选手交换场区，确认站位后继续比赛。如使用球队暂停，球拍请放在场内。`);
                     renderGame(); backupState();
                     startTimer(60, '🔄 交换场区：请双方选手交换场区，确认站位后继续比赛。如使用球队暂停，球拍请放在场内。');
@@ -1561,9 +1586,11 @@ const normalizeMatchId = id => String(id ?? '').replace(/\s+/g, '').toUpperCase(
         window.toggleRefereeView = () => { gameState.viewBa = !gameState.viewBa; renderGame(); backupState(); };
 
         window.undoLastPoint = () => {
+            if (!['in_progress','game_complete_pending_settlement'].includes(matchPhase) || activeTimer) return showToast('⚠️ 当前转换尚未完成，不能撤分', true);
             if (matchState.history.length > 0) {
                 let last = matchState.history.pop(); matchState.timeline.pop();
-                matchState.t1Score = last.t1Score; matchState.t2Score = last.t2Score; gameState = last.gameState; timeoutUsed = last.timeoutUsed; matchState.halfSwitched = last.halfSwitched;
+                matchState.t1Score = last.t1Score; matchState.t2Score = last.t2Score; gameState = last.gameState; timeoutUsed = last.timeoutUsed;
+                matchState.halfSwitched = last.halfSwitched; matchState.endChangePending = !!last.endChangePending; matchPhase = last.matchPhase || 'in_progress';
                 reconcileGameCompletion();
                 renderGame(); syncLiveScore(); backupState(); showToast('↩️ 已回档');
             } else showToast('⚠️ 无历史可撤回', true);
