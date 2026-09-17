@@ -17,10 +17,11 @@ function functionSource(name) {
   throw new Error(`unterminated ${name}`);
 }
 
-const lifecycleHelpers = ['isGameComplete', 'reconcileGameCompletion', 'updateScoringAuthority', 'updateSetupAuthority']
+const lifecycleHelpers = ['isGameComplete', 'hideGameSettlementPrompt', 'showGameSettlementPrompt', 'reconcileGameCompletion', 'updateScoringAuthority', 'updateSetupAuthority']
   .map(functionSource).join('\n');
 const awardSource = html.slice(html.indexOf('window.award ='), html.indexOf('window.toggleRefereeView'));
-const undoSource = html.slice(html.indexOf('window.undoLastPoint ='), html.indexOf('window.endCurrentGame'));
+const undoStart = html.indexOf('window.undoLastPoint =');
+const undoSource = html.slice(undoStart, html.indexOf('window.endCurrentGame =', undoStart));
 
 function harness({ t1 = 14, t2 = 13, target = 15, cap = 0 } = {}) {
   const elements = new Map();
@@ -33,7 +34,7 @@ function harness({ t1 = 14, t2 = 13, target = 15, cap = 0 } = {}) {
   };
   const context = {
     window: null, matchPhase: 'in_progress', activeTimer: null,
-    currentMatch: { target, cap, meth: 'rally', type: 'singles', t1p1: 'A', t2p1: 'B' },
+    currentMatch: { target, cap, meth: 'rally', type: 'singles', t1Name: 'Blue', t2Name: 'Green', t1p1: 'A', t2p1: 'B' },
     matchState: { t1Score: t1, t2Score: t2, history: [], timeline: [], halfSwitched: true, over: false },
     gameState: { viewBa: false, servTeam: 1, t1: { r: 'A', l: 'A' }, t2: { r: 'B', l: 'B' } },
     timeoutUsed: {}, $: element,
