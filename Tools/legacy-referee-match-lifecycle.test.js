@@ -29,7 +29,8 @@ function elements() {
     if (!map.has(id)) {
       const classes = new Set(['hidden-section']);
       map.set(id, {
-      id, disabled: false, value: 'P1', innerText: '', innerHTML: '', style: {},
+      id, disabled: false, readOnly: false, tagName: id === 'gameFormat' || id === 'scoreRule' || id === 'matchTypeSel' ? 'SELECT' : 'INPUT', value: 'P1', innerText: '', innerHTML: '', style: {},
+      setAttribute() {},
       remove() {}, classList: {
         add(...names) { names.forEach(name => classes.add(name)); },
         remove(...names) { names.forEach(name => classes.delete(name)); },
@@ -135,7 +136,7 @@ function settlementSandbox({ game, t1Wins, t2Wins, t1Score = 11, t2Score = 5, ta
   };
   context.window = context;
   vm.createContext(context);
-  vm.runInContext(`${functionSource('isGameComplete')}\n${functionSource('hideGameSettlementPrompt')}\n${functionSource('prepareNextGame')}\n${functionSource('endCurrentGame')}\n${functionSource('settleGameFromPrompt')}`, context);
+  vm.runInContext(`${functionSource('projectCurrentMatchToSetup')}\n${functionSource('isGameComplete')}\n${functionSource('hideGameSettlementPrompt')}\n${functionSource('prepareNextGame')}\n${functionSource('endCurrentGame')}\n${functionSource('settleGameFromPrompt')}`, context);
   context.settleGameFromPrompt();
   return { context, steps, serve };
 }
@@ -179,10 +180,12 @@ test('previous-game winner is an editable default and player choices are indepen
 
 test('between-game preparation preserves and locks established non-default match rules', () => {
   const source = functionSource('prepareNextGame');
+  assert.match(source, /projectCurrentMatchToSetup\(\)/);
+  const projection = functionSource('projectCurrentMatchToSetup');
   for (const [field, property] of [
     ['targetScore', 'target'], ['capScore', 'cap'], ['gameFormat', 'format'],
     ['scoreRule', 'meth'], ['matchTypeSel', 'type']
-  ]) assert.match(source, new RegExp(`\\$\\('${field}'\\)\\.value = currentMatch\\.${property}`));
+  ]) assert.match(projection, new RegExp(`${field}: '${property}'`));
   assert.match(source, /setAuthoritativeFieldsLocked\(true\)/);
   assert.match(functionSource('backToStep1'), /matchPhase === 'between_games_preparation'.*return showToast/);
   assert.match(functionSource('updateSetupAuthority'), /matchPhase === 'between_games_preparation'\) backBtn\.disabled = true/);
@@ -242,6 +245,123 @@ test('Local next game runs the same behavior without any backend lifecycle call'
   assert.ok(!calls.includes('referee_update_status'));
 });
 
+function realGameOneFlow() {
+  const $ = elements();
+  const stored = new Map();
+  const serve = { checked: false };
+  const context = {
+    window: null, $, console, sysMode: 'local', matchPhase: 'not_started', activeTimer: null, prepInterval: null,
+    AUTHORITATIVE_FIELD_IDS: ['matchIdInput2','courtNo','targetScore','capScore','gameFormat','scoreRule','matchTypeSel','t1Name','t2Name','t1p1','t1p2','t2p1','t2p2'],
+    currentMatch: {}, currentRefLevel: 'Local', currentRefereeName: 'Referee', currentRefereeId: 'local_admin',
+    matchState: { t1Score: 0, t2Score: 0, t1Wins: 0, t2Wins: 0, currentGame: 1, history: [], timeline: [], halfSwitched: false, over: false },
+    gameState: { viewBa: false }, timeoutUsed: {},
+    document: { querySelector: selector => selector.includes('serve') ? serve : null, querySelectorAll: () => [] },
+    localStorage: { setItem: (key, value) => stored.set(key, value), getItem: key => stored.get(key) ?? null },
+    getRadio: () => '1', validateAuthoritativeRules: () => '', stopPrepCounting() {},
+    updateRefereeStatus: async () => {}, setLiveSyncStatus() {}, renderGame() {}, syncLiveScore() {},
+    recoveryIdentity: () => ({}), recoveryBackupKey: () => 'backup', getCurrentStep: () => 2,
+    showStep() {}, showToast() {}, alert() {}, setTimeout() {}
+  };
+  context.window = context;
+  context.window.pendingTask = null;
+  Object.assign($('targetScore'), { value: '15' });
+  Object.assign($('capScore'), { value: '19' });
+  Object.assign($('gameFormat'), { value: '3' });
+  Object.assign($('scoreRule'), { value: 'rally' });
+  Object.assign($('matchTypeSel'), { value: 'singles' });
+  Object.assign($('courtNo'), { value: '7' });
+  Object.assign($('matchIdInput2'), { value: 'LOCAL-15' });
+  Object.assign($('t1Name'), { value: 'Blue' }); Object.assign($('t2Name'), { value: 'Green' });
+  Object.assign($('t1p1'), { value: 'Alice' }); Object.assign($('t2p1'), { value: 'Bob' });
+  vm.createContext(context);
+  vm.runInContext([
+    functionSource('setAuthoritativeFieldsLocked'), functionSource('projectCurrentMatchToSetup'),
+    functionSource('backupState'),
+    functionSource('handleStartSetup'), functionSource('executeStartMatch'), functionSource('isGameComplete'),
+    functionSource('hideGameSettlementPrompt'), functionSource('prepareNextGame'), functionSource('endCurrentGame')
+  ].join('\n'), context);
+  return { context, $, stored };
+}
+
+async function recoverPreparation(serialized, mode) {
+  const $ = elements();
+  $('targetScore').value = '21'; $('capScore').value = '21'; $('gameFormat').value = '1';
+  $('scoreRule').value = 'rally'; $('matchTypeSel').value = 'doubles';
+  const context = {
+    window: null, $, console, sysMode: mode, currentMatch: {}, matchState: {}, gameState: {}, timeoutUsed: {},
+    currentRefereeId: 'local_admin', password: 'secret',
+    AUTHORITATIVE_FIELD_IDS: ['matchIdInput2','courtNo','targetScore','capScore','gameFormat','scoreRule','matchTypeSel','t1Name','t2Name','t1p1','t1p2','t2p1','t2p2'],
+    matchPhase: 'not_started', LEGACY_BACKUP_KEY: 'legacy', localStorage: {
+      removeItem() {}, getItem: key => key === 'backup' ? serialized : null
+    },
+    document: { querySelector: () => ({ checked: false }) },
+    recoveryBackupKey: () => 'backup', validateRecoveryPayload: () => '', validateAssignmentRecovery: () => '',
+    apiCall: async () => ({ status: 'success', kind: 'assignment', assignment: { lifecycle: 'in_progress' } }),
+    clearBackup() {}, confirm: () => true, reconcileGameCompletion() {}, showStep() {}, renderGame() {}, startTimer() {}
+  };
+  context.window = context;
+  vm.createContext(context);
+  const recoverySource = functionSource('checkAndRestoreBackup').replace('} catch(e) { clearBackup(); }', '} catch(e) { throw e; }');
+  vm.runInContext([
+    functionSource('setAuthoritativeFieldsLocked'), functionSource('projectCurrentMatchToSetup'),
+    recoverySource, 'this.restore = checkAndRestoreBackup'
+  ].join('\n'), context);
+  assert.equal(await context.restore(), true);
+  return { context, $ };
+}
+
+test('real Game 1 setup preserves non-default cap through Games 2 and 3 preparation and recovery', async () => {
+  const game = realGameOneFlow();
+  await game.context.handleStartSetup({ currentTarget: { innerText: '', disabled: false } });
+  await vm.runInContext('executeStartMatch()', game.context);
+  assert.equal(game.context.currentMatch.target, 15);
+  assert.equal(game.context.currentMatch.cap, 19);
+
+  game.context.matchState.t1Score = 15; game.context.matchState.t2Score = 8;
+  game.context.matchPhase = 'game_complete_pending_settlement';
+  game.context.endCurrentGame();
+  assert.equal(game.$('targetScore').value, 15);
+  assert.equal(game.$('capScore').value, 19);
+
+  game.context.backupState();
+  const game2Backup = game.stored.get('backup');
+  for (const mode of ['local', 'ind']) {
+    const recovered = await recoverPreparation(game2Backup, mode);
+    assert.equal(recovered.context.currentMatch.cap, 19);
+    for (const [id, value] of Object.entries({
+      matchIdInput2: 'LOCAL-15', courtNo: '7', targetScore: 15, capScore: 19,
+      gameFormat: 3, scoreRule: 'rally', matchTypeSel: 'singles',
+      t1Name: 'Blue', t2Name: 'Green', t1p1: 'Alice', t2p1: 'Bob'
+    })) assert.equal(recovered.$(id).value, value, `${mode} recovery projects ${id}`);
+    assert.equal(recovered.$('capScore').readOnly, true);
+  }
+
+  await vm.runInContext('executeStartMatch()', game.context);
+  game.context.matchState.t1Score = 8; game.context.matchState.t2Score = 15;
+  game.context.matchPhase = 'game_complete_pending_settlement';
+  game.context.endCurrentGame();
+  assert.equal(game.context.matchState.currentGame, 3);
+  game.context.backupState();
+  const game3Backup = game.stored.get('backup');
+  for (const mode of ['local', 'ind']) {
+    const recovered = await recoverPreparation(game3Backup, mode);
+    assert.equal(recovered.context.matchState.currentGame, 3);
+    assert.equal(recovered.$('targetScore').value, 15);
+    assert.equal(recovered.$('capScore').value, 19);
+  }
+});
+
+test('fresh Local setup restores the saved cap default alongside target', () => {
+  const $ = elements();
+  $('targetScore').value = '21'; $('capScore').value = '21';
+  const saved = { pickle_def_target: '15', pickle_def_cap: '19' };
+  const context = { $, localStorage: { getItem: key => saved[key] ?? null } };
+  vm.createContext(context);
+  vm.runInContext(`${functionSource('restoreLocalSetupDefaults')}\nrestoreLocalSetupDefaults()`, context);
+  assert.equal($('targetScore').value, '15');
+  assert.equal($('capScore').value, '19');
+});
+
 async function restoreLifecycleBackup(phase, step) {
   const $ = elements();
   const timers = [];
@@ -261,7 +381,7 @@ async function restoreLifecycleBackup(phase, step) {
   };
   context.window = context;
   vm.createContext(context);
-  vm.runInContext(`${functionSource('checkAndRestoreBackup')}\nthis.restore = checkAndRestoreBackup`, context);
+  vm.runInContext(`${functionSource('projectCurrentMatchToSetup')}\n${functionSource('checkAndRestoreBackup')}\nthis.restore = checkAndRestoreBackup`, context);
   assert.equal(await context.restore(), true);
   return { context, timers };
 }
