@@ -249,6 +249,14 @@
                         <select id="t2Stance" onchange="backupPreparationChoices()" class="input-base text-xs font-bold text-center bg-slate-900"></select>
                     </div>
                 </div>
+                <div id="nextGamePlayerChoices" class="hidden border-t border-slate-700 pt-4 mt-2">
+                    <label class="text-[11px] font-black text-amber-400 mb-2 block tracking-widest">3. 下一局发球员 / 接发球员</label>
+                    <p class="text-[10px] text-slate-400 mb-2">按上方发球队伍选择发球员；另一队选择接发球员。既有场端与轮转不变。</p>
+                    <div class="grid grid-cols-2 gap-3">
+                        <select id="t1NextPlayer" onchange="backupPreparationChoices()" class="input-base text-xs font-bold text-center bg-slate-900"></select>
+                        <select id="t2NextPlayer" onchange="backupPreparationChoices()" class="input-base text-xs font-bold text-center bg-slate-900"></select>
+                    </div>
+                </div>
             </div>
 
             <div class="flex gap-3">
@@ -354,6 +362,7 @@
                 </div>
 
                 <button id="submitReport" onclick="submitFinalReport()" class="bg-gradient-to-r from-emerald-600 to-teal-600 w-full py-4 rounded-xl font-black text-base mb-3 shadow-[0_4px_15px_rgba(16,185,129,0.3)] btn-press tracking-widest mt-4">☁️ 签名确认并上传战果</button>
+                <button id="saveSignedRecord" onclick="saveSignedRecordImage()" class="hidden bg-indigo-600 w-full py-4 rounded-xl font-black text-base mb-3 shadow-lg btn-press">💾 保存比赛记录图片</button>
 
                 <div class="grid grid-cols-2 gap-3 mb-6">
                     <button onclick="copyReportText()" class="bg-slate-800 border border-slate-600 py-3.5 rounded-xl text-xs font-bold btn-press text-slate-300">📋 手动复制战报</button>
@@ -646,12 +655,13 @@ const normalizeMatchId = id => String(id ?? '').replace(/\s+/g, '').toUpperCase(
                                 $('serveLabel1').innerText = `${currentMatch.t1Name} 发球`; $('serveLabel2').innerText = `${currentMatch.t2Name} 发球`;
                                 $('t1Stance').innerHTML = `<option value="P1">${currentMatch.t1p1}</option>${currentMatch.type==='doubles'?`<option value="P2">${currentMatch.t1p2}</option>`:''}`;
                                 $('t2Stance').innerHTML = `<option value="P1">${currentMatch.t2p1}</option>${currentMatch.type==='doubles'?`<option value="P2">${currentMatch.t2p2}</option>`:''}`;
+                                $('t1NextPlayer').innerHTML = $('t1Stance').innerHTML;
+                                $('t2NextPlayer').innerHTML = $('t2Stance').innerHTML;
                                 const preparation = matchState.preparation || {};
                                 const serveRadio = typeof document !== 'undefined' ? document.querySelector(`input[name="serve"][value="${preparation.serveTeam || 1}"]`) : null;
                                 if (serveRadio) serveRadio.checked = true;
-                                if (preparation.t1Stance) $('t1Stance').value = preparation.t1Stance;
-                                if (preparation.t2Stance) $('t2Stance').value = preparation.t2Stance;
-                                if(currentMatch.type === 'doubles') $('doublesStance').classList.remove('hidden');
+                                if (preparation.t1Stance) $('t1NextPlayer').value = preparation.t1Stance;
+                                if (preparation.t2Stance) $('t2NextPlayer').value = preparation.t2Stance;
                                 showStep(2);
                             } else if(data.step === 3) {
                                 renderGame(); showStep(3); $('recoveryBadge').classList.remove('hidden');
@@ -1083,6 +1093,8 @@ const normalizeMatchId = id => String(id ?? '').replace(/\s+/g, '').toUpperCase(
             // [PR#155 R8] 根据 matchPhase 更新按钮文案
             if (step === 2) {
                 const betweenGames = matchPhase === 'between_games_preparation';
+                $('doublesStance').classList.toggle('hidden', betweenGames || currentMatch.type !== 'doubles');
+                $('nextGamePlayerChoices').classList.toggle('hidden', !betweenGames || currentMatch.type !== 'doubles');
                 $('betweenGamesHeading').classList.toggle('hidden', !betweenGames);
                 $('servingTeamLabel').innerText = betweenGames ? '2. 发球权（默认上一局胜方，可修改）' : '2. 发球权（第一回合发球队伍）';
                 if (betweenGames) $('betweenGamesTitle').innerText = `下一局准备 / Game ${matchState.currentGame} Preparation`;
@@ -1103,6 +1115,10 @@ const normalizeMatchId = id => String(id ?? '').replace(/\s+/g, '').toUpperCase(
                     }
                 }
                 updateSetupAuthority();
+            }
+            if (step === 4) {
+                const submitBtn = $('submitReport');
+                if (submitBtn && matchPhase !== 'finalized') submitBtn.innerText = sysMode === 'local' ? '✓ 签名确认并完成比赛' : '☁️ 签名确认并上传战果';
             }
             if (step === 3) {
                 // [PR#155 R9] viewSettingsBtn 已在 HTML 中直接设置正确样式，无需运行时修改
@@ -1268,8 +1284,8 @@ const normalizeMatchId = id => String(id ?? '').replace(/\s+/g, '').toUpperCase(
             if (matchPhase !== 'between_games_preparation') return;
             matchState.preparation = {
                 serveTeam: parseInt(getRadio('serve') || 1),
-                t1Stance: $('t1Stance').value,
-                t2Stance: $('t2Stance').value
+                t1Stance: $('t1NextPlayer').value,
+                t2Stance: $('t2NextPlayer').value
             };
             backupState();
         };
@@ -1302,7 +1318,8 @@ const normalizeMatchId = id => String(id ?? '').replace(/\s+/g, '').toUpperCase(
             gameState = { viewBa: viewBa, servTeam: serveTeam, initServTeam: serveTeam, servNum: initServNum, court: 'Right', t1: { r:'', l:'' }, t2: { r:'', l:'' }, initRightP1: '', initRightP2: '', servingPlayer: '' };
 
             if(currentMatch.type === 'doubles'){
-                let t1s = $('t1Stance').value, t2s = $('t2Stance').value;
+                let t1s = isNextGame ? $('t1NextPlayer').value : $('t1Stance').value;
+                let t2s = isNextGame ? $('t2NextPlayer').value : $('t2Stance').value;
                 let p11 = currentMatch.t1p1, p12 = currentMatch.t1p2 || p11;
                 let p21 = currentMatch.t2p1, p22 = currentMatch.t2p2 || p21;
                 gameState.t1.r = t1s === 'P1' ? p11 : p12;
@@ -1310,8 +1327,8 @@ const normalizeMatchId = id => String(id ?? '').replace(/\s+/g, '').toUpperCase(
                 gameState.t2.r = t2s === 'P1' ? p21 : p22;
                 gameState.t2.l = t2s === 'P1' ? p22 : p21;
             } else {
-                gameState.t1.r = gameState.t1.l = currentMatch.t1p1;
-                gameState.t2.r = gameState.t2.l = currentMatch.t2p1;
+                gameState.t1.r = currentMatch.t1p1; gameState.t1.l = '';
+                gameState.t2.r = currentMatch.t2p1; gameState.t2.l = '';
             }
             gameState.initRightP1 = gameState.t1.r;
             gameState.initRightP2 = gameState.t2.r;
@@ -1400,7 +1417,18 @@ const normalizeMatchId = id => String(id ?? '').replace(/\s+/g, '').toUpperCase(
             }
         }
 
+        function projectSinglesCourtPositions() {
+            if (currentMatch.type !== 'singles') return;
+            const place = (team, player, score) => {
+                gameState[team].r = score % 2 === 0 ? player : '';
+                gameState[team].l = score % 2 === 0 ? '' : player;
+            };
+            place('t1', currentMatch.t1p1, matchState.t1Score);
+            place('t2', currentMatch.t2p1, matchState.t2Score);
+        }
+
         function renderGame() {
+            projectSinglesCourtPositions();
             let leftTeamNum = gameState.viewBa ? 2 : 1; let rightTeamNum = gameState.viewBa ? 1 : 2;
             let leftName = gameState.viewBa ? currentMatch.t2Name : currentMatch.t1Name; let rightName = gameState.viewBa ? currentMatch.t1Name : currentMatch.t2Name;
             let leftBuff = gameState.initServTeam === leftTeamNum ? `<span class="bg-amber-600 text-white px-1.5 py-0.5 rounded shadow-sm ml-2 text-[9px] font-black uppercase">首发</span>` : `<span class="bg-cyan-600 text-white px-1.5 py-0.5 rounded shadow-sm ml-2 text-[9px] font-black uppercase">首接</span>`;
@@ -1441,6 +1469,7 @@ const normalizeMatchId = id => String(id ?? '').replace(/\s+/g, '').toUpperCase(
             ['slotTL','slotBL','slotTR','slotBR'].forEach(id => { $(id).innerHTML = ''; $(id).classList.remove('slot-active'); });
 
             const bld = (name, teamNum, isServTarget, sText) => {
+                if (!name) return '';
                 let isInitRight = (teamNum===1 && name===gameState.initRightP1) || (teamNum===2 && name===gameState.initRightP2);
                 let pBuff = (isInitRight && currentMatch.type === 'doubles') ? `<div class="text-[14px] bg-red-950 text-red-400 px-2.5 py-0.5 rounded mt-1 shadow-inner font-black tracking-widest border border-red-500/50">[首发位]</div>` : '';
                 return `<div class='flex flex-col items-center justify-center w-full'><div class='text-2xl font-black w-full overflow-hidden text-center ${isServTarget?'text-yellow-400 scale-125 drop-shadow-md':'text-slate-400 opacity-60'}'>${name}</div>${pBuff}${isServTarget ? `<div class='text-sm bg-gradient-to-r from-yellow-400 to-amber-500 text-slate-900 px-4 py-1.5 rounded-full font-black mt-2 shadow-lg animate-pulse border-2 border-white/20'>${sText}</div>` : ''}</div>`;
@@ -1669,7 +1698,7 @@ const normalizeMatchId = id => String(id ?? '').replace(/\s+/g, '').toUpperCase(
             const t1s = `<option value="P1">${currentMatch.t1p1}</option>${currentMatch.type==='doubles'?`<option value="P2">${currentMatch.t1p2}</option>`:''}`;
             const t2s = `<option value="P1">${currentMatch.t2p1}</option>${currentMatch.type==='doubles'?`<option value="P2">${currentMatch.t2p2}</option>`:''}`;
             $('t1Stance').innerHTML = t1s; $('t2Stance').innerHTML = t2s;
-            if (currentMatch.type === 'doubles') $('doublesStance').classList.remove('hidden');
+            $('t1NextPlayer').innerHTML = t1s; $('t2NextPlayer').innerHTML = t2s;
             matchState.preparation = { serveTeam: winningTeam, t1Stance: 'P1', t2Stance: 'P1' };
 
             matchPhase = 'between_games_preparation';
@@ -1715,6 +1744,16 @@ const normalizeMatchId = id => String(id ?? '').replace(/\s+/g, '').toUpperCase(
             renderGame(); syncLiveScore();
         };
 
+        let signedRecordImageData = '';
+
+        window.saveSignedRecordImage = () => {
+            if (!signedRecordImageData) return showToast('请先签名并完成比赛记录', true);
+            const link = document.createElement('a');
+            link.href = signedRecordImageData;
+            link.download = `${currentMatch.id || 'match'}-signed-record.jpg`;
+            document.body.appendChild(link); link.click(); link.remove();
+        };
+
         window.submitFinalReport = async () => {
             try {
                 const btn = $('submitReport');
@@ -1741,8 +1780,10 @@ const normalizeMatchId = id => String(id ?? '').replace(/\s+/g, '').toUpperCase(
                     if ($('clearRefereeSigBtn')) {
                         $('clearRefereeSigBtn').outerHTML = `<div class="text-xs text-amber-400 mt-2 font-black animate-pulse bg-amber-900/30 py-2 rounded">👆 长按上方生成的图片可保存或发往赛事群</div>`;
                     }
+                    signedRecordImageData = signedReportBase64;
+                    $('saveSignedRecord').classList.remove('hidden');
                     matchPhase = 'finalized';
-                    showToast('单机模式：无需上传', false); btn.innerText = '✅ 本地裁决结束'; clearBackup(); return;
+                    showToast('✅ 比赛记录已在本地完成，可保存图片', false); btn.innerText = '✅ 本地比赛已完成'; clearBackup(); return;
                 }
 
                 window.finalPayload = {

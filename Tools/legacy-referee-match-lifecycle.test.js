@@ -173,9 +173,11 @@ test('previous-game winner is an editable default and player choices are indepen
   const preparation = functionSource('prepareNextGame');
   assert.match(preparation, /serveRadio\.checked = true/);
   assert.match(html, /name="serve" value="1" onchange="backupPreparationChoices\(\)"/);
-  assert.match(html, /id="t1Stance" onchange="backupPreparationChoices\(\)"/);
-  assert.match(html, /id="t2Stance" onchange="backupPreparationChoices\(\)"/);
+  assert.match(html, /id="t1NextPlayer" onchange="backupPreparationChoices\(\)"/);
+  assert.match(html, /id="t2NextPlayer" onchange="backupPreparationChoices\(\)"/);
   assert.match(functionSource('backupPreparationChoices'), /serveTeam:[\s\S]*t1Stance:[\s\S]*t2Stance:/);
+  assert.match(html, /doublesStance.*betweenGames \|\| currentMatch\.type !== 'doubles'/);
+  assert.match(html, /nextGamePlayerChoices.*!betweenGames \|\| currentMatch\.type !== 'doubles'/);
 });
 
 test('between-game preparation preserves and locks established non-default match rules', () => {
@@ -206,7 +208,7 @@ test('between-game preparation preserves and locks established non-default match
 
 async function runNextGame(mode = 'team') {
   const $ = elements();
-  $('t1Stance').value = 'P2'; $('t2Stance').value = 'P2';
+  $('t1NextPlayer').value = 'P2'; $('t2NextPlayer').value = 'P2';
   const calls = [];
   const context = {
     window: null, $, sysMode: mode, matchPhase: 'between_games_preparation', activeTimer: null,
@@ -389,8 +391,8 @@ async function restoreLifecycleBackup(phase, step) {
 test('recovery behavior restores editable between-game preparation choices', async () => {
   const { context, timers } = await restoreLifecycleBackup('between_games_preparation', 2);
   assert.equal(context.matchPhase, 'between_games_preparation');
-  assert.equal(context.$('t1Stance').value, 'P2');
-  assert.equal(context.$('t2Stance').value, 'P1');
+  assert.equal(context.$('t1NextPlayer').value, 'P2');
+  assert.equal(context.$('t2NextPlayer').value, 'P1');
   assert.equal(timers.length, 0);
 });
 
