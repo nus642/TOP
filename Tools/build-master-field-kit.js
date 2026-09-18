@@ -59,11 +59,13 @@ fs.writeFileSync(path.join(offlineDirectory, 'README.txt'), `TOP 离线裁判（
 无需互联网连接。
 
 赛前启动：
-1. 请现场技术人员在 Field Kit 所在电脑启动 localhost：
-   python3 -m http.server 8000 --directory dist/master-field-kit/01_Offline-Referee
-2. 在同一台电脑的浏览器打开：
-   http://localhost:8000/?mode=local
-3. 确认页面显示 Local 模式后再开始比赛。
+1. 打开命令提示符，进入 Field Kit 的 01_Offline-Referee 文件夹：
+   cd 01_Offline-Referee
+2. 启动 localhost：
+   python -m http.server 8088
+3. 在同一台电脑的浏览器打开：
+   http://localhost:8088/?mode=local
+4. 确认页面显示 Local 模式后再开始比赛。
 
 裁判程序权威来源：Legacy/referee.html。本目录 index.html 由打包工具逐字节复制，不是另一套程序。
 

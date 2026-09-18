@@ -54,6 +54,13 @@ test('records Git source traceability and the field-verified baseline', () => {
   assert.match(version, /field-verified baseline: 84d5353 \/ 2026-09-18/);
 });
 
+test('documents the field-verified Windows localhost procedure', () => {
+  const readme = fs.readFileSync(path.join(kitRoot, '01_Offline-Referee/README.txt'), 'utf8');
+  assert.match(readme, /cd 01_Offline-Referee/);
+  assert.match(readme, /python -m http\.server 8088/);
+  assert.match(readme, /http:\/\/localhost:8088\/\?mode=local/);
+});
+
 test('packaged referee has no external HTTP(S) runtime resources', () => {
   const html = fs.readFileSync(path.join(kitRoot, '01_Offline-Referee/index.html'), 'utf8');
   const attributes = [...html.matchAll(/\b(?:src|href|poster|manifest)\s*=\s*(["'])(.*?)\1/gi)]
