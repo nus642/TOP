@@ -23,7 +23,7 @@ function elementFactory() {
   const elements = new Map();
   return id => {
     if (!elements.has(id)) {
-      const classes = new Set(id === 'mainApp' ? ['hidden-section'] : []);
+      const classes = new Set(['mainApp', 'onlineEntryForm', 'offlineEntryForm', 'offlineSessionBanner'].includes(id) ? ['hidden-section'] : []);
       elements.set(id, {
         value: '', innerText: '', innerHTML: '',
         classList: {
@@ -63,6 +63,7 @@ function initializationHarness(search) {
     setAuthoritativeFieldsLocked() {},
     checkAndRestoreBackup: async () => false,
     showStep() {},
+    showToast() {},
   };
   context.window = context;
   vm.createContext(context);
@@ -77,10 +78,15 @@ function initializationHarness(search) {
   );
   vm.runInContext([
     modeInitialization,
-    "let eventCode = null, currentRefereeId = null, currentRefereeName = '', currentRefLevel = 'L1';",
+    "let eventCode = null, currentRefereeId = null, currentRefereeName = '', currentRefLevel = 'L1'; let offlineSession = null;",
+    "const recoveryText = value => String(value ?? '').trim();",
     functionSource('restoreLocalSetupDefaults'),
+    functionSource('createOfflineSessionId'),
+    functionSource('initializeLocalReferee'),
+    html.slice(html.indexOf('window.showOnlineEntry ='), html.indexOf('function createOfflineSessionId')),
+    html.slice(html.indexOf('window.startOfflineEmergency ='), html.indexOf('window.onload = async () => {')),
     onloadSource,
-    'this.readInitialization = () => ({ sysMode, eventCode, currentRefereeId, currentRefereeName, currentRefLevel });',
+    'this.readInitialization = () => ({ sysMode, eventCode, currentRefereeId, currentRefereeName, currentRefLevel, offlineSession });',
   ].join('\n'), context);
   return { context, element, fetchCalls, session };
 }
@@ -110,24 +116,52 @@ function apiHarness(mode) {
   return { context, fetchCalls };
 }
 
-test('?mode=local activates the existing standalone initialization without login', async () => {
+test('?mode=local opens the explicit emergency form without silently starting Local mode', async () => {
   const { context, element, fetchCalls } = initializationHarness('?mode=local');
 
   await context.onload();
 
   const initialized = context.readInitialization();
-  assert.equal(initialized.sysMode, 'local');
+  assert.equal(initialized.sysMode, 'ind');
   assert.equal(initialized.eventCode, null);
-  assert.equal(initialized.currentRefereeId, 'local_admin');
-  assert.equal(initialized.currentRefereeName, '单机执裁者');
-  assert.equal(initialized.currentRefLevel, 'Local');
-  assert.equal(element('loginPanel').classList.contains('hidden-section'), true);
-  assert.equal(element('mainApp').classList.contains('hidden-section'), false);
-  assert.equal(element('cloudPullBlock').classList.contains('hidden-section'), true);
-  assert.equal(element('chiefMessageBlock').classList.contains('hidden-section'), true);
-  assert.equal(element('refereeInfoBar').classList.contains('hidden-section'), true);
-  assert.equal(element('sysBadge').innerText, '单机离线模式');
+  assert.equal(initialized.currentRefereeId, null);
+  assert.equal(element('loginPanel').classList.contains('hidden-section'), false);
+  assert.equal(element('mainApp').classList.contains('hidden-section'), true);
+  assert.equal(element('offlineEntryForm').classList.contains('hidden-section'), false);
+  assert.equal(element('sysBadge').innerText, '离线应急入口');
   assert.equal(fetchCalls.length, 0);
+});
+
+test('explicit Offline Emergency entry initializes an identified Local session without API calls', async () => {
+  const { context, element, fetchCalls } = initializationHarness('');
+  await context.onload();
+
+  context.showOfflineEmergencyEntry();
+  assert.equal(element('offlineEntryForm').classList.contains('hidden-section'), false);
+  element('offlineEventId').value = 'field-finals';
+  element('offlineRefereeName').value = 'Court Referee';
+  element('offlineNotes').value = 'Backend unavailable';
+  await context.startOfflineEmergency();
+
+  const initialized = context.readInitialization();
+  assert.equal(initialized.sysMode, 'local');
+  assert.equal(initialized.eventCode, 'FIELD-FINALS');
+  assert.equal(initialized.currentRefereeName, 'Court Referee');
+  assert.match(initialized.currentRefereeId, /^OFFLINE-\d{8}-[A-Z0-9]+$/);
+  assert.equal(initialized.offlineSession.notes, 'Backend unavailable');
+  assert.equal(element('mainApp').classList.contains('hidden-section'), false);
+  assert.equal(element('offlineSessionId').innerText, initialized.currentRefereeId);
+  assert.equal(fetchCalls.length, 0);
+});
+
+test('explicit Online Mode exposes the unchanged SaaS gate', async () => {
+  const { context, element } = initializationHarness('');
+  await context.onload();
+
+  context.showOnlineEntry();
+  assert.equal(element('onlineEntryForm').classList.contains('hidden-section'), false);
+  assert.equal(element('offlineEntryForm').classList.contains('hidden-section'), true);
+  assert.match(html, /id="eventCode"[\s\S]*id="refereePwd"[\s\S]*onclick="handleLogin\(\)"/);
 });
 
 for (const [label, search, expectedCode] of [

@@ -56,7 +56,8 @@ test('local/manual mode remains editable', () => {
     if (field.tagName === 'SELECT') assert.equal(field.disabled, false);
     else assert.equal(field.readOnly, false);
   }
-  const localBlock = html.slice(html.indexOf("if (sysMode === 'local') {"), html.indexOf('// 联网模式'));
+  const localStart = html.indexOf('async function initializeLocalReferee');
+  const localBlock = html.slice(localStart, html.indexOf('window.startOfflineEmergency', localStart));
   assert.match(localBlock, /setAuthoritativeFieldsLocked\(false\)/);
 });
 

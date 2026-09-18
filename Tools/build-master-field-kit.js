@@ -64,8 +64,9 @@ fs.writeFileSync(path.join(offlineDirectory, 'README.txt'), `TOP 离线裁判（
 2. 启动 localhost：
    python -m http.server 8088
 3. 在同一台电脑的浏览器打开：
-   http://localhost:8088/?mode=local
-4. 确认页面显示 Local 模式后再开始比赛。
+   http://localhost:8088/
+4. 明确选择“离线应急模式”，填写本地赛事标识和裁判姓名，然后启动本地执裁。
+5. 确认页面显示 OFFLINE 本地会话编号后再开始比赛。
 
 裁判程序权威来源：Legacy/referee.html。本目录 index.html 由打包工具逐字节复制，不是另一套程序。
 
