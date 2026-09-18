@@ -169,13 +169,14 @@ test('Game 3 settlement at 2-1 is the only remaining route to Final Summary', ()
   assert.equal(result.context.matchState.t1Wins, 2);
 });
 
-test('previous-game winner is an editable default and player choices are independent', () => {
+test('previous-game winner is an editable default with no between-game position controls', () => {
   const preparation = functionSource('prepareNextGame');
   assert.match(preparation, /serveRadio\.checked = true/);
   assert.match(html, /name="serve" value="1" onchange="backupPreparationChoices\(\)"/);
-  assert.match(html, /id="t1Stance" onchange="backupPreparationChoices\(\)"/);
-  assert.match(html, /id="t2Stance" onchange="backupPreparationChoices\(\)"/);
-  assert.match(functionSource('backupPreparationChoices'), /serveTeam:[\s\S]*t1Stance:[\s\S]*t2Stance:/);
+  assert.doesNotMatch(html, /t1NextPlayer|t2NextPlayer|nextGamePlayerChoices|下一局发球员/);
+  assert.match(functionSource('backupPreparationChoices'), /serveTeam: parseInt/);
+  assert.doesNotMatch(functionSource('backupPreparationChoices'), /t1Stance|t2Stance/);
+  assert.match(html, /doublesStance.*betweenGames \|\| currentMatch\.type !== 'doubles'/);
 });
 
 test('between-game preparation preserves and locks established non-default match rules', () => {
@@ -206,13 +207,12 @@ test('between-game preparation preserves and locks established non-default match
 
 async function runNextGame(mode = 'team') {
   const $ = elements();
-  $('t1Stance').value = 'P2'; $('t2Stance').value = 'P2';
   const calls = [];
   const context = {
     window: null, $, sysMode: mode, matchPhase: 'between_games_preparation', activeTimer: null,
     currentMatch: { id: 'M1', court: '1', format: 3, target: 11, cap: 0, type: 'doubles', meth: 'rally', t1Name: 'Blue', t2Name: 'Green', t1p1: 'A', t1p2: 'B', t2p1: 'C', t2p2: 'D' },
     matchState: { currentGame: 2, t1Wins: 1, t2Wins: 0, t1Score: 11, t2Score: 5, history: [{}], timeline: [1], halfSwitched: false, over: false },
-    gameState: { viewBa: true }, timeoutUsed: {}, getRadio: name => name === 'serve' ? '2' : 'f',
+    gameState: { viewBa: true, servTeam: 1, initServTeam: 1, servNum: 1, court: 'Left', t1: { r: 'B', l: 'A' }, t2: { r: 'D', l: 'C' }, initRightP1: 'A', initRightP2: 'C', servingPlayer: 'A' }, timeoutUsed: {}, getRadio: name => name === 'serve' ? '2' : 'f',
     stopPrepCounting() {}, apiCall: async action => { calls.push(action); return { status: 'success' }; },
     updateRefereeStatus: async () => calls.push('referee_update_status'), setLiveSyncStatus() {},
     backupState() {}, renderGame() {}, syncLiveScore: async () => calls.push('sync_live_score'), showStep: step => calls.push(`step:${step}`), showToast() {}, document: { querySelector: () => null }
@@ -224,7 +224,7 @@ async function runNextGame(mode = 'team') {
   return { context, calls };
 }
 
-test('connected next game behavior reuses the match and independently applies overridden team/server/receiver', async () => {
+test('connected next game preserves inherited doubles positions while independently applying serving-team override', async () => {
   const { context, calls } = await runNextGame('team');
   assert.ok(!calls.includes('start_task'));
   assert.ok(!calls.includes('referee_update_status'));
@@ -234,8 +234,9 @@ test('connected next game behavior reuses the match and independently applies ov
   assert.equal(context.matchState.t1Wins, 1);
   assert.equal(context.gameState.viewBa, true, 'between-game end change remains intact');
   assert.equal(context.gameState.servTeam, 2, 'referee override wins over default');
-  assert.equal(context.gameState.servingPlayer, 'D', 'team 2 server selection is applied');
-  assert.equal(context.gameState.t1.r, 'B', 'team 1 receiver selection is independent');
+  assert.equal(context.gameState.servingPlayer, 'D', 'selected serving team uses its inherited right-court player');
+  assert.deepEqual(JSON.parse(JSON.stringify(context.gameState.t1)), { r: 'B', l: 'A' });
+  assert.deepEqual(JSON.parse(JSON.stringify(context.gameState.t2)), { r: 'D', l: 'C' });
 });
 
 test('Local next game runs the same behavior without any backend lifecycle call', async () => {
@@ -243,6 +244,50 @@ test('Local next game runs the same behavior without any backend lifecycle call'
   assert.equal(context.matchPhase, 'in_progress');
   assert.ok(!calls.includes('start_task'));
   assert.ok(!calls.includes('referee_update_status'));
+});
+
+test('doubles ends alternate G1 left to G2 right to G3 left before the independent deciding-game threshold change', async () => {
+  const $ = elements();
+  let selectedServeTeam = 2;
+  const context = {
+    window: null, $, console, sysMode: 'local', matchPhase: 'in_progress', activeTimer: null,
+    currentMatch: { id: 'M1', court: '1', format: 3, target: 11, cap: 0, type: 'doubles', meth: 'rally', t1Name: 'Team A', t2Name: 'Team B', t1p1: 'A1', t1p2: 'A2', t2p1: 'B1', t2p2: 'B2' },
+    matchState: { currentGame: 1, t1Wins: 1, t2Wins: 0, t1Score: 11, t2Score: 7, results: [], history: [], timeline: [], halfSwitched: false, over: true },
+    gameState: { viewBa: false, servTeam: 1, initServTeam: 1, servNum: 1, court: 'Right', t1: { r: 'A2', l: 'A1' }, t2: { r: 'B1', l: 'B2' }, initRightP1: 'A1', initRightP2: 'B1', servingPlayer: 'A2' },
+    timeoutUsed: {}, getRadio: name => name === 'serve' ? String(selectedServeTeam) : 'f',
+    document: { querySelector: () => ({ checked: false }) }, stopPrepCounting() {}, projectCurrentMatchToSetup() {}, setAuthoritativeFieldsLocked() {},
+    hideGameSettlementPrompt() {}, showStep() {}, backupState() {}, renderGame() {}, syncLiveScore() {}, setLiveSyncStatus() {}, showToast() {},
+    updateScoringAuthority() {}, setTimeout: fn => fn(), clearInterval() {}, alert() {}, startTimer() {}
+  };
+  context.window = context;
+  vm.createContext(context);
+  vm.runInContext([
+    functionSource('prepareNextGame'), functionSource('executeStartMatch'), functionSource('isGameComplete'),
+    functionSource('showGameSettlementPrompt'), functionSource('reconcileGameCompletion'), functionSource('award')
+  ].join('\n'), context);
+
+  context.prepareNextGame(1);
+  assert.equal(context.matchState.currentGame, 2);
+  assert.equal(context.gameState.viewBa, true, 'Team A changes from referee-left to referee-right');
+  await vm.runInContext('executeStartMatch()', context);
+  assert.deepEqual(JSON.parse(JSON.stringify(context.gameState.t1)), { r: 'A2', l: 'A1' }, 'G1 player rotation is inherited');
+  assert.equal(context.gameState.servTeam, 2, 'serving-team override is independent');
+  assert.equal(context.gameState.viewBa, true);
+
+  context.matchState.t1Score = 7; context.matchState.t2Score = 11; context.matchState.t2Wins = 1;
+  context.matchState.over = true; context.matchPhase = 'in_progress'; selectedServeTeam = 1;
+  context.prepareNextGame(2);
+  assert.equal(context.matchState.currentGame, 3);
+  assert.equal(context.gameState.viewBa, false, 'Team A returns to referee-left');
+  await vm.runInContext('executeStartMatch()', context);
+  assert.deepEqual(JSON.parse(JSON.stringify(context.gameState.t1)), { r: 'A2', l: 'A1' });
+  assert.equal(context.gameState.servTeam, 1);
+
+  context.matchState.t1Score = 5; context.matchState.t2Score = 0;
+  context.award(true);
+  assert.equal(context.matchPhase, 'deciding_game_end_change');
+  assert.equal(context.gameState.viewBa, true, 'Game 3 threshold changes ends as a separate event');
+  assert.deepEqual(JSON.parse(JSON.stringify(context.gameState.t1)), { r: 'A1', l: 'A2' }, 'only normal rally rotation changes relative positions');
 });
 
 function realGameOneFlow() {
@@ -368,8 +413,8 @@ async function restoreLifecycleBackup(phase, step) {
   const data = {
     version: 6, identity: {}, matchPhase: phase, step,
     currentMatch: { id: 'M1', type: 'doubles', t1Name: 'Blue', t2Name: 'Green', t1p1: 'A', t1p2: 'B', t2p1: 'C', t2p2: 'D' },
-    matchState: { currentGame: step === 2 ? 2 : 3, t1Score: 6, t2Score: 2, timeline: [], endChangePending: phase === 'deciding_game_end_change', preparation: { serveTeam: 2, t1Stance: 'P2', t2Stance: 'P1' } },
-    gameState: { viewBa: true }, timeoutUsed: {}
+    matchState: { currentGame: step === 2 ? 2 : 3, t1Score: 6, t2Score: 2, timeline: [], endChangePending: phase === 'deciding_game_end_change', preparation: { serveTeam: 2 } },
+    gameState: { viewBa: true, t1: { r: 'B', l: 'A' }, t2: { r: 'C', l: 'D' } }, timeoutUsed: {}
   };
   const context = {
     window: null, $, document: { querySelector: () => ({ checked: false }) }, sysMode: 'local',
@@ -386,11 +431,12 @@ async function restoreLifecycleBackup(phase, step) {
   return { context, timers };
 }
 
-test('recovery behavior restores editable between-game preparation choices', async () => {
+test('recovery behavior restores inherited between-game positioning with no position selector', async () => {
   const { context, timers } = await restoreLifecycleBackup('between_games_preparation', 2);
   assert.equal(context.matchPhase, 'between_games_preparation');
-  assert.equal(context.$('t1Stance').value, 'P2');
-  assert.equal(context.$('t2Stance').value, 'P1');
+  assert.deepEqual(JSON.parse(JSON.stringify(context.gameState.t1)), { r: 'B', l: 'A' });
+  assert.deepEqual(JSON.parse(JSON.stringify(context.gameState.t2)), { r: 'C', l: 'D' });
+  assert.doesNotMatch(html, /t1NextPlayer|t2NextPlayer|nextGamePlayerChoices/);
   assert.equal(timers.length, 0);
 });
 
