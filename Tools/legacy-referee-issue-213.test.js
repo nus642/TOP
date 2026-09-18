@@ -56,14 +56,18 @@ function visibleSlots($) {
   return ['slotTL', 'slotBL', 'slotTR', 'slotBR'].filter(id => $(id).innerHTML.includes("text-2xl"));
 }
 
-test('singles projects exactly two real players into score-correct courts through scoring, service change, Undo, and recovered legacy state', () => {
+test('singles projects server and receiver diagonally from current service through scoring, service change, Undo, and recovery', () => {
   const { context, $ } = courtSandbox();
   context.renderGame();
   assert.deepEqual(visibleSlots($), ['slotBL', 'slotTR']);
   assert.equal($('slotBL').innerHTML.includes('发球: Alice'), true);
+  context.timeoutUsed.medicalT1 = true;
+  context.renderGame();
+  assert.equal($('medTimeoutLeft').disabled, true);
+  assert.equal($('medTimeoutLeft').className.includes('line-through'), true);
 
-  context.award(false); // Bob scores, takes service, and moves to his odd-score (left) court.
-  assert.deepEqual(visibleSlots($), ['slotBL', 'slotBR']);
+  context.award(false); // Bob scores, takes service, and both players project to the odd-service diagonal.
+  assert.deepEqual(visibleSlots($), ['slotTL', 'slotBR']);
   assert.equal($('slotBR').innerHTML.includes('发球: Bob'), true);
   assert.equal($('slotTR').innerHTML, '');
 
@@ -75,10 +79,30 @@ test('singles projects exactly two real players into score-correct courts throug
   context.gameState.t1 = { r: 'Alice', l: 'Alice' }; context.gameState.t2 = { r: 'Bob', l: 'Bob' };
   context.matchState.t1Score = 1; context.matchState.t2Score = 2; context.gameState.servTeam = 2; context.gameState.servingPlayer = 'Bob';
   context.renderGame();
-  assert.deepEqual(visibleSlots($), ['slotTL', 'slotTR']);
-  assert.deepEqual(context.gameState.t1, { r: '', l: 'Alice' });
+  assert.deepEqual(visibleSlots($), ['slotBL', 'slotTR']);
+  assert.deepEqual(context.gameState.t1, { r: 'Alice', l: '' });
   assert.deepEqual(context.gameState.t2, { r: 'Bob', l: '' });
   assert.equal($('slotTR').innerHTML.includes('发球: Bob'), true);
+});
+
+test('every singles server parity uses the correct service box and the diagonally opposite receiving box', () => {
+  const { context, $ } = courtSandbox();
+  const cases = [
+    { team: 1, t1: 0, t2: 7, slots: ['slotBL', 'slotTR'], server: 'slotBL', player: 'Alice' },
+    { team: 1, t1: 1, t2: 2, slots: ['slotTL', 'slotBR'], server: 'slotTL', player: 'Alice' },
+    { team: 2, t1: 5, t2: 0, slots: ['slotBL', 'slotTR'], server: 'slotTR', player: 'Bob' },
+    { team: 2, t1: 4, t2: 1, slots: ['slotTL', 'slotBR'], server: 'slotBR', player: 'Bob' }
+  ];
+  for (const entry of cases) {
+    context.gameState.servTeam = entry.team;
+    context.gameState.servingPlayer = entry.player;
+    context.matchState.t1Score = entry.t1;
+    context.matchState.t2Score = entry.t2;
+    context.renderGame();
+    assert.deepEqual(visibleSlots($), entry.slots);
+    assert.equal($(entry.server).innerHTML.includes(`发球: ${entry.player}`), true);
+    assert.equal(visibleSlots($).length, 2);
+  }
 });
 
 test('doubles retains four visible player instances', () => {

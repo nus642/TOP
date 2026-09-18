@@ -215,20 +215,20 @@
         <div id="step2" class="hidden-section">
             <div id="betweenGamesHeading" class="hidden mb-4 p-4 rounded-xl border border-amber-500/40 bg-amber-900/20 text-center">
                 <div id="betweenGamesTitle" class="text-xl font-black text-amber-300">下一局准备</div>
-                <div class="text-xs text-slate-300 mt-1">队伍及选手保持不变；可调整发球队、发球员和接发球员后明确开始下一局</div>
+                <div class="text-xs text-slate-300 mt-1">场端及双打相对站位沿用上一局；可调整发球队后明确开始下一局</div>
             </div>
             <div class="flex justify-between items-center mb-4 bg-slate-800 p-3 rounded-xl border border-slate-700 shadow-md">
                 <button id="prepTimerBtn" onclick="togglePrepTimer()" class="bg-indigo-600 px-4 py-2 rounded-lg text-sm font-bold btn-press text-white shadow-md border border-indigo-400/30">⏱️ 热身倒数</button>
                 <span id="prepTimer" class="text-2xl font-mono font-black text-amber-400 bg-black/40 px-3 py-1 rounded-lg border border-black/50">00:00</span>
             </div>
 
-            <div class="flex gap-3 mb-4 items-center">
+            <div id="coinTossSetup" class="flex gap-3 mb-4 items-center">
                 <button id="flipCoinBtn" onclick="rollCoin()" class="bg-slate-700 w-1/3 h-16 rounded-2xl font-black text-sm btn-press shadow-lg border border-slate-500 text-slate-200">🪙<br>裁判抛币</button>
                 <div id="coinResult" class="bg-slate-900 w-2/3 h-16 flex items-center justify-center rounded-2xl font-black text-3xl text-yellow-500 border border-slate-700 shadow-inner tracking-widest transition-all duration-300">等待抛掷</div>
             </div>
 
             <div class="section-card space-y-4">
-                <div>
+                <div id="courtEndSetup">
                     <label class="text-[11px] font-black text-blue-400 mb-2 block tracking-widest">1. 方位 (主裁左手边是哪队？)</label>
                     <div class="flex gap-2">
                         <input type="radio" id="init-ba-f" name="init_ba" value="f" checked><label for="init-ba-f" id="label-init-ba-f" class="radio-label py-3 truncate w-1/2"></label>
@@ -1081,6 +1081,8 @@ const normalizeMatchId = id => String(id ?? '').replace(/\s+/g, '').toUpperCase(
             // [PR#155 R8] 根据 matchPhase 更新按钮文案
             if (step === 2) {
                 const betweenGames = matchPhase === 'between_games_preparation';
+                $('coinTossSetup').classList.toggle('hidden', betweenGames);
+                $('courtEndSetup').classList.toggle('hidden', betweenGames);
                 $('doublesStance').classList.toggle('hidden', betweenGames || currentMatch.type !== 'doubles');
                 $('betweenGamesHeading').classList.toggle('hidden', !betweenGames);
                 $('servingTeamLabel').innerText = betweenGames ? '2. 发球权（默认上一局胜方，可修改）' : '2. 发球权（第一回合发球队伍）';
@@ -1413,12 +1415,17 @@ const normalizeMatchId = id => String(id ?? '').replace(/\s+/g, '').toUpperCase(
 
         function projectSinglesCourtPositions() {
             if (currentMatch.type !== 'singles') return;
-            const place = (team, player, score) => {
-                gameState[team].r = score % 2 === 0 ? player : '';
-                gameState[team].l = score % 2 === 0 ? '' : player;
+            const servingTeam = gameState.servTeam === 2 ? 2 : 1;
+            const servingScore = servingTeam === 1 ? matchState.t1Score : matchState.t2Score;
+            const serviceSide = servingScore % 2 === 0 ? 'r' : 'l';
+            const place = (team, player) => {
+                gameState[team].r = serviceSide === 'r' ? player : '';
+                gameState[team].l = serviceSide === 'l' ? player : '';
             };
-            place('t1', currentMatch.t1p1, matchState.t1Score);
-            place('t2', currentMatch.t2p1, matchState.t2Score);
+            // The two teams face opposite directions, so the same logical service
+            // side projects into diagonally opposite visual boxes on the court.
+            place('t1', currentMatch.t1p1);
+            place('t2', currentMatch.t2p1);
         }
 
         function renderGame() {
@@ -1527,6 +1534,23 @@ const normalizeMatchId = id => String(id ?? '').replace(/\s+/g, '').toUpperCase(
             }, 1000);
         }
 
+        function startElapsedTimer(msg) {
+            if(activeTimer) clearInterval(activeTimer);
+            $('pointLeft').disabled = true; $('pointRight').disabled = true; $('undoPoint').disabled = true;
+            window.timerCancelCb = null;
+            const shield = document.createElement('div'); shield.id = 'timerShield';
+            shield.className = 'fixed top-0 left-0 right-0 h-36 bg-red-700 text-slate-100 z-[99999] flex flex-col justify-center items-center shadow-[0_10px_30px_rgba(220,38,38,0.5)] font-black border-b-4 border-red-500 animate-enter';
+            shield.innerHTML = `<div id="tmsg" class="text-sm mb-3 tracking-widest flex items-center gap-2"><span>🏥</span> ${msg}</div><div class="flex flex-col items-center gap-4"><div class="text-3xl font-black font-mono tracking-wider bg-black/40 px-6 py-1.5 rounded-xl shadow-inner text-amber-400"><span id="tsec">00:00</span></div><button onclick="stopTimerManually(true)" class="bg-slate-800 hover:bg-slate-700 text-white px-5 py-2.5 rounded-xl text-xs font-black shadow-md border border-slate-600 transition-colors">结束医疗伤停并继续</button></div>`;
+            document.body.appendChild(shield);
+            let elapsed = 0;
+            activeTimer = setInterval(() => {
+                elapsed++;
+                const minutes = Math.floor(elapsed / 60).toString().padStart(2, '0');
+                const seconds = (elapsed % 60).toString().padStart(2, '0');
+                if($('tsec')) $('tsec').innerText = `${minutes}:${seconds}`;
+            }, 1000);
+        }
+
         window.stopTimerManually = function(isManual = true) {
             if (matchPhase === 'deciding_game_end_change') {
                 showToast('⚠️ 决胜局换场必须使用“确认双方已完成换场并继续”', true);
@@ -1572,10 +1596,10 @@ const normalizeMatchId = id => String(id ?? '').replace(/\s+/g, '').toUpperCase(
 
             if(isT1Target) {
                 if(timeoutUsed.medicalT1) return showToast('左队医疗额度已用尽', true);
-                if(confirm(`⚠️ 确定为【${teamName}】启动医疗通道吗？\n每场比赛仅限 1 次 15 分钟伤停。`)) { timeoutUsed.medicalT1 = true; backupState(); startTimer(900, `🚨 ${teamName} 医疗伤停`); }
+                if(confirm(`⚠️ 确定为【${teamName}】启动医疗通道吗？\n计时将持续到裁判明确结束。`)) { timeoutUsed.medicalT1 = true; renderGame(); backupState(); startElapsedTimer(`🚨 ${teamName} 医疗伤停（已用时间）`); }
             } else {
                 if(timeoutUsed.medicalT2) return showToast('右队医疗额度已用尽', true);
-                if(confirm(`⚠️ 确定为【${teamName}】启动医疗通道吗？\n每场比赛仅限 1 次 15 分钟伤停。`)) { timeoutUsed.medicalT2 = true; backupState(); startTimer(900, `🚨 ${teamName} 医疗伤停`); }
+                if(confirm(`⚠️ 确定为【${teamName}】启动医疗通道吗？\n计时将持续到裁判明确结束。`)) { timeoutUsed.medicalT2 = true; renderGame(); backupState(); startElapsedTimer(`🚨 ${teamName} 医疗伤停（已用时间）`); }
             }
         };
 
@@ -1681,7 +1705,12 @@ const normalizeMatchId = id => String(id ?? '').replace(/\s+/g, '').toUpperCase(
             matchState.history = [];
             matchState.over = false;
             gameState.viewBa = !gameState.viewBa; // the single between-games change of ends
-            timeoutUsed = {t1:false, t2:false, medicalT1:false, medicalT2:false};
+            timeoutUsed = {
+                t1: false,
+                t2: false,
+                medicalT1: !!timeoutUsed.medicalT1,
+                medicalT2: !!timeoutUsed.medicalT2
+            };
 
             $('label-init-ba-f').innerText = `${currentMatch.t1Name} (场端已确定)`;
             $('label-init-ba-t').innerText = `${currentMatch.t2Name} (场端已确定)`;
