@@ -121,7 +121,7 @@ test('winning score opens one immediate settlement prompt and deferral preserves
   assert.equal(context.matchPhase, 'in_progress');
 });
 
-function settlementSandbox({ game, t1Wins, t2Wins, t1Score = 11, t2Score = 5, target = 11, cap = 0 }) {
+function settlementSandbox({ game, t1Wins, t2Wins, t1Score = 11, t2Score = 5, target = 11, cap = 0, used = {} }) {
   const $ = elements();
   const serve = { checked: false };
   const steps = [];
@@ -130,7 +130,7 @@ function settlementSandbox({ game, t1Wins, t2Wins, t1Score = 11, t2Score = 5, ta
     matchPhase: 'game_complete_pending_settlement',
     currentMatch: { id: 'M1', court: '1', format: 3, target, cap, type: 'doubles', meth: 'rally', t1Name: 'Blue', t2Name: 'Green', t1p1: 'A', t1p2: 'B', t2p1: 'C', t2p2: 'D', ref: 'R' },
     matchState: { currentGame: game, t1Wins, t2Wins, t1Score, t2Score, results: [], timeline: [1], history: [{}], halfSwitched: false, over: true },
-    gameState: { viewBa: false }, timeoutUsed: {}, alert() {}, showToast() {},
+    gameState: { viewBa: false }, timeoutUsed: used, alert() {}, showToast() {},
     establishedRulesLocked: false, setAuthoritativeFieldsLocked(locked) { context.establishedRulesLocked = locked; },
     showStep: step => steps.push(step), setTimeout() {}
   };
@@ -177,6 +177,42 @@ test('previous-game winner is an editable default with no between-game position 
   assert.match(functionSource('backupPreparationChoices'), /serveTeam: parseInt/);
   assert.doesNotMatch(functionSource('backupPreparationChoices'), /t1Stance|t2Stance/);
   assert.match(html, /doublesStance.*betweenGames \|\| currentMatch\.type !== 'doubles'/);
+});
+
+test('Game 2 and Game 3 preparation hide first-game coin and court-end controls', () => {
+  const $ = elements();
+  const context = {
+    $, matchPhase: 'not_started', currentMatch: { type: 'doubles', t1Name: 'Team A', t2Name: 'Team B' },
+    matchState: { currentGame: 1 }, gameState: { viewBa: false, t1: { r: 'A1', l: 'A2' }, t2: { r: 'B1', l: 'B2' } }
+  };
+  vm.createContext(context);
+  vm.runInContext(`${functionSource('renderBetweenGamesInheritedState')}\nthis.renderState = renderBetweenGamesInheritedState`, context);
+
+  context.renderState();
+  assert.equal($('firstGameCoinControls').classList.contains('hidden'), false, 'Game 1 coin toss remains visible');
+  assert.equal($('firstGameCourtEndControls').classList.contains('hidden'), false, 'Game 1 court-end choice remains visible');
+
+  for (const game of [2, 3]) {
+    context.matchPhase = 'between_games_preparation';
+    context.matchState.currentGame = game;
+    context.gameState.viewBa = game === 2;
+    context.renderState();
+    assert.equal($('firstGameCoinControls').classList.contains('hidden'), true, `Game ${game} has no coin-toss control`);
+    assert.equal($('firstGameCourtEndControls').classList.contains('hidden'), true, `Game ${game} has no court-end control`);
+    assert.equal($('betweenGamesInheritedState').classList.contains('hidden'), false);
+    assert.match($('betweenGamesCourtEnd').innerText, /主裁(左|右)手边/);
+    assert.match($('betweenGamesPlayerPositions').innerText, /A1.*A2.*B1.*B2/);
+  }
+});
+
+test('between-game transition resets ordinary timeouts but preserves match-level medical use', () => {
+  const { context } = settlementSandbox({
+    game: 1, t1Wins: 0, t2Wins: 0,
+    used: { t1: true, t2: true, medicalT1: true, medicalT2: false }
+  });
+  assert.deepEqual(JSON.parse(JSON.stringify(context.timeoutUsed)), {
+    t1: false, t2: false, medicalT1: true, medicalT2: false
+  });
 });
 
 test('between-game preparation preserves and locks established non-default match rules', () => {
@@ -490,4 +526,69 @@ test('deciding-game end change resumes only through its explicit completion acti
   assert.match(complete, /matchState\.endChangePending = false/);
   assert.match(complete, /matchPhase = 'in_progress'/);
   assert.match(functionSource('startTimer'), /completeDecidingGameEndChange\(\)/);
+});
+
+function timeoutSandbox() {
+  const $ = elements();
+  const intervals = new Map();
+  let nextInterval = 1;
+  const renderedStates = [];
+  const context = {
+    window: null, $, matchPhase: 'in_progress', activeTimer: null, activeTimerKind: null,
+    matchState: { over: false }, gameState: { viewBa: false },
+    currentMatch: { t1Name: 'Blue', t2Name: 'Green' },
+    timeoutUsed: { t1: false, t2: false, medicalT1: false, medicalT2: false },
+    document: { createElement: () => $('timerShield'), body: { appendChild() {} } },
+    setInterval: fn => { const id = nextInterval++; intervals.set(id, fn); return id; },
+    clearInterval: id => intervals.delete(id), confirm: () => true,
+    renderGame() { renderedStates.push({ ...context.timeoutUsed }); }, backupState() {}, showToast() {}
+  };
+  context.window = context;
+  vm.createContext(context);
+  vm.runInContext([
+    functionSource('updateScoringAuthority'), functionSource('formatElapsedTime'),
+    functionSource('startMedicalElapsedTimer'), functionSource('stopMedicalTimeout'),
+    functionSource('stopTimerManually'), functionSource('startTimer'), functionSource('requestMedical')
+  ].join('\n'), context);
+  return { context, $, intervals, renderedStates };
+}
+
+test('medical timeout starts an elapsed timer with no forced fifteen-minute completion', () => {
+  const { context, $, intervals, renderedStates } = timeoutSandbox();
+  context.requestMedical(true);
+  assert.equal(context.timeoutUsed.medicalT1, true);
+  assert.equal(context.activeTimerKind, 'medical');
+  assert.equal($('medicalElapsed').innerText, '');
+  intervals.values().next().value();
+  assert.equal($('medicalElapsed').innerText, '00:01');
+  assert.deepEqual(renderedStates.at(-1), { t1: false, t2: false, medicalT1: true, medicalT2: false });
+  assert.doesNotMatch(functionSource('requestMedical'), /900|15 分钟/);
+});
+
+test('referee explicitly ends a running medical timeout', () => {
+  const { context, intervals } = timeoutSandbox();
+  context.requestMedical(false);
+  assert.equal(intervals.size, 1);
+  context.stopMedicalTimeout();
+  assert.equal(context.activeTimer, null);
+  assert.equal(context.activeTimerKind, null);
+  assert.equal(intervals.size, 0);
+  assert.equal(context.$('pointLeft').disabled, false);
+});
+
+test('medical timeout used state renders visibly disabled', () => {
+  const render = functionSource('renderGame');
+  assert.match(render, /medL\.disabled = mT1Used/);
+  assert.match(render, /medR\.disabled = mT2Used/);
+  assert.match(render, /bg-slate-900 line-through text-slate-600/);
+  assert.match(functionSource('requestMedical'), /renderGame\(\); backupState\(\); startMedicalElapsedTimer/);
+});
+
+test('ordinary timeout remains a 60-second countdown and completes normally', () => {
+  const { context, intervals } = timeoutSandbox();
+  context.startTimer(60, 'ordinary timeout');
+  assert.equal(context.activeTimerKind, 'countdown');
+  for (let second = 0; second < 60; second++) intervals.values().next().value();
+  assert.equal(context.activeTimer, null);
+  assert.equal(intervals.size, 0);
 });
