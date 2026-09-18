@@ -58,7 +58,8 @@ test('documents the field-verified Windows localhost procedure', () => {
   const readme = fs.readFileSync(path.join(kitRoot, '01_Offline-Referee/README.txt'), 'utf8');
   assert.match(readme, /cd 01_Offline-Referee/);
   assert.match(readme, /python -m http\.server 8088/);
-  assert.match(readme, /http:\/\/localhost:8088\/\?mode=local/);
+  assert.match(readme, /http:\/\/localhost:8088\//);
+  assert.match(readme, /明确选择“离线应急模式”/);
 });
 
 test('packaged referee has no external HTTP(S) runtime resources', () => {

@@ -119,20 +119,43 @@
 <body class="max-w-md mx-auto p-4" oncontextmenu="return false" onselectstart="return false">
 
     <div id="loginPanel" class="section-card text-center mt-10">
-        <div id="sysBadge" class="inline-block bg-blue-900/40 border border-blue-500/30 text-blue-300 text-[10px] font-black tracking-widest px-3 py-1 rounded-full mb-4">Pickle球 SaaS 终端</div>
-        <h2 class="text-xl font-bold mb-6 text-amber-500">主裁连接通道</h2>
-        <input type="text" id="eventCode" class="input-base mb-3 text-center uppercase font-mono tracking-widest" placeholder="赛事码 (如 A1B3)">
-        <input type="text" id="refereeName" class="input-base mb-3 text-center" placeholder="您的真实姓名 (用于法务记录)">
-        <select id="refLevel" class="input-base mb-3 text-center font-black text-amber-400 appearance-none bg-slate-900">
-            <option value="L1">🟢 L1 见习裁判 (执裁内部赛 W=0.8)</option>
-            <option value="L2">🔵 L2 认证裁判 (定级赛 W=1.2)</option>
-            <option value="L3">🟣 L3 高级裁判 (大型赛事主裁 W=1.5)</option>
-        </select>
-        <input type="password" id="refereePwd" class="input-base mb-6 text-center" placeholder="授权验证密码">
-        <button onclick="handleLogin()" id="doLoginBtn" class="w-full bg-blue-600 py-3 rounded-lg font-bold text-lg btn-press shadow-[0_4px_15px_rgba(37,99,235,0.4)]">建立通讯链路</button>
+        <div id="sysBadge" class="inline-block bg-blue-900/40 border border-blue-500/30 text-blue-300 text-[10px] font-black tracking-widest px-3 py-1 rounded-full mb-4">Pickle球裁判终端</div>
+        <h2 class="text-xl font-bold mb-6 text-amber-500">选择启动模式</h2>
+        <div id="modeChoicePanel" class="space-y-3">
+            <button onclick="showOnlineEntry()" id="onlineModeBtn" class="w-full bg-blue-600 py-3 rounded-lg font-bold text-lg btn-press">在线模式</button>
+            <button onclick="showOfflineEmergencyEntry()" id="offlineModeBtn" class="w-full bg-amber-600 py-3 rounded-lg font-bold text-lg btn-press">离线应急模式</button>
+            <p class="text-xs text-slate-400">离线应急模式仅用于后端或网络不可用的现场执裁。</p>
+        </div>
+        <div id="onlineEntryForm" class="hidden-section">
+            <h3 class="font-bold mb-4 text-blue-300">在线 SaaS 连接</h3>
+            <input type="text" id="eventCode" class="input-base mb-3 text-center uppercase font-mono tracking-widest" placeholder="赛事码 (如 A1B3)">
+            <input type="text" id="refereeName" class="input-base mb-3 text-center" placeholder="您的真实姓名 (用于法务记录)">
+            <select id="refLevel" class="input-base mb-3 text-center font-black text-amber-400 appearance-none bg-slate-900">
+                <option value="L1">🟢 L1 见习裁判 (执裁内部赛 W=0.8)</option>
+                <option value="L2">🔵 L2 认证裁判 (定级赛 W=1.2)</option>
+                <option value="L3">🟣 L3 高级裁判 (大型赛事主裁 W=1.5)</option>
+            </select>
+            <input type="password" id="refereePwd" class="input-base mb-6 text-center" placeholder="授权验证密码">
+            <button onclick="handleLogin()" id="doLoginBtn" class="w-full bg-blue-600 py-3 rounded-lg font-bold text-lg btn-press shadow-[0_4px_15px_rgba(37,99,235,0.4)]">建立通讯链路</button>
+        </div>
+        <div id="offlineEntryForm" class="hidden-section">
+            <h3 class="font-bold mb-2 text-amber-400">离线应急初始化</h3>
+            <p class="text-xs text-amber-200 mb-4">不会连接服务器或验证在线授权。</p>
+            <input type="text" id="offlineEventId" class="input-base mb-3 text-center uppercase font-mono tracking-widest" placeholder="本地赛事标识">
+            <input type="text" id="offlineRefereeName" class="input-base mb-3 text-center" placeholder="裁判姓名">
+            <textarea id="offlineNotes" class="input-base mb-6" rows="3" placeholder="备注（可选）"></textarea>
+            <button onclick="startOfflineEmergency()" id="startOfflineBtn" class="w-full bg-amber-600 py-3 rounded-lg font-bold text-lg btn-press">启动本地执裁</button>
+        </div>
     </div>
 
     <div id="mainApp" class="hidden-section">
+
+        <div id="offlineSessionBanner" class="hidden-section bg-amber-950/60 border border-amber-500/60 p-3 rounded-xl mb-3 text-center">
+            <div class="text-[10px] font-black text-amber-300 tracking-widest">离线应急本地会话</div>
+            <div id="offlineSessionId" class="font-mono font-bold text-amber-100 mt-1"></div>
+            <div id="offlineSessionEvent" class="text-xs text-slate-300 mt-1"></div>
+            <div id="offlineSessionNotes" class="text-xs text-slate-400 mt-1"></div>
+        </div>
 
         <div id="chiefMessageBlock" class="bg-indigo-900/60 border border-indigo-500/50 p-3 rounded-xl mb-3 flex items-start gap-2 shadow-inner transition-all duration-300">
             <span class="animate-pulse text-indigo-400 text-base mt-0.5">👑</span>
@@ -413,9 +436,11 @@ const normalizeMatchId = id => String(id ?? '').replace(/\s+/g, '').toUpperCase(
         const LEGACY_BACKUP_KEY = 'pickle_referee_backup_v5';
 
         const urlParams = new URLSearchParams(window.location.search);
-        let sysMode = urlParams.get('mode') === 'local' ? 'local' : 'ind';
+        const offlineModeRequested = urlParams.get('mode') === 'local';
+        let sysMode = 'ind';
 
         let eventCode = null, currentRefereeId = null, currentRefereeName = '', currentRefLevel = 'L1';
+        let offlineSession = null;
         let currentMatch = {};
 
         let matchState = { t1Score: 0, t2Score: 0, t1Wins: 0, t2Wins: 0, currentGame: 1, history: [], timeline: [], halfSwitched: false, over: false };
@@ -530,7 +555,7 @@ const normalizeMatchId = id => String(id ?? '').replace(/\s+/g, '').toUpperCase(
             if (!['rally', 'sideout'].includes(meth)) return '计分方式缺失或无效';
             return '';
         }
-        function recoveryEventId() { return sysMode === 'local' ? 'LOCAL' : recoveryText(eventCode).toUpperCase(); }
+        function recoveryEventId() { return sysMode === 'local' ? (offlineSession?.sessionId || recoveryText(eventCode).toUpperCase() || 'LOCAL') : recoveryText(eventCode).toUpperCase(); }
         function recoveryBackupKey() { return `${BACKUP_KEY_PREFIX}:${encodeURIComponent(recoveryEventId())}`; }
         function recoveryIdentity(match = currentMatch) {
             return {
@@ -774,25 +799,62 @@ const normalizeMatchId = id => String(id ?? '').replace(/\s+/g, '').toUpperCase(
         }
 
         // ======================== 【安全加固】登录与会话管理 ========================
+        window.showOnlineEntry = () => {
+            $('modeChoicePanel').classList.add('hidden-section');
+            $('offlineEntryForm').classList.add('hidden-section');
+            $('onlineEntryForm').classList.remove('hidden-section');
+            $('sysBadge').innerText = 'Pickle球 SaaS 终端';
+        };
+
+        window.showOfflineEmergencyEntry = () => {
+            $('modeChoicePanel').classList.add('hidden-section');
+            $('onlineEntryForm').classList.add('hidden-section');
+            $('offlineEntryForm').classList.remove('hidden-section');
+            $('sysBadge').innerText = '离线应急入口';
+        };
+
+        function createOfflineSessionId(now = new Date()) {
+            const date = now.toISOString().slice(0, 10).replaceAll('-', '');
+            const localId = `${now.getTime().toString(36)}${Math.random().toString(36).slice(2, 6)}`.slice(-10).toUpperCase();
+            return `OFFLINE-${date}-${localId}`;
+        }
+
+        async function initializeLocalReferee({ localEventId = 'LOCAL', refereeName = '单机执裁者', notes = '', sessionId = 'OFFLINE-LEGACY-LOCAL' } = {}) {
+            sysMode = 'local';
+            eventCode = recoveryText(localEventId).toUpperCase();
+            currentRefLevel = 'Local';
+            currentRefereeId = sessionId;
+            currentRefereeName = refereeName;
+            offlineSession = { sessionId, eventId: eventCode, refereeName, notes };
+
+            setAuthoritativeFieldsLocked(false);
+            $('sysBadge').innerText = '离线应急模式';
+            $('loginPanel').classList.add('hidden-section');
+            $('mainApp').classList.remove('hidden-section');
+            $('cloudPullBlock').classList.add('hidden-section');
+            $('chiefMessageBlock').classList.add('hidden-section');
+            $('currentRefereeName').innerText = currentRefereeName;
+            $('currentRefLevel').innerText = currentRefLevel;
+            $('offlineSessionId').innerText = sessionId;
+            $('offlineSessionEvent').innerText = `本地赛事：${eventCode} · 裁判：${currentRefereeName}`;
+            $('offlineSessionNotes').innerText = notes ? `备注：${notes}` : '';
+            $('offlineSessionBanner').classList.remove('hidden-section');
+
+            restoreLocalSetupDefaults();
+            if (!(await checkAndRestoreBackup())) showStep(1);
+        }
+
+        window.startOfflineEmergency = async () => {
+            const localEventId = $('offlineEventId').value.trim();
+            const refereeName = $('offlineRefereeName').value.trim();
+            const notes = $('offlineNotes').value.trim();
+            if (!localEventId || !refereeName) return showToast('请填写本地赛事标识和裁判姓名', true);
+            await initializeLocalReferee({ localEventId, refereeName, notes, sessionId: createOfflineSessionId() });
+        };
+
         window.onload = async () => {
-            if (sysMode === 'local') {
-                setAuthoritativeFieldsLocked(false);
-                $('sysBadge').innerText = '单机离线模式';
-                $('loginPanel').classList.add('hidden-section');
-                $('mainApp').classList.remove('hidden-section');
-
-                $('cloudPullBlock').classList.add('hidden-section');
-                $('chiefMessageBlock').classList.add('hidden-section');
-                $('refereeInfoBar').classList.add('hidden-section');
-
-                currentRefLevel = 'Local';
-                currentRefereeId = 'local_admin';
-                currentRefereeName = '单机执裁者';
-                $('currentRefereeName').innerText = currentRefereeName;
-
-                restoreLocalSetupDefaults();
-
-                if(!(await checkAndRestoreBackup())) showStep(1);
+            if (offlineModeRequested) {
+                showOfflineEmergencyEntry();
                 return;
             }
 
@@ -818,6 +880,7 @@ const normalizeMatchId = id => String(id ?? '').replace(/\s+/g, '').toUpperCase(
             if (sPwd) $('refereePwd').value = sPwd;
             if (sName) $('refereeName').value = sName;
             if (sLevel) $('refLevel').value = sLevel;
+            if (urlCode || urlPwd) showOnlineEntry();
 
             // 清除 URL 中的敏感参数
             if (window.history && window.history.replaceState) {
