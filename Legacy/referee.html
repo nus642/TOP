@@ -249,14 +249,6 @@
                         <select id="t2Stance" onchange="backupPreparationChoices()" class="input-base text-xs font-bold text-center bg-slate-900"></select>
                     </div>
                 </div>
-                <div id="nextGamePlayerChoices" class="hidden border-t border-slate-700 pt-4 mt-2">
-                    <label class="text-[11px] font-black text-amber-400 mb-2 block tracking-widest">3. 下一局发球员 / 接发球员</label>
-                    <p class="text-[10px] text-slate-400 mb-2">按上方发球队伍选择发球员；另一队选择接发球员。既有场端与轮转不变。</p>
-                    <div class="grid grid-cols-2 gap-3">
-                        <select id="t1NextPlayer" onchange="backupPreparationChoices()" class="input-base text-xs font-bold text-center bg-slate-900"></select>
-                        <select id="t2NextPlayer" onchange="backupPreparationChoices()" class="input-base text-xs font-bold text-center bg-slate-900"></select>
-                    </div>
-                </div>
             </div>
 
             <div class="flex gap-3">
@@ -655,13 +647,9 @@ const normalizeMatchId = id => String(id ?? '').replace(/\s+/g, '').toUpperCase(
                                 $('serveLabel1').innerText = `${currentMatch.t1Name} 发球`; $('serveLabel2').innerText = `${currentMatch.t2Name} 发球`;
                                 $('t1Stance').innerHTML = `<option value="P1">${currentMatch.t1p1}</option>${currentMatch.type==='doubles'?`<option value="P2">${currentMatch.t1p2}</option>`:''}`;
                                 $('t2Stance').innerHTML = `<option value="P1">${currentMatch.t2p1}</option>${currentMatch.type==='doubles'?`<option value="P2">${currentMatch.t2p2}</option>`:''}`;
-                                $('t1NextPlayer').innerHTML = $('t1Stance').innerHTML;
-                                $('t2NextPlayer').innerHTML = $('t2Stance').innerHTML;
                                 const preparation = matchState.preparation || {};
                                 const serveRadio = typeof document !== 'undefined' ? document.querySelector(`input[name="serve"][value="${preparation.serveTeam || 1}"]`) : null;
                                 if (serveRadio) serveRadio.checked = true;
-                                if (preparation.t1Stance) $('t1NextPlayer').value = preparation.t1Stance;
-                                if (preparation.t2Stance) $('t2NextPlayer').value = preparation.t2Stance;
                                 showStep(2);
                             } else if(data.step === 3) {
                                 renderGame(); showStep(3); $('recoveryBadge').classList.remove('hidden');
@@ -1094,7 +1082,6 @@ const normalizeMatchId = id => String(id ?? '').replace(/\s+/g, '').toUpperCase(
             if (step === 2) {
                 const betweenGames = matchPhase === 'between_games_preparation';
                 $('doublesStance').classList.toggle('hidden', betweenGames || currentMatch.type !== 'doubles');
-                $('nextGamePlayerChoices').classList.toggle('hidden', !betweenGames || currentMatch.type !== 'doubles');
                 $('betweenGamesHeading').classList.toggle('hidden', !betweenGames);
                 $('servingTeamLabel').innerText = betweenGames ? '2. 发球权（默认上一局胜方，可修改）' : '2. 发球权（第一回合发球队伍）';
                 if (betweenGames) $('betweenGamesTitle').innerText = `下一局准备 / Game ${matchState.currentGame} Preparation`;
@@ -1283,9 +1270,7 @@ const normalizeMatchId = id => String(id ?? '').replace(/\s+/g, '').toUpperCase(
         window.backupPreparationChoices = () => {
             if (matchPhase !== 'between_games_preparation') return;
             matchState.preparation = {
-                serveTeam: parseInt(getRadio('serve') || 1),
-                t1Stance: $('t1NextPlayer').value,
-                t2Stance: $('t2NextPlayer').value
+                serveTeam: parseInt(getRadio('serve') || 1)
             };
             backupState();
         };
@@ -1315,18 +1300,27 @@ const normalizeMatchId = id => String(id ?? '').replace(/\s+/g, '').toUpperCase(
             let viewBa = isNextGame ? gameState.viewBa : getRadio('init_ba') === 't';
             let serveTeam = parseInt(getRadio('serve') || 1);
             let initServNum = (currentMatch.type === 'doubles' && currentMatch.meth === 'sideout') ? 2 : 1;
-            gameState = { viewBa: viewBa, servTeam: serveTeam, initServTeam: serveTeam, servNum: initServNum, court: 'Right', t1: { r:'', l:'' }, t2: { r:'', l:'' }, initRightP1: '', initRightP2: '', servingPlayer: '' };
+            if (!isNextGame) {
+                gameState = { viewBa: viewBa, servTeam: serveTeam, initServTeam: serveTeam, servNum: initServNum, court: 'Right', t1: { r:'', l:'' }, t2: { r:'', l:'' }, initRightP1: '', initRightP2: '', servingPlayer: '' };
+            } else {
+                // Between games only the teams change ends. Preserve each doubles
+                // pair's completed rotation; serving-team selection is independent.
+                gameState.viewBa = viewBa;
+                gameState.servTeam = serveTeam;
+                gameState.initServTeam = serveTeam;
+                gameState.servNum = initServNum;
+                gameState.court = 'Right';
+            }
 
-            if(currentMatch.type === 'doubles'){
-                let t1s = isNextGame ? $('t1NextPlayer').value : $('t1Stance').value;
-                let t2s = isNextGame ? $('t2NextPlayer').value : $('t2Stance').value;
+            if(currentMatch.type === 'doubles' && !isNextGame){
+                let t1s = $('t1Stance').value, t2s = $('t2Stance').value;
                 let p11 = currentMatch.t1p1, p12 = currentMatch.t1p2 || p11;
                 let p21 = currentMatch.t2p1, p22 = currentMatch.t2p2 || p21;
                 gameState.t1.r = t1s === 'P1' ? p11 : p12;
                 gameState.t1.l = t1s === 'P1' ? p12 : p11;
                 gameState.t2.r = t2s === 'P1' ? p21 : p22;
                 gameState.t2.l = t2s === 'P1' ? p22 : p21;
-            } else {
+            } else if (currentMatch.type === 'singles') {
                 gameState.t1.r = currentMatch.t1p1; gameState.t1.l = '';
                 gameState.t2.r = currentMatch.t2p1; gameState.t2.l = '';
             }
@@ -1698,8 +1692,7 @@ const normalizeMatchId = id => String(id ?? '').replace(/\s+/g, '').toUpperCase(
             const t1s = `<option value="P1">${currentMatch.t1p1}</option>${currentMatch.type==='doubles'?`<option value="P2">${currentMatch.t1p2}</option>`:''}`;
             const t2s = `<option value="P1">${currentMatch.t2p1}</option>${currentMatch.type==='doubles'?`<option value="P2">${currentMatch.t2p2}</option>`:''}`;
             $('t1Stance').innerHTML = t1s; $('t2Stance').innerHTML = t2s;
-            $('t1NextPlayer').innerHTML = t1s; $('t2NextPlayer').innerHTML = t2s;
-            matchState.preparation = { serveTeam: winningTeam, t1Stance: 'P1', t2Stance: 'P1' };
+            matchState.preparation = { serveTeam: winningTeam };
 
             matchPhase = 'between_games_preparation';
             projectCurrentMatchToSetup();
