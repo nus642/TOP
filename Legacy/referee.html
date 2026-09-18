@@ -236,7 +236,7 @@
                     </div>
                 </div>
                 <div>
-                    <label class="text-[11px] font-black text-emerald-400 mb-2 block tracking-widest">2. 发球权 (第一回合发球队伍)</label>
+                    <label id="servingTeamLabel" class="text-[11px] font-black text-emerald-400 mb-2 block tracking-widest">2. 发球权（第一回合发球队伍）</label>
                     <div class="flex gap-2">
                         <label class="radio-label py-3 truncate w-1/2" style="padding:0; border:none; background:transparent;"><input type="radio" name="serve" value="1" onchange="backupPreparationChoices()" checked><span class="radio-label py-3 w-full" id="serveLabel1">左队</span></label>
                         <label class="radio-label py-3 truncate w-1/2" style="padding:0; border:none; background:transparent;"><input type="radio" name="serve" value="2" onchange="backupPreparationChoices()"><span class="radio-label py-3 w-full" id="serveLabel2">右队</span></label>
@@ -365,6 +365,16 @@
     </div>
 
     <div id="toast" class="toast hidden"></div>
+
+    <div id="gameSettlementPrompt" role="dialog" aria-modal="true" aria-labelledby="gameSettlementTitle" class="fixed inset-0 hidden-section dnd-modal-overlay flex items-center justify-center p-4">
+        <div class="dnd-modal-box text-center">
+            <span class="icon">🏁</span>
+            <h3 id="gameSettlementTitle">本局已达到结束条件</h3>
+            <p id="gameSettlementSummary" class="highlight text-xl font-black"></p>
+            <button id="promptSettleGame" onclick="settleGameFromPrompt()" class="btn-primary">结算本局</button>
+            <button id="promptDeferSettlement" onclick="deferGameSettlement()" class="btn-skip">暂不结算</button>
+        </div>
+    </div>
 
     <!-- 勿扰模式提醒 -->
     <div id="dndReminderModal" class="fixed inset-0 hidden-section dnd-modal-overlay flex items-center justify-center p-4">
@@ -994,11 +1004,32 @@ const normalizeMatchId = id => String(id ?? '').replace(/\s+/g, '').toUpperCase(
         function reconcileGameCompletion() {
             if (['not_started','between_games_preparation','deciding_game_end_change','finalized'].includes(matchPhase)) return;
             const complete = isGameComplete();
+            const firstCompletion = complete && matchPhase !== 'game_complete_pending_settlement';
             matchPhase = complete ? 'game_complete_pending_settlement' : 'in_progress';
             matchState.over = complete;
             const endButton = $('endGameBtn');
             if (endButton) endButton.classList.toggle('hidden', !complete);
+            if (!complete) hideGameSettlementPrompt();
+            else if (firstCompletion) showGameSettlementPrompt();
         }
+
+        function hideGameSettlementPrompt() {
+            const prompt = $('gameSettlementPrompt');
+            if (prompt) prompt.classList.add('hidden-section');
+        }
+
+        function showGameSettlementPrompt() {
+            const winningTeam = matchState.t1Score > matchState.t2Score ? 1 : 2;
+            const winner = winningTeam === 1 ? currentMatch.t1Name : currentMatch.t2Name;
+            $('gameSettlementSummary').innerText = `${winner}  ${matchState.t1Score} - ${matchState.t2Score}`;
+            $('gameSettlementPrompt').classList.remove('hidden-section');
+        }
+
+        window.deferGameSettlement = () => { hideGameSettlementPrompt(); };
+        window.settleGameFromPrompt = () => {
+            hideGameSettlementPrompt();
+            window.endCurrentGame();
+        };
 
         function updateScoringAuthority() {
             const scoringAllowed = matchPhase === 'in_progress' && !activeTimer;
@@ -1018,6 +1049,8 @@ const normalizeMatchId = id => String(id ?? '').replace(/\s+/g, '').toUpperCase(
             ['prepTimerBtn', 'flipCoinBtn', 'backToSetupBtn'].forEach(id => { const element = $(id); if (element) element.disabled = readOnly; });
             const confirmBtn = $('confirmStartBtn');
             if (confirmBtn) confirmBtn.disabled = false;
+            const backBtn = $('backToSetupBtn');
+            if (backBtn && matchPhase === 'between_games_preparation') backBtn.disabled = true;
         }
 
         window.handleQuickLoad = () => {
@@ -1031,6 +1064,7 @@ const normalizeMatchId = id => String(id ?? '').replace(/\s+/g, '').toUpperCase(
             if (step === 2) {
                 const betweenGames = matchPhase === 'between_games_preparation';
                 $('betweenGamesHeading').classList.toggle('hidden', !betweenGames);
+                $('servingTeamLabel').innerText = betweenGames ? '2. 发球权（默认上一局胜方，可修改）' : '2. 发球权（第一回合发球队伍）';
                 if (betweenGames) $('betweenGamesTitle').innerText = `下一局准备 / Game ${matchState.currentGame} Preparation`;
                 const confirmBtn = $('confirmStartBtn');
                 if (confirmBtn) {
@@ -1122,6 +1156,7 @@ const normalizeMatchId = id => String(id ?? '').replace(/\s+/g, '').toUpperCase(
         };
 
         window.backToStep1 = async () => {
+            if (matchPhase === 'between_games_preparation') return showToast('下一局准备期间比赛规则已锁定', true);
             // [SECOND HARDENING] 严格顺序（任何一步失败即 fail closed，不继续清理后续状态）：
             // 确认当前比赛状态 → 若比赛中：阻断并 return → 若待开赛：release_task_acceptance
             // → release 成功后才 updateRefereeStatus('空闲') → 最后清理本地 pendingTask/UI。
@@ -1618,12 +1653,28 @@ const normalizeMatchId = id => String(id ?? '').replace(/\s+/g, '').toUpperCase(
             matchState.preparation = { serveTeam: winningTeam, t1Stance: 'P1', t2Stance: 'P1' };
 
             matchPhase = 'between_games_preparation';
+            $('matchIdInput2').value = currentMatch.id;
+            $('courtNo').value = currentMatch.court;
+            $('targetScore').value = currentMatch.target;
+            $('capScore').value = currentMatch.cap;
+            $('gameFormat').value = currentMatch.format;
+            $('scoreRule').value = currentMatch.meth;
+            $('matchTypeSel').value = currentMatch.type;
+            $('t1Name').value = currentMatch.t1Name;
+            $('t2Name').value = currentMatch.t2Name;
+            $('t1p1').value = currentMatch.t1p1;
+            $('t1p2').value = currentMatch.t1p2;
+            $('t2p1').value = currentMatch.t2p1;
+            $('t2p2').value = currentMatch.t2p2;
+            setAuthoritativeFieldsLocked(true);
+            hideGameSettlementPrompt();
             $('endGameBtn').classList.add('hidden');
             showStep(2);
         }
 
         window.endCurrentGame = () => {
             if (matchPhase !== 'game_complete_pending_settlement' || !isGameComplete()) return showToast('⚠️ 当前比分尚未达到合法终局', true);
+            hideGameSettlementPrompt();
             const winningTeam = matchState.t1Score > matchState.t2Score ? 1 : 2;
             if(winningTeam === 1) matchState.t1Wins++; else matchState.t2Wins++;
             matchState.results = matchState.results || [];

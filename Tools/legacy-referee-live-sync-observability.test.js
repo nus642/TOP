@@ -65,9 +65,10 @@ function harness({ mode = 'ind', matchId = 'M-01', t1 = 8, t2 = 6, target = 15 }
   vm.createContext(context);
   const sources = [
     functionSource('setLiveSyncStatus'), functionSource('syncLiveScore'),
-    functionSource('isGameComplete'), functionSource('reconcileGameCompletion'),
+    functionSource('isGameComplete'), functionSource('hideGameSettlementPrompt'),
+    functionSource('showGameSettlementPrompt'), functionSource('reconcileGameCompletion'),
     html.slice(html.indexOf('window.award ='), html.indexOf('window.toggleRefereeView')),
-    html.slice(html.indexOf('window.undoLastPoint ='), html.indexOf('window.endCurrentGame')),
+    html.slice(html.indexOf('window.undoLastPoint ='), html.indexOf('window.endCurrentGame =')),
     functionSource('resetVolatileMatchContext'),
   ].join('\n');
   vm.runInContext(`${sources}\nthis.syncLiveScore = syncLiveScore; this.setLiveSyncStatus = setLiveSyncStatus; this.resetVolatileMatchContext = resetVolatileMatchContext;`, context);

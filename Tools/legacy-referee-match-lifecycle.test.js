@@ -26,10 +26,18 @@ function functionSource(name) {
 function elements() {
   const map = new Map();
   return id => {
-    if (!map.has(id)) map.set(id, {
+    if (!map.has(id)) {
+      const classes = new Set(['hidden-section']);
+      map.set(id, {
       id, disabled: false, value: 'P1', innerText: '', innerHTML: '', style: {},
-      remove() {}, classList: { add() {}, remove() {}, toggle() {}, contains() { return false; } }
+      remove() {}, classList: {
+        add(...names) { names.forEach(name => classes.add(name)); },
+        remove(...names) { names.forEach(name => classes.delete(name)); },
+        toggle(name, force) { if (force === undefined ? !classes.has(name) : force) classes.add(name); else classes.delete(name); },
+        contains(name) { return classes.has(name); }
+      }
     });
+    }
     return map.get(id);
   };
 }
@@ -39,7 +47,7 @@ function scoringSandbox(game = 1, score = 5) {
   const deferred = [];
   const context = {
     window: null, $, console, activeTimer: null, matchPhase: 'in_progress',
-    currentMatch: { format: 3, target: 11, cap: 0, meth: 'rally', type: 'singles', t1p1: 'A', t2p1: 'B' },
+    currentMatch: { format: 3, target: 11, cap: 0, meth: 'rally', type: 'singles', t1Name: 'Blue', t2Name: 'Green', t1p1: 'A', t2p1: 'B' },
     matchState: { t1Score: score, t2Score: 0, t1Wins: 0, t2Wins: 0, currentGame: game, history: [], timeline: [], halfSwitched: false, over: false },
     gameState: { viewBa: false, servTeam: 1, initServTeam: 1, servNum: 1, t1: { r: 'A', l: 'A' }, t2: { r: 'B', l: 'B' }, servingPlayer: 'A' },
     timeoutUsed: {}, setTimeout: fn => { deferred.push(fn); }, clearInterval() {}, alert() {},
@@ -48,7 +56,8 @@ function scoringSandbox(game = 1, score = 5) {
   context.window = context;
   vm.createContext(context);
   vm.runInContext([
-    functionSource('isGameComplete'), functionSource('reconcileGameCompletion'),
+    functionSource('isGameComplete'), functionSource('hideGameSettlementPrompt'), functionSource('showGameSettlementPrompt'), functionSource('reconcileGameCompletion'),
+    functionSource('deferGameSettlement'),
     functionSource('updateScoringAuthority'), functionSource('award'),
     functionSource('completeDecidingGameEndChange'), functionSource('undoLastPoint')
   ].join('\n'), context);
@@ -90,22 +99,44 @@ test('between-game and final settlement branches implement best-of-three lifecyc
   assert.match(functionSource('prepareNextGame'), /matchPhase = 'between_games_preparation'/);
 });
 
-function settlementSandbox({ game, t1Wins, t2Wins, t1Score = 11, t2Score = 5 }) {
+test('serving-team wording distinguishes Game 1 from between-game preparation', () => {
+  assert.match(html, /id="servingTeamLabel"[^>]*>2\. 发球权（第一回合发球队伍）/);
+  assert.match(html, /betweenGames \? '2\. 发球权（默认上一局胜方，可修改）' : '2\. 发球权（第一回合发球队伍）'/);
+});
+
+test('winning score opens one immediate settlement prompt and deferral preserves Undo', () => {
+  const { context } = scoringSandbox(1, 10);
+  context.award(true);
+  assert.equal(context.matchPhase, 'game_complete_pending_settlement');
+  assert.equal(context.$('gameSettlementPrompt').classList.contains('hidden-section'), false);
+  assert.equal(context.$('gameSettlementSummary').innerText, 'Blue  11 - 0');
+  context.deferGameSettlement();
+  assert.equal(context.matchPhase, 'game_complete_pending_settlement');
+  assert.equal(context.$('gameSettlementPrompt').classList.contains('hidden-section'), true);
+  context.reconcileGameCompletion();
+  assert.equal(context.$('gameSettlementPrompt').classList.contains('hidden-section'), true, 'repeated reconciliation does not reopen a deferred prompt');
+  context.undoLastPoint();
+  assert.equal(context.matchState.t1Score, 10);
+  assert.equal(context.matchPhase, 'in_progress');
+});
+
+function settlementSandbox({ game, t1Wins, t2Wins, t1Score = 11, t2Score = 5, target = 11, cap = 0 }) {
   const $ = elements();
   const serve = { checked: false };
   const steps = [];
   const context = {
     window: null, $, document: { querySelector: () => serve },
     matchPhase: 'game_complete_pending_settlement',
-    currentMatch: { id: 'M1', court: '1', format: 3, target: 11, cap: 0, type: 'doubles', meth: 'rally', t1Name: 'Blue', t2Name: 'Green', t1p1: 'A', t1p2: 'B', t2p1: 'C', t2p2: 'D', ref: 'R' },
+    currentMatch: { id: 'M1', court: '1', format: 3, target, cap, type: 'doubles', meth: 'rally', t1Name: 'Blue', t2Name: 'Green', t1p1: 'A', t1p2: 'B', t2p1: 'C', t2p2: 'D', ref: 'R' },
     matchState: { currentGame: game, t1Wins, t2Wins, t1Score, t2Score, results: [], timeline: [1], history: [{}], halfSwitched: false, over: true },
     gameState: { viewBa: false }, timeoutUsed: {}, alert() {}, showToast() {},
+    establishedRulesLocked: false, setAuthoritativeFieldsLocked(locked) { context.establishedRulesLocked = locked; },
     showStep: step => steps.push(step), setTimeout() {}
   };
   context.window = context;
   vm.createContext(context);
-  vm.runInContext(`${functionSource('isGameComplete')}\n${functionSource('prepareNextGame')}\n${functionSource('endCurrentGame')}`, context);
-  context.endCurrentGame();
+  vm.runInContext(`${functionSource('isGameComplete')}\n${functionSource('hideGameSettlementPrompt')}\n${functionSource('prepareNextGame')}\n${functionSource('endCurrentGame')}\n${functionSource('settleGameFromPrompt')}`, context);
+  context.settleGameFromPrompt();
   return { context, steps, serve };
 }
 
@@ -144,6 +175,30 @@ test('previous-game winner is an editable default and player choices are indepen
   assert.match(html, /id="t1Stance" onchange="backupPreparationChoices\(\)"/);
   assert.match(html, /id="t2Stance" onchange="backupPreparationChoices\(\)"/);
   assert.match(functionSource('backupPreparationChoices'), /serveTeam:[\s\S]*t1Stance:[\s\S]*t2Stance:/);
+});
+
+test('between-game preparation preserves and locks established non-default match rules', () => {
+  const source = functionSource('prepareNextGame');
+  for (const [field, property] of [
+    ['targetScore', 'target'], ['capScore', 'cap'], ['gameFormat', 'format'],
+    ['scoreRule', 'meth'], ['matchTypeSel', 'type']
+  ]) assert.match(source, new RegExp(`\\$\\('${field}'\\)\\.value = currentMatch\\.${property}`));
+  assert.match(source, /setAuthoritativeFieldsLocked\(true\)/);
+  assert.match(functionSource('backToStep1'), /matchPhase === 'between_games_preparation'.*return showToast/);
+  assert.match(functionSource('updateSetupAuthority'), /matchPhase === 'between_games_preparation'\) backBtn\.disabled = true/);
+
+  const game2 = settlementSandbox({ game: 1, t1Wins: 0, t2Wins: 0, t1Score: 15, t2Score: 8, target: 15, cap: 19 });
+  assert.equal(game2.context.currentMatch.target, 15);
+  assert.equal(game2.context.currentMatch.cap, 19);
+  assert.equal(game2.context.$('targetScore').value, 15);
+  assert.equal(game2.context.$('capScore').value, 19);
+  assert.equal(game2.context.establishedRulesLocked, true);
+
+  const game3 = settlementSandbox({ game: 2, t1Wins: 0, t2Wins: 1, t1Score: 15, t2Score: 8, target: 15, cap: 19 });
+  assert.equal(game3.context.matchState.currentGame, 3);
+  assert.equal(game3.context.$('targetScore').value, 15);
+  assert.equal(game3.context.$('capScore').value, 19);
+  assert.equal(game3.context.establishedRulesLocked, true);
 });
 
 async function runNextGame(mode = 'team') {
