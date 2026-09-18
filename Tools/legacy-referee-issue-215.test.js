@@ -27,14 +27,17 @@ function element() {
   };
 }
 
-test('between-game UI removes coin toss, court-end selection, and doubles stance while retaining editable service', () => {
+test('between-game UI removes coin toss and court-end selection while exposing doubles-only per-game starters', () => {
   assert.match(html, /id="coinTossSetup"/);
   assert.match(html, /id="courtEndSetup"/);
   assert.match(html, /coinTossSetup'\)\.classList\.toggle\('hidden', betweenGames\)/);
   assert.match(html, /courtEndSetup'\)\.classList\.toggle\('hidden', betweenGames\)/);
-  assert.match(html, /doublesStance'\)\.classList\.toggle\('hidden', betweenGames/);
+  assert.match(html, /doublesStance'\)\.classList\.toggle\('hidden', currentMatch\.type !== 'doubles'/);
+  assert.match(html, /本局右侧球员（两队独立选择）/);
   assert.match(html, /发球权（默认上一局胜方，可修改）/);
-  assert.doesNotMatch(functionSource('backupPreparationChoices'), /t1Stance|t2Stance|init_ba/);
+  assert.match(functionSource('backupPreparationChoices'), /t1Right:.*t1Stance/);
+  assert.match(functionSource('backupPreparationChoices'), /t2Right:.*t2Stance/);
+  assert.doesNotMatch(functionSource('backupPreparationChoices'), /init_ba/);
 });
 
 function medicalSandbox() {
