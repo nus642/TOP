@@ -20,6 +20,7 @@ function functionSource(name) {
 const helperSource = source.slice(source.indexOf('const recoveryText ='), source.indexOf('function backupState()'));
 const recoverySource = [
   helperSource,
+  functionSource('projectCurrentMatchToSetup'),
   functionSource('validateRecoveryPayload'),
   functionSource('validateAuthoritativeRecovery'),
   functionSource('validateAssignmentRecovery'),

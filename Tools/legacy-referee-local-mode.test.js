@@ -78,6 +78,7 @@ function initializationHarness(search) {
   vm.runInContext([
     modeInitialization,
     "let eventCode = null, currentRefereeId = null, currentRefereeName = '', currentRefLevel = 'L1';",
+    functionSource('restoreLocalSetupDefaults'),
     onloadSource,
     'this.readInitialization = () => ({ sysMode, eventCode, currentRefereeId, currentRefereeName, currentRefLevel });',
   ].join('\n'), context);
