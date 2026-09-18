@@ -277,7 +277,7 @@ test('reload recovery replaces an old local score with the authoritative in-prog
   const staleLocal = backup();
   staleLocal.matchState = { t1Score: 5, t2Score: 3, over: false, timeline: ['local-history'] };
   staleLocal.gameState = { servTeam: 2, servingPlayer: '绿二' };
-  staleLocal.timeoutUsed = { t1: true, t2: false, medicalT1: false, medicalT2: false };
+  staleLocal.timeoutUsed = { t1: true, t2: false, medicalT1: true, medicalT2: false };
   const { context, calls } = sandbox(staleLocal, assignmentResponse(staleLocal, 7, 5));
 
   assert.equal(await context.restore('secret'), true);
@@ -287,6 +287,7 @@ test('reload recovery replaces an old local score with the authoritative in-prog
   assert.equal(context.gameState.servTeam, 2);
   assert.equal(context.gameState.servingPlayer, '绿二');
   assert.equal(context.timeoutUsed.t1, true);
+  assert.equal(context.timeoutUsed.medicalT1, true, 'refresh recovery preserves consumed match-level medical timeout');
   assert.ok(calls.indexOf('get_referee_active_assignment') < calls.indexOf('render'));
   assert.ok(!calls.includes('WRITE_REFEREE') && !calls.includes('WRITE_SCORE'));
 });
