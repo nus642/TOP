@@ -26,6 +26,13 @@
         return parts.length === 2 ? parts.map(text) : [name, ''];
     }
 
+    function playerDisplay(task, side) {
+        return [`${side}p1`, `${side}p2`]
+            .map(key => text(task && task[key]))
+            .filter(name => name && name !== '待定')
+            .join(' / ');
+    }
+
     /**
      * The only adapter that knows the Legacy dashboard shape. The returned object
      * is deliberately small and presentation-oriented; it is not a new Canon contract.
@@ -45,12 +52,18 @@
             const task = taskById.get(matchId.toLowerCase()) || {};
             const fallbackSides = splitMatchName(raw.match_name);
             const status = [RUNNING, PENDING].includes(raw.status) ? raw.status : IDLE;
+            const teamA = text(task.t1);
+            const teamB = text(task.t2);
+            const playersA = playerDisplay(task, 't1');
+            const playersB = playerDisplay(task, 't2');
             return {
                 match_id: matchId,
                 court: text(court),
                 status,
-                side_a: text(task.t1) || fallbackSides[0],
-                side_b: text(task.t2) || fallbackSides[1],
+                side_a: playersA || teamA || fallbackSides[0],
+                side_b: playersB || teamB || fallbackSides[1],
+                side_a_team: playersA && teamA ? teamA : '',
+                side_b_team: playersB && teamB ? teamB : '',
                 score: status === RUNNING ? text(raw.score || task.live_score) : '',
                 referee: text(raw.referee),
                 relevance: status === RUNNING ? 0 : status === PENDING ? 1 : 2
